@@ -64,6 +64,7 @@ ul.list li { display: flex; justify-content: space-between; align-items: center;
 ul.list li:last-child { border-bottom: 0; }
 
 /* Editor */
+.question-head { margin-bottom: 1rem; }
 .answer-row { display: flex; gap: .5rem; align-items: center; margin-bottom: .4rem; }
 .answer-row input[type=text] { flex: 1; }
 

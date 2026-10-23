@@ -34,7 +34,7 @@
     function render() {
       $('#questions').innerHTML = questions.map((q, i) => `
         <div class="card" data-q="${i}">
-          <div class="row spread">
+          <div class="row spread question-head">
             <h3>Frage ${i + 1}</h3>
             <div class="row">
               <button type="button" data-action="up" ${i === 0 ? 'disabled' : ''}>↑</button>
