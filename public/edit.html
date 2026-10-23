@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quiz – Bearbeiten</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/dashboard">← Meine Quizze</a>
+    <button class="primary" type="button" id="save">Speichern</button>
+  </header>
+  <main>
+    <div class="card">
+      <label for="title">Titel</label>
+      <input type="text" id="title" placeholder="z. B. Statistik – Kapitel 3">
+    </div>
+    <div id="questions"></div>
+    <button type="button" id="add">+ Frage hinzufügen</button>
+    <p class="error" id="error"></p>
+  </main>
+  <script src="/js/common.js"></script>
+  <script>
+    const id = new URLSearchParams(location.search).get('id');
+    let questions = [];
+
+    function blankQuestion() {
+      return { text: '', answers: ['', '', '', ''], correct: 0, timeLimit: 20 };
+    }
+
+    function render() {
+      $('#questions').innerHTML = questions.map((q, i) => `
+        <div class="card" data-q="${i}">
+          <div class="row spread">
+            <h3>Frage ${i + 1}</h3>
+            <div class="row">
+              <button type="button" data-action="up" ${i === 0 ? 'disabled' : ''}>↑</button>
+              <button type="button" data-action="down" ${i === questions.length - 1 ? 'disabled' : ''}>↓</button>
+              <button type="button" class="danger" data-action="remove">Entfernen</button>
+            </div>
+          </div>
+          <textarea rows="2" data-field="text" placeholder="Fragetext">${escapeHtml(q.text)}</textarea>
+          <label>Antworten <span class="muted">(richtige Antwort anklicken)</span></label>
+          ${q.answers.map((a, j) => `
+            <div class="answer-row">
+              <input type="radio" name="correct-${i}" data-correct="${j}" ${q.correct === j ? 'checked' : ''}>
+              <input type="text" data-answer="${j}" value="${escapeHtml(a)}" placeholder="Antwort ${j + 1}">
+            </div>`).join('')}
+          <label>Zeit (Sekunden)</label>
+          <input type="number" min="5" max="120" data-field="timeLimit" value="${q.timeLimit}" style="max-width:120px">
+        </div>`).join('');
+    }
+
+    // Eingaben direkt ins Datenmodell übernehmen
+    $('#questions').addEventListener('input', (e) => {
+      const card = e.target.closest('[data-q]');
+      if (!card) return;
+      const q = questions[card.dataset.q];
+      const t = e.target;
+      if (t.dataset.field === 'text') q.text = t.value;
+      if (t.dataset.field === 'timeLimit') q.timeLimit = Number(t.value);
+      if (t.dataset.answer !== undefined) q.answers[t.dataset.answer] = t.value;
+      if (t.dataset.correct !== undefined) q.correct = Number(t.dataset.correct);
+    });
+
+    $('#questions').addEventListener('click', (e) => {
+      const action = e.target.dataset.action;
+      if (!action) return;
+      const i = Number(e.target.closest('[data-q]').dataset.q);
+      if (action === 'remove') questions.splice(i, 1);
+      if (action === 'up') [questions[i - 1], questions[i]] = [questions[i], questions[i - 1]];
+      if (action === 'down') [questions[i + 1], questions[i]] = [questions[i], questions[i + 1]];
+      render();
+    });
+
+    $('#add').onclick = () => {
+      questions.push(blankQuestion());
+      render();
+    };
+
+    $('#save').onclick = async () => {
+      $('#error').textContent = '';
+      // Leere Antwortfelder am Ende ignorieren (Fragen mit 2–3 Antworten erlauben)
+      const payload = questions.map((q) => {
+        const answers = [...q.answers];
+        while (answers.length > 2 && !answers[answers.length - 1].trim()) answers.pop();
+        return { ...q, answers };
+      });
+      try {
+        const body = { title: $('#title').value, questions: payload };
+        if (id) await api(`/api/quizzes/${id}`, { method: 'PUT', body });
+        else await api('/api/quizzes', { method: 'POST', body });
+        location.href = '/dashboard';
+      } catch (err) {
+        $('#error').textContent = err.message;
+      }
+    };
+
+    requireLogin().then(async () => {
+      if (id) {
+        const quiz = await api(`/api/quizzes/${id}`);
+        $('#title').value = quiz.title;
+        questions = quiz.questions.map((q) => ({
+          ...q,
+          answers: [...q.answers, '', '', ''].slice(0, 4),
+        }));
+      } else {
+        questions = [blankQuestion()];
+      }
+      render();
+    });
+  </script>
+</body>
+</html>

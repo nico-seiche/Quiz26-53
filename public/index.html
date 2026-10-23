@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quiz – Anmelden</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
+    <div class="card narrow">
+      <h1>Quiz</h1>
+      <div class="tabs">
+        <button type="button" id="tab-login" class="active">Anmelden</button>
+        <button type="button" id="tab-register">Registrieren</button>
+      </div>
+      <form id="form">
+        <label for="username">Nutzername</label>
+        <input type="text" id="username" autocomplete="username" required>
+        <label for="password">Passwort</label>
+        <input type="password" id="password" autocomplete="current-password" required>
+        <p class="error" id="error"></p>
+        <button class="primary" type="submit" id="submit">Anmelden</button>
+      </form>
+    </div>
+  </main>
+  <script src="/js/common.js"></script>
+  <script>
+    let mode = 'login';
+    const next = new URLSearchParams(location.search).get('next') || '/dashboard';
+
+    function setMode(m) {
+      mode = m;
+      $('#tab-login').classList.toggle('active', m === 'login');
+      $('#tab-register').classList.toggle('active', m === 'register');
+      $('#submit').textContent = m === 'login' ? 'Anmelden' : 'Konto erstellen';
+      $('#password').autocomplete = m === 'login' ? 'current-password' : 'new-password';
+      $('#error').textContent = '';
+    }
+    $('#tab-login').onclick = () => setMode('login');
+    $('#tab-register').onclick = () => setMode('register');
+
+    $('#form').onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        await api(`/api/auth/${mode}`, {
+          method: 'POST',
+          body: { username: $('#username').value, password: $('#password').value },
+        });
+        location.href = next.startsWith('/') ? next : '/dashboard';
+      } catch (err) {
+        $('#error').textContent = err.message;
+      }
+    };
+
+    // Schon angemeldet? Direkt weiter
+    api('/api/auth/me').then(() => { location.href = next; }).catch(() => {});
+  </script>
+</body>
+</html>

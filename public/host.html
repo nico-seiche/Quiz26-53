@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quiz – Host</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/dashboard">← Dashboard</a>
+    <strong id="title"></strong>
+    <div class="row">
+      <button type="button" class="danger" id="end">Beenden</button>
+      <button type="button" class="primary" id="next">Starten</button>
+    </div>
+  </header>
+  <main class="host">
+    <p class="error" id="error"></p>
+    <div id="view"></div>
+  </main>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/common.js"></script>
+  <script>
+    const pin = new URLSearchParams(location.search).get('pin');
+    let joinInfo = null;
+    let state = null;
+    let tick = null;
+
+    function answersHtml(q, reveal, distribution) {
+      return `<div class="answers">${q.answers.map((a, i) => `
+        <div class="answer c${i} ${reveal && i !== q.correct ? 'dim' : ''}">
+          ${escapeHtml(a)}${distribution ? ` <span style="float:right">${distribution[i]}</span>` : ''}
+        </div>`).join('')}</div>`;
+    }
+
+    function render() {
+      const s = state;
+      $('#title').textContent = s.title;
+      clearInterval(tick);
+      const nextBtn = $('#next');
+      nextBtn.hidden = s.state === 'finished';
+      $('#end').hidden = s.state === 'finished';
+      nextBtn.textContent = {
+        lobby: 'Quiz starten',
+        question: 'Auflösen',
+        reveal: s.questionIndex + 1 < s.total ? 'Nächste Frage' : 'Ergebnis zeigen',
+      }[s.state] || '';
+      nextBtn.disabled = s.state === 'lobby' && !s.players.length;
+
+      let html = '';
+      if (s.state === 'lobby') {
+        html = `
+          <div class="card join-box">
+            ${joinInfo ? `<img src="${joinInfo.qr}" alt="QR-Code zum Beitreten">` : ''}
+            <div>
+              <p class="big">Beitreten unter<br><strong>${escapeHtml(joinInfo ? joinInfo.joinUrl.split('/play')[0] : location.origin)}</strong></p>
+              <p class="muted">Game-PIN</p>
+              <div class="pin">${escapeHtml(s.pin)}</div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>${s.players.length} Teilnehmer</h3>
+            <div class="players">${s.players.map((p) =>
+              `<span class="chip ${p.connected ? '' : 'offline'}">${escapeHtml(p.username)}</span>`).join('') ||
+              '<span class="muted">Warte auf Teilnehmer …</span>'}</div>
+          </div>`;
+      } else if (s.state === 'question' || s.state === 'reveal') {
+        const reveal = s.state === 'reveal';
+        html = `
+          <div class="row spread">
+            <span class="muted">Frage ${s.questionIndex + 1} / ${s.total} · PIN ${escapeHtml(s.pin)}</span>
+            <span class="muted">${s.answeredCount} / ${s.players.length} geantwortet</span>
+          </div>
+          <div class="question-text">${escapeHtml(s.question.text)}</div>
+          ${reveal ? '' : '<div class="timer" id="timer"></div>'}
+          ${answersHtml(s.question, reveal, reveal ? s.distribution : null)}
+          ${reveal ? `
+            <div class="card" style="margin-top:1.5rem">
+              <h3>Zwischenstand</h3>
+              <ol class="ranking">${s.players.slice(0, 5).map((p) =>
+                `<li>${escapeHtml(p.username)} – ${p.score}</li>`).join('')}</ol>
+            </div>` : ''}`;
+      } else if (s.state === 'finished') {
+        html = `
+          <div class="card center">
+            <h1>Endstand</h1>
+            <ol class="ranking" style="display:inline-block;text-align:left">${s.players.map((p) =>
+              `<li>${escapeHtml(p.username)} – ${p.score} Punkte</li>`).join('')}</ol>
+            <p><a class="btn" href="/dashboard">Zurück zum Dashboard</a></p>
+          </div>`;
+      }
+      $('#view').innerHTML = html;
+
+      if (s.state === 'question') {
+        const update = () => {
+          const left = Math.max(0, Math.ceil((s.endsAt - Date.now()) / 1000));
+          const el = $('#timer');
+          if (el) el.textContent = left;
+        };
+        update();
+        tick = setInterval(update, 250);
+      }
+    }
+
+    requireLogin().then(async () => {
+      try {
+        joinInfo = await api(`/api/games/${encodeURIComponent(pin)}/qr`);
+      } catch (err) {
+        $('#error').textContent = err.message;
+        return;
+      }
+      const socket = io();
+      socket.on('connect', () => {
+        socket.emit('host:join', { pin }, (res) => {
+          if (res.error) $('#error').textContent = res.error;
+        });
+      });
+      socket.on('game:state', (s) => { state = s; render(); });
+      $('#next').onclick = () => socket.emit('host:next');
+      $('#end').onclick = () => {
+        if (confirm('Spiel wirklich beenden?')) socket.emit('host:end');
+      };
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{
+  "name": "quiz26-53",
+  "version": "1.0.0",
+  "description": "Quiz-Plattform für den Studienkurs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nico-seiche/Quiz26-53.git"
+  },
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/nico-seiche/Quiz26-53/issues"
+  },
+  "homepage": "https://github.com/nico-seiche/Quiz26-53#readme",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^13.0.3",
+    "cookie": "^2.0.1",
+    "express": "^5.3.0",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.4"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "private": true
+}

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quiz – Mitspielen</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/dashboard">Quiz</a>
+    <span class="muted" id="status"></span>
+  </header>
+  <main>
+    <div id="join" class="card narrow" hidden>
+      <h2>Spiel beitreten</h2>
+      <form id="join-form">
+        <label for="pin">Game-PIN</label>
+        <input type="text" id="pin" inputmode="numeric" autocomplete="off">
+        <p class="error" id="error"></p>
+        <button class="primary" type="submit">Beitreten</button>
+      </form>
+    </div>
+    <div id="view"></div>
+  </main>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/common.js"></script>
+  <script>
+    let socket;
+    let state = null;
+    let tick = null;
+    let joinedPin = null;
+
+    function render() {
+      const s = state;
+      $('#status').textContent = `${s.username} · ${s.score} Punkte`;
+      clearInterval(tick);
+      let html = '';
+
+      if (s.state === 'lobby') {
+        html = `<div class="card center">
+          <h2>${escapeHtml(s.title)}</h2>
+          <p class="big">Du bist drin! 🎉</p>
+          <p class="muted">Warte, bis der Host das Quiz startet …</p>
+        </div>`;
+      } else if (s.state === 'question') {
+        const answered = s.myAnswer !== null;
+        html = `
+          <div class="row spread">
+            <span class="muted">Frage ${s.questionIndex + 1} / ${s.total}</span>
+            <strong id="timer"></strong>
+          </div>
+          <h2>${escapeHtml(s.question.text)}</h2>
+          <div class="answers">${s.question.answers.map((a, i) => `
+            <button type="button" class="answer c${i} ${answered && s.myAnswer !== i ? 'dim' : ''} ${s.myAnswer === i ? 'chosen' : ''}"
+              data-choice="${i}" ${answered ? 'disabled' : ''}>${escapeHtml(a)}</button>`).join('')}
+          </div>
+          ${answered ? '<p class="center muted">Antwort abgegeben – warte auf die anderen …</p>' : ''}`;
+      } else if (s.state === 'reveal') {
+        const correct = s.myAnswer === s.question.correct;
+        html = `<div class="card center">
+          <h2>${s.myAnswer === null ? 'Keine Antwort ⏱️' : correct ? 'Richtig! ✅' : 'Leider falsch ❌'}</h2>
+          <p>Richtige Antwort: <strong>${escapeHtml(s.question.answers[s.question.correct])}</strong></p>
+          <p class="big">+${s.lastPoints} Punkte</p>
+          <p class="muted">Platz ${s.rank} von ${s.playerCount}</p>
+        </div>`;
+      } else if (s.state === 'finished') {
+        html = `<div class="card center">
+          <h1>Quiz beendet</h1>
+          <p class="big">${s.score} Punkte</p>
+          <p>Platz ${s.rank} von ${s.playerCount}</p>
+          <p><a class="btn" href="/dashboard">Zum Dashboard</a></p>
+        </div>`;
+      }
+      $('#view').innerHTML = html;
+
+      if (s.state === 'question') {
+        const update = () => {
+          const el = $('#timer');
+          if (el) el.textContent = `${Math.max(0, Math.ceil((s.endsAt - Date.now()) / 1000))} s`;
+        };
+        update();
+        tick = setInterval(update, 250);
+      }
+    }
+
+    function join(pin) {
+      socket.emit('player:join', { pin }, (res) => {
+        if (res.error) {
+          $('#join').hidden = false;
+          $('#error').textContent = res.error;
+          return;
+        }
+        $('#join').hidden = true;
+        history.replaceState(null, '', `/play?pin=${encodeURIComponent(pin)}`);
+        joinedPin = pin;
+      });
+    }
+
+    $('#view').addEventListener('click', (e) => {
+      const choice = e.target.closest('[data-choice]');
+      if (choice && !choice.disabled) socket.emit('player:answer', { choice: Number(choice.dataset.choice) });
+    });
+
+    $('#join-form').onsubmit = (e) => {
+      e.preventDefault();
+      join($('#pin').value.trim());
+    };
+
+    requireLogin().then(() => {
+      socket = io();
+      socket.on('game:state', (s) => { state = s; render(); });
+      // Bei Verbindungsabbruch automatisch wieder beitreten
+      socket.on('connect', () => {
+        const pin = joinedPin || new URLSearchParams(location.search).get('pin');
+        if (pin) {
+          $('#pin').value = pin;
+          join(pin);
+        } else {
+          $('#join').hidden = false;
+        }
+      });
+    });
+  </script>
+</body>
+</html>

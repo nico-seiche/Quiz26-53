@@ -1,0 +1,98 @@
+:root {
+  --bg: #f4f5fb;
+  --card: #ffffff;
+  --text: #1d1f2b;
+  --muted: #6b6f80;
+  --primary: #4f46e5;
+  --primary-text: #ffffff;
+  --border: #dfe1ec;
+  --danger: #dc2626;
+  --ok: #16a34a;
+  --a0: #e11d48;
+  --a1: #2563eb;
+  --a2: #d97706;
+  --a3: #16a34a;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12131a;
+    --card: #1d1f2b;
+    --text: #eceef6;
+    --muted: #9a9eb2;
+    --border: #2f3242;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+header.top {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: .75rem 1rem; background: var(--card); border-bottom: 1px solid var(--border);
+}
+header.top a.brand { font-weight: 700; color: var(--text); text-decoration: none; }
+main { max-width: 860px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+.narrow { max-width: 420px; margin: 3rem auto; }
+h1, h2, h3 { margin-top: 0; }
+label { display: block; font-weight: 600; margin: .75rem 0 .25rem; }
+input[type=text], input[type=password], input[type=number], textarea {
+  width: 100%; padding: .6rem .7rem; font: inherit; color: var(--text);
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+}
+button, .btn {
+  display: inline-block; padding: .6rem 1rem; font: inherit; font-weight: 600;
+  border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
+  background: var(--card); color: var(--text); text-decoration: none;
+}
+button.primary, .btn.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-text); }
+button.danger { color: var(--danger); }
+button:disabled { opacity: .5; cursor: default; }
+.row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.spread { justify-content: space-between; }
+.muted { color: var(--muted); }
+.error { color: var(--danger); min-height: 1.5em; }
+.tabs { display: flex; gap: .5rem; margin-bottom: 1rem; }
+.tabs button.active { background: var(--primary); color: var(--primary-text); border-color: var(--primary); }
+ul.list { list-style: none; padding: 0; margin: 0; }
+ul.list li { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; padding: .75rem 0; border-bottom: 1px solid var(--border); }
+ul.list li:last-child { border-bottom: 0; }
+
+/* Editor */
+.answer-row { display: flex; gap: .5rem; align-items: center; margin-bottom: .4rem; }
+.answer-row input[type=text] { flex: 1; }
+
+/* Antwortfarben (Host + Spieler) */
+.answers { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+.answer {
+  padding: 1.25rem 1rem; border-radius: 10px; color: #fff; font-weight: 700; font-size: 1.15rem;
+  border: 0; text-align: left; min-height: 4.5rem;
+}
+.answer.c0 { background: var(--a0); } .answer.c1 { background: var(--a1); }
+.answer.c2 { background: var(--a2); } .answer.c3 { background: var(--a3); }
+.answer.dim { opacity: .3; }
+.answer.chosen { outline: 4px solid var(--text); outline-offset: 2px; }
+
+/* Host-Bildschirm */
+.host { max-width: 1200px; }
+.join-box { display: grid; grid-template-columns: auto 1fr; gap: 2rem; align-items: center; }
+.join-box img { width: 260px; height: 260px; border-radius: 12px; background: #fff; }
+.pin { font-size: 4rem; font-weight: 800; letter-spacing: .3rem; }
+.players { display: flex; flex-wrap: wrap; gap: .5rem; }
+.chip { padding: .35rem .75rem; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); }
+.chip.offline { opacity: .4; }
+.question-text { font-size: 2rem; font-weight: 700; text-align: center; margin: 1rem 0 1.5rem; }
+.timer { font-size: 2.5rem; font-weight: 800; text-align: center; }
+.big { font-size: 1.5rem; }
+.center { text-align: center; }
+ol.ranking { font-size: 1.25rem; padding-left: 1.5rem; }
+ol.ranking li { padding: .25rem 0; }
+@media (max-width: 640px) {
+  .join-box { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+  .pin { font-size: 3rem; }
+  .question-text { font-size: 1.4rem; }
+}
