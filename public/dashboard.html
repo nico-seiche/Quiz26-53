@@ -89,7 +89,7 @@
         <li>
           <div>
             <strong>${escapeHtml(r.quiz_title)}</strong><br>
-            <span class="muted">${new Date(r.played_at.replace(' ', 'T') + 'Z').toLocaleString('de-DE')}</span>
+            <span class="muted">${new Date(r.played_at).toLocaleString('de-DE')}</span>
           </div>
           <div>${r.score} Punkte · Platz ${r.rank}/${r.player_count}</div>
         </li>`).join('') : '<li class="muted">Noch keine Ergebnisse – spiel eingeloggt mit, dann werden deine Punkte hier gespeichert.</li>';

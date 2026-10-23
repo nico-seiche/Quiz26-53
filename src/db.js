@@ -1,58 +1,41 @@
-const fs = require('fs');
-const path = require('path');
-const Database = require('better-sqlite3');
+const { Pool } = require('pg');
 
-const dataDir = path.join(__dirname, '..', 'data');
-fs.mkdirSync(dataDir, { recursive: true });
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL fehlt (siehe README)');
+}
 
-const db = new Database(path.join(dataDir, 'quiz.db'));
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+const isLocal = /@(localhost|127\.0\.0\.1)[:/]|host=\/tmp/.test(process.env.DATABASE_URL);
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
-    password_hash TEXT NOT NULL,
-    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
-  );
+// Auf Vercel läuft jede Funktion mit eigenem Pool, deshalb klein halten
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: isLocal ? false : { rejectUnauthorized: false },
+  max: 3,
+});
 
-  CREATE TABLE IF NOT EXISTS sessions (
-    token      TEXT PRIMARY KEY,
-    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    expires_at INTEGER NOT NULL
-  );
+async function query(text, params) {
+  const { rows } = await pool.query(text, params);
+  return rows;
+}
 
-  CREATE TABLE IF NOT EXISTS quizzes (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    owner_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    title      TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
+async function one(text, params) {
+  return (await query(text, params))[0] || null;
+}
 
-  -- answers: JSON-Array mit Antworttexten, correct: Index der richtigen Antwort
-  CREATE TABLE IF NOT EXISTS questions (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    quiz_id    INTEGER NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
-    position   INTEGER NOT NULL,
-    text       TEXT NOT NULL,
-    answers    TEXT NOT NULL,
-    correct    INTEGER NOT NULL,
-    time_limit INTEGER NOT NULL DEFAULT 20
-  );
+// Führt fn(client) in einer Transaktion aus
+async function tx(fn) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
 
-  -- Ergebnisse eingeloggter Spieler; Titel wird kopiert, damit Ergebnisse gelöschte Quizze überleben
-  CREATE TABLE IF NOT EXISTS game_results (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    quiz_id      INTEGER,
-    quiz_title   TEXT NOT NULL,
-    score        INTEGER NOT NULL,
-    rank         INTEGER NOT NULL,
-    player_count INTEGER NOT NULL,
-    played_at    TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-`);
-
-module.exports = db;
+module.exports = { pool, query, one, tx };

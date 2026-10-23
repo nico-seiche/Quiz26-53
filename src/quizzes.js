@@ -5,18 +5,19 @@ const { requireAuth } = require('./auth');
 const router = express.Router();
 router.use(requireAuth);
 
-function loadQuiz(id) {
-  const quiz = db.prepare('SELECT * FROM quizzes WHERE id = ?').get(id);
+async function loadQuiz(id) {
+  if (!/^\d+$/.test(String(id))) return null;
+  const quiz = await db.one('SELECT * FROM quiz.quizzes WHERE id = $1', [id]);
   if (!quiz) return null;
-  quiz.questions = db
-    .prepare('SELECT * FROM questions WHERE quiz_id = ? ORDER BY position')
-    .all(id)
-    .map((q) => ({
-      text: q.text,
-      answers: JSON.parse(q.answers),
-      correct: q.correct,
-      timeLimit: q.time_limit,
-    }));
+  quiz.id = Number(quiz.id);
+  quiz.owner_id = Number(quiz.owner_id);
+  const rows = await db.query('SELECT * FROM quiz.questions WHERE quiz_id = $1 ORDER BY position', [id]);
+  quiz.questions = rows.map((q) => ({
+    text: q.text,
+    answers: q.answers,
+    correct: q.correct,
+    timeLimit: q.time_limit,
+  }));
   return quiz;
 }
 
@@ -40,16 +41,15 @@ function validateQuestions(input) {
   });
 }
 
-const saveQuestions = db.transaction((quizId, questions) => {
-  db.prepare('DELETE FROM questions WHERE quiz_id = ?').run(quizId);
-  const insert = db.prepare(`
-    INSERT INTO questions (quiz_id, position, text, answers, correct, time_limit)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
-  questions.forEach((q, i) => {
-    insert.run(quizId, i, q.text, JSON.stringify(q.answers), q.correct, q.timeLimit);
-  });
-});
+async function saveQuestions(client, quizId, questions) {
+  await client.query('DELETE FROM quiz.questions WHERE quiz_id = $1', [quizId]);
+  for (const [i, q] of questions.entries()) {
+    await client.query(`
+      INSERT INTO quiz.questions (quiz_id, position, text, answers, correct, time_limit)
+      VALUES ($1, $2, $3, $4, $5, $6)
+    `, [quizId, i, q.text, JSON.stringify(q.answers), q.correct, q.timeLimit]);
+  }
+}
 
 function readBody(req, res) {
   const title = String(req.body.title || '').trim();
@@ -65,47 +65,55 @@ function readBody(req, res) {
   }
 }
 
-router.get('/', (req, res) => {
-  const quizzes = db.prepare(`
+router.get('/', async (req, res) => {
+  const quizzes = await db.query(`
     SELECT q.id, q.title, q.updated_at,
-           (SELECT COUNT(*) FROM questions WHERE quiz_id = q.id) AS question_count
-    FROM quizzes q WHERE q.owner_id = ? ORDER BY q.updated_at DESC
-  `).all(req.user.id);
+           (SELECT COUNT(*)::int FROM quiz.questions WHERE quiz_id = q.id) AS question_count
+    FROM quiz.quizzes q WHERE q.owner_id = $1 ORDER BY q.updated_at DESC
+  `, [req.user.id]);
   res.json(quizzes);
 });
 
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const body = readBody(req, res);
   if (!body) return;
-  const { lastInsertRowid } = db
-    .prepare('INSERT INTO quizzes (owner_id, title) VALUES (?, ?)')
-    .run(req.user.id, body.title);
-  saveQuestions(lastInsertRowid, body.questions);
-  res.json({ id: lastInsertRowid });
+  const id = await db.tx(async (client) => {
+    const { rows } = await client.query(
+      'INSERT INTO quiz.quizzes (owner_id, title) VALUES ($1, $2) RETURNING id',
+      [req.user.id, body.title],
+    );
+    await saveQuestions(client, rows[0].id, body.questions);
+    return Number(rows[0].id);
+  });
+  res.json({ id });
 });
 
-router.get('/:id', (req, res) => {
-  const quiz = loadQuiz(req.params.id);
+router.get('/:id', async (req, res) => {
+  const quiz = await loadQuiz(req.params.id);
   if (!quiz || quiz.owner_id !== req.user.id) return res.status(404).json({ error: 'Quiz nicht gefunden' });
   res.json(quiz);
 });
 
-router.put('/:id', (req, res) => {
-  const quiz = db.prepare('SELECT * FROM quizzes WHERE id = ?').get(req.params.id);
+router.put('/:id', async (req, res) => {
+  const quiz = await loadQuiz(req.params.id);
   if (!quiz || quiz.owner_id !== req.user.id) return res.status(404).json({ error: 'Quiz nicht gefunden' });
   const body = readBody(req, res);
   if (!body) return;
-  db.prepare("UPDATE quizzes SET title = ?, updated_at = datetime('now') WHERE id = ?")
-    .run(body.title, quiz.id);
-  saveQuestions(quiz.id, body.questions);
+  await db.tx(async (client) => {
+    await client.query('UPDATE quiz.quizzes SET title = $1, updated_at = now() WHERE id = $2', [
+      body.title, quiz.id,
+    ]);
+    await saveQuestions(client, quiz.id, body.questions);
+  });
   res.json({ id: quiz.id });
 });
 
-router.delete('/:id', (req, res) => {
-  const result = db
-    .prepare('DELETE FROM quizzes WHERE id = ? AND owner_id = ?')
-    .run(req.params.id, req.user.id);
-  if (!result.changes) return res.status(404).json({ error: 'Quiz nicht gefunden' });
+router.delete('/:id', async (req, res) => {
+  if (!/^\d+$/.test(req.params.id)) return res.status(404).json({ error: 'Quiz nicht gefunden' });
+  const rows = await db.query('DELETE FROM quiz.quizzes WHERE id = $1 AND owner_id = $2 RETURNING id', [
+    req.params.id, req.user.id,
+  ]);
+  if (!rows.length) return res.status(404).json({ error: 'Quiz nicht gefunden' });
   res.json({ ok: true });
 });
 

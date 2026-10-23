@@ -4,8 +4,8 @@
   "description": "Quiz-Plattform für den Studienkurs",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "start": "node --env-file-if-exists=.env server.js",
+    "dev": "node --env-file-if-exists=.env --watch server.js"
   },
   "repository": {
     "type": "git",
@@ -18,11 +18,10 @@
   "homepage": "https://github.com/nico-seiche/Quiz26-53#readme",
   "dependencies": {
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^13.0.3",
     "cookie": "^2.0.1",
     "express": "^5.3.0",
-    "qrcode": "^1.5.4",
-    "socket.io": "^4.8.4"
+    "pg": "^8.23.1",
+    "qrcode": "^1.5.4"
   },
   "engines": {
     "node": ">=22"

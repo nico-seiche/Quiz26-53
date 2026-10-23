@@ -19,13 +19,14 @@
     <p class="error" id="error"></p>
     <div id="view"></div>
   </main>
-  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   <script src="/js/common.js"></script>
   <script>
     const pin = new URLSearchParams(location.search).get('pin');
     let joinInfo = null;
     let state = null;
     let tick = null;
+    let live;
 
     function answersHtml(q, reveal, distribution) {
       return `<div class="answers">${q.answers.map((a, i) => `
@@ -62,7 +63,7 @@
           <div class="card">
             <h3>${s.players.length} Teilnehmer</h3>
             <div class="players">${s.players.map((p) =>
-              `<span class="chip ${p.connected ? '' : 'offline'}">${escapeHtml(p.name)}${p.guest ? ' <span class="muted">(Gast)</span>' : ''}</span>`).join('') ||
+              `<span class="chip">${escapeHtml(p.name)}${p.guest ? ' <span class="muted">(Gast)</span>' : ''}</span>`).join('') ||
               '<span class="muted">Warte auf Teilnehmer …</span>'}</div>
           </div>`;
       } else if (s.state === 'question' || s.state === 'reveal') {
@@ -94,7 +95,7 @@
 
       if (s.state === 'question') {
         const update = () => {
-          const left = Math.max(0, Math.ceil((s.endsAt - Date.now()) / 1000));
+          const left = Math.ceil(live.remaining(s));
           const el = $('#timer');
           if (el) el.textContent = left;
         };
@@ -110,16 +111,22 @@
         $('#error').textContent = err.message;
         return;
       }
-      const socket = io();
-      socket.on('connect', () => {
-        socket.emit('host:join', { pin }, (res) => {
-          if (res.error) $('#error').textContent = res.error;
-        });
+      live = liveGame(pin, () => api(`/api/games/${encodeURIComponent(pin)}/host`), (s) => {
+        state = s;
+        render();
       });
-      socket.on('game:state', (s) => { state = s; render(); });
-      $('#next').onclick = () => socket.emit('host:next');
+      const act = async (action) => {
+        $('#next').disabled = true;
+        try {
+          live.apply(await api(`/api/games/${encodeURIComponent(pin)}/${action}`, { method: 'POST' }));
+        } catch (err) {
+          $('#error').textContent = err.message;
+          $('#next').disabled = false;
+        }
+      };
+      $('#next').onclick = () => act('next');
       $('#end').onclick = () => {
-        if (confirm('Spiel wirklich beenden?')) socket.emit('host:end');
+        if (confirm('Spiel wirklich beenden?')) act('end');
       };
     });
   </script>

@@ -28,13 +28,13 @@
     </div>
     <div id="view"></div>
   </main>
-  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   <script src="/js/common.js"></script>
   <script>
-    let socket;
     let me = null;
     let state = null;
     let tick = null;
+    let live = null;
     let joinedPin = null;
 
     // Zufällige Gast-ID pro Tab, damit man nach einem Reload im selben Spiel bleibt
@@ -47,6 +47,7 @@
       }
       return id;
     }
+    apiHeaders['X-Guest-Id'] = guestId();
 
     function showJoinForm() {
       $('#join').hidden = false;
@@ -107,32 +108,46 @@
       if (s.state === 'question') {
         const update = () => {
           const el = $('#timer');
-          if (el) el.textContent = `${Math.max(0, Math.ceil((s.endsAt - Date.now()) / 1000))} s`;
+          if (el) el.textContent = `${Math.ceil(live.remaining(s))} s`;
         };
         update();
         tick = setInterval(update, 250);
       }
     }
 
-    function join(pin, name) {
-      socket.emit('player:join', { pin, name, guestId: guestId() }, (res) => {
-        if (res.error) {
-          joinedPin = null;
-          showJoinForm();
-          $('#error').textContent = res.error;
-          return;
-        }
-        $('#join').hidden = true;
-        $('#error').textContent = '';
-        if (name) sessionStorage.setItem('guestName', name);
-        history.replaceState(null, '', `/play?pin=${encodeURIComponent(pin)}`);
-        joinedPin = pin;
+    function startLive(pin) {
+      joinedPin = pin;
+      $('#join').hidden = true;
+      $('#error').textContent = '';
+      history.replaceState(null, '', `/play?pin=${encodeURIComponent(pin)}`);
+      live = liveGame(pin, () => api(`/api/games/${encodeURIComponent(pin)}/me`), (s) => {
+        state = s;
+        render();
       });
     }
 
-    $('#view').addEventListener('click', (e) => {
+    async function join(pin, name) {
+      try {
+        await api(`/api/games/${encodeURIComponent(pin)}/join`, { method: 'POST', body: { name } });
+        if (name) sessionStorage.setItem('guestName', name);
+        startLive(pin);
+      } catch (err) {
+        showJoinForm();
+        $('#error').textContent = err.message;
+      }
+    }
+
+    $('#view').addEventListener('click', async (e) => {
       const choice = e.target.closest('[data-choice]');
-      if (choice && !choice.disabled) socket.emit('player:answer', { choice: Number(choice.dataset.choice) });
+      if (!choice || choice.disabled) return;
+      document.querySelectorAll('[data-choice]').forEach((b) => { b.disabled = true; });
+      try {
+        live.apply(await api(`/api/games/${encodeURIComponent(joinedPin)}/answer`, {
+          method: 'POST', body: { choice: Number(choice.dataset.choice) },
+        }));
+      } catch (err) {
+        live.refresh();
+      }
     });
 
     $('#join-form').onsubmit = (e) => {
@@ -140,19 +155,19 @@
       join($('#pin').value.trim(), me ? undefined : $('#name').value.trim());
     };
 
-    api('/api/auth/me').catch(() => null).then((user) => {
+    api('/api/auth/me').catch(() => null).then(async (user) => {
       me = user;
-      socket = io();
-      socket.on('game:state', (s) => { state = s; render(); });
-      socket.on('connect', () => {
-        // Nach Verbindungsabbruch automatisch wieder beitreten
-        if (joinedPin) return join(joinedPin);
-        const pin = new URLSearchParams(location.search).get('pin');
-        if (pin) $('#pin').value = pin;
-        // Eingeloggte (oder Gäste, die schon drin waren) treten direkt bei
-        if (pin && (me || sessionStorage.getItem('guestName'))) join(pin, sessionStorage.getItem('guestName'));
-        else showJoinForm();
-      });
+      const pin = new URLSearchParams(location.search).get('pin');
+      if (!pin) return showJoinForm();
+      $('#pin').value = pin;
+      // Schon im Spiel (z. B. nach Reload)? Dann direkt weiter
+      try {
+        await api(`/api/games/${encodeURIComponent(pin)}/me`);
+        return startLive(pin);
+      } catch {}
+      // Eingeloggte (oder Gäste mit gemerktem Namen) treten direkt bei
+      if (me || sessionStorage.getItem('guestName')) join(pin, sessionStorage.getItem('guestName'));
+      else showJoinForm();
     });
   </script>
 </body>
