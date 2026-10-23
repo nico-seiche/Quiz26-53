@@ -2,5 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "outputDirectory": "public",
   "cleanUrls": true,
+  "regions": ["fra1"],
   "rewrites": [{ "source": "/api/(.*)", "destination": "/api" }]
 }

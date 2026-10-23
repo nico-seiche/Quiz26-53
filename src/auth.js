@@ -1,7 +1,6 @@
 const crypto = require('crypto');
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const { parseCookie } = require('cookie');
 const db = require('./db');
 
 const COOKIE_NAME = 'sid';
@@ -17,7 +16,11 @@ async function createSession(userId) {
 }
 
 function sessionToken(req) {
-  return parseCookie(req.headers.cookie || '')[COOKIE_NAME];
+  for (const part of (req.headers.cookie || '').split(';')) {
+    const [name, ...value] = part.trim().split('=');
+    if (name === COOKIE_NAME) return decodeURIComponent(value.join('='));
+  }
+  return null;
 }
 
 // Hängt den eingeloggten Nutzer ({ id, username }) als req.user an, sonst null
