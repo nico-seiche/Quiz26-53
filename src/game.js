@@ -3,6 +3,7 @@ const QRCode = require('qrcode');
 const db = require('./db');
 const { requireAuth } = require('./auth');
 const { loadQuiz } = require('./quizzes');
+const { MIN_PLAYERS_FOR_SCORING } = require('./config');
 
 // Der Spielstand liegt in der Datenbank. Nach jeder Änderung wird per Supabase Realtime
 // ein "update"-Signal an den Kanal game:<pin> geschickt; die Browser laden dann ihren Stand neu.
@@ -151,6 +152,7 @@ function baseView({ game }) {
     state: game.state,
     questionIndex: game.question_index,
     total: game.quiz.questions.length,
+    minPlayers: MIN_PLAYERS_FOR_SCORING,
     serverNow: Date.now(),
   };
   if (game.state === 'question' || game.state === 'reveal') {

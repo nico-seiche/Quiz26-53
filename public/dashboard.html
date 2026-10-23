@@ -30,6 +30,7 @@
       <div class="stat-total" id="total">0</div>
       <div class="muted" id="games">Punkte insgesamt</div>
       <div id="subjects" style="margin-top:1rem"></div>
+      <p class="muted" id="rule" style="margin-bottom:0"></p>
     </div>
 
     <div class="card">
@@ -88,7 +89,8 @@
     };
 
     async function loadResults() {
-      const { total, games, subjects, results } = await api('/api/results');
+      const { total, games, minPlayers, subjects, results } = await api('/api/results');
+      $('#rule').textContent = `Gewertet werden nur Spiele mit mindestens ${minPlayers} Teilnehmern.`;
       $('#total').textContent = total.toLocaleString('de-DE');
       $('#games').textContent = `Punkte insgesamt · ${games} ${games === 1 ? 'Spiel' : 'Spiele'}`;
       const max = Math.max(1, ...subjects.map((s) => s.points));
@@ -104,7 +106,10 @@
             <strong>${escapeHtml(r.quiz_title)}</strong>${r.subject ? ` <span class="tag">${escapeHtml(r.subject)}</span>` : ''}<br>
             <span class="muted">${new Date(r.played_at).toLocaleString('de-DE')}</span>
           </div>
-          <div>${r.score} Punkte · Platz ${r.rank}/${r.player_count}</div>
+          <div>
+            ${r.score} Punkte · Platz ${r.rank}/${r.player_count}
+            ${r.counted ? '' : `<br><span class="muted">zählt nicht (unter ${minPlayers} Teilnehmer)</span>`}
+          </div>
         </li>`).join('') : '<li class="muted">Noch keine Ergebnisse – spiel eingeloggt mit, dann werden deine Punkte hier gespeichert.</li>';
     }
 

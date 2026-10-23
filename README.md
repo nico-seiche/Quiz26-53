@@ -62,6 +62,7 @@ src/db.js          Postgres-Verbindung
 src/auth.js        Registrierung, Login, Sessions (httpOnly-Cookie, bcrypt)
 src/quizzes.js     Quizze erstellen/bearbeiten/löschen
 src/game.js        Live-Spiele: PIN, QR-Code, Spielablauf, Gäste, Punkte
+src/config.js      Spielregeln (Mindestteilnehmer für die Wertung)
 src/results.js     Statistik und gespeicherte Ergebnisse eingeloggter Spieler
 public/            Frontend (reines HTML/CSS/JS, kein Build-Schritt)
 supabase/          Datenbank-Migrationen
@@ -76,6 +77,8 @@ INSERT INTO quiz.subjects (name, position) VALUES ('Statistik', 4);
 ```
 
 `position` bestimmt die Reihenfolge. Das Dashboard zeigt eingeloggten Spielern ihre Gesamtpunkte und die Punkte je Fach. Quizze aus der Zeit vor den Fächern erscheinen unter „Ohne Fach“.
+
+**Mindestteilnehmer:** In Gesamtpunkte und Fächer-Statistik fließen nur Spiele mit mindestens 10 Teilnehmern ein (Gäste mitgezählt). Kleinere Spiele bleiben in „Meine Ergebnisse“ sichtbar, sind dort aber als „zählt nicht“ markiert. Der Wert steht in `src/config.js` (`MIN_PLAYERS_FOR_SCORING`) und wird beim Abruf der Statistik angewendet, eine Änderung gilt also auch rückwirkend.
 
 ## Punkte
 

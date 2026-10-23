@@ -111,7 +111,9 @@
           <p>Platz ${s.rank} von ${s.playerCount}</p>
           ${s.guest
             ? '<p class="muted">Als Gast werden deine Punkte nicht gespeichert.</p><p><a class="btn" href="/">Konto erstellen</a></p>'
-            : '<p class="muted">Deine Punkte wurden gespeichert.</p><p><a class="btn" href="/dashboard">Zu meinen Ergebnissen</a></p>'}
+            : `<p class="muted">Deine Punkte wurden gespeichert${s.playerCount < s.minPlayers
+                ? `, zählen aber nicht für die Gesamtwertung (dafür braucht es mindestens ${s.minPlayers} Teilnehmer).`
+                : '.'}</p><p><a class="btn" href="/dashboard">Zu meinen Ergebnissen</a></p>`}
         </div>`;
       }
       $('#view').innerHTML = html;

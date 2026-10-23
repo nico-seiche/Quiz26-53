@@ -207,6 +207,9 @@
           </div>
           <div class="card">
             <h3>${s.players.length} Teilnehmer</h3>
+            <p class="muted">${s.players.length >= s.minPlayers
+              ? 'Dieses Quiz zählt für die Gesamtwertung.'
+              : `Mit weniger als ${s.minPlayers} Teilnehmern zählt das Quiz nicht für die Gesamtwertung (noch ${s.minPlayers - s.players.length} fehlen).`}</p>
             <div class="players">${s.players.map((p) =>
               `<span class="chip">${escapeHtml(p.name)}${guestTag(p)}</span>`).join('') ||
               '<span class="muted">Warte auf Teilnehmer …</span>'}</div>
