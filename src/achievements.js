@@ -9,14 +9,14 @@ const { buildTeams, rankTeams } = require('./teams');
 const ACHIEVEMENTS = [
   // Dabeisein
   { key: 'first_game', icon: '🌱', name: 'Neuling', description: 'Spiele dein erstes gewertetes Quiz.' },
-  { key: 'regular_5', icon: '📚', name: 'Stammgast', description: 'Spiele 5 gewertete Quizze.', progress: { stat: 'games', target: 5 } },
-  { key: 'regular_20', icon: '🎓', name: 'Veteran', description: 'Spiele 20 gewertete Quizze.', progress: { stat: 'games', target: 20 } },
+  { key: 'regular_5', icon: '📚', name: 'Stammgast', description: 'Spiele 5 gewertete Quiz.', progress: { stat: 'games', target: 5 } },
+  { key: 'regular_20', icon: '🎓', name: 'Veteran', description: 'Spiele 20 gewertete Quiz.', progress: { stat: 'games', target: 20 } },
   { key: 'all_subjects', icon: '🧭', name: 'Allrounder', description: 'Spiele in jedem Fach mindestens ein gewertetes Quiz.', progress: { stat: 'subjects', target: 'subjectCount' } },
   { key: 'points_10000', icon: '💎', name: 'Punktesammler', description: 'Sammle insgesamt 10.000 Punkte.', progress: { stat: 'points', target: 10000 } },
   // Siege
   { key: 'podium', icon: '🥉', name: 'Treppchen', description: 'Komm in einem Quiz unter die ersten 3.' },
   { key: 'winner', icon: '🥇', name: 'Siegertyp', description: 'Gewinne ein Quiz.' },
-  { key: 'winner_3', icon: '👑', name: 'Seriensieger', description: 'Gewinne 3 Quizze.', progress: { stat: 'wins', target: 3 } },
+  { key: 'winner_3', icon: '👑', name: 'Seriensieger', description: 'Gewinne 3 Quiz.', progress: { stat: 'wins', target: 3 } },
   // Starke Runden
   { key: 'perfect', icon: '🎯', name: 'Volltreffer', description: 'Beantworte in einem Quiz mit mindestens 5 Fragen alle richtig.' },
   { key: 'streak_5', icon: '🔥', name: 'Heißer Lauf', description: 'Beantworte 5 Fragen in Folge richtig.' },

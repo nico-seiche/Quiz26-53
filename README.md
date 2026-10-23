@@ -1,9 +1,9 @@
 # Quiz26-53
 
-Quiz-Plattform für den Studienkurs: Quizze erstellen und live zusammen spielen – ein Host zeigt Fragen, QR-Code und PIN auf dem großen Bildschirm, alle anderen spielen am Handy mit.
+Quiz-Plattform für den Studienkurs: Quiz erstellen und live zusammen spielen – ein Host zeigt Fragen, QR-Code und PIN auf dem großen Bildschirm, alle anderen spielen am Handy mit.
 
 - **Mitspielen** geht immer, auch ohne Konto als Gast (nur mit Namen).
-- **Ein Konto** braucht man, um Quizze zu speichern und zu hosten. Wer eingeloggt mitspielt, bekommt seine Punkte gespeichert.
+- **Ein Konto** braucht man, um Quiz zu speichern und zu hosten. Wer eingeloggt mitspielt, bekommt seine Punkte gespeichert.
 
 ## Architektur
 
@@ -15,7 +15,7 @@ Browser ──HTTP──▶ Vercel (statische Seiten + Express-API als Serverles
 ```
 
 - **Vercel** liefert `public/` aus und betreibt die API (`api/index.js` → `src/app.js`).
-- **Supabase Postgres** speichert Konten, Quizze, laufende Spiele und Ergebnisse (Schema `quiz`, nicht über die Supabase-REST-API erreichbar; die API verbindet sich mit der eigenen Rolle `quiz_app`).
+- **Supabase Postgres** speichert Konten, Quiz, laufende Spiele und Ergebnisse (Schema `quiz`, nicht über die Supabase-REST-API erreichbar; die API verbindet sich mit der eigenen Rolle `quiz_app`).
 - **Supabase Realtime**: Nach jeder Änderung an einem Spiel schickt die Datenbank ein `update`-Signal in den Kanal `game:<PIN>`. Host und Spieler laden daraufhin ihren Stand über die API neu. Ohne Realtime fragen die Seiten alle 2 Sekunden nach (Polling).
 - **Timer**: Es gibt keinen dauerhaft laufenden Server. Eine Frage wird beim nächsten Abruf aufgelöst, sobald die Zeit abgelaufen ist oder alle geantwortet haben; die Browser fragen dafür zum Ablauf der Zeit automatisch nach.
 
@@ -46,7 +46,7 @@ Ohne `SUPABASE_URL`/`SUPABASE_PUBLISHABLE_KEY` läuft alles per Polling.
 ## Ablauf
 
 1. **Konto** erstellen bzw. anmelden (`/`) – nur zum Erstellen/Hosten und Punktesammeln nötig
-2. **Navigation:** Nach dem Login führt eine schwebende Leiste am unteren Bildschirmrand zu **Home** (`/dashboard`: PIN eingeben, Kennzahlen, zuletzt gespielt), **Quizze** (`/quizzes`: eigene Quizze verwalten und starten), **Bestenliste** (`/leaderboard`) und **Profil** (`/profile`: Statistik, Erfolge, Ergebnisse, Abmelden). Sie steht nicht im Editor und nicht im Spiel selbst (Host-Bildschirm, Handy-Ansicht).
+2. **Navigation:** Nach dem Login führt eine schwebende Leiste am unteren Bildschirmrand zu **Home** (`/dashboard`: PIN eingeben, Kennzahlen, zuletzt gespielt), **Quiz** (`/quizzes`: eigene Quiz verwalten und starten), **Bestenliste** (`/leaderboard`) und **Profil** (`/profile`: Statistik, Erfolge, Ergebnisse, Abmelden). Sie steht nicht im Editor und nicht im Spiel selbst (Host-Bildschirm, Handy-Ansicht).
 3. **Editor** (`/edit`): Titel, Fach, Fragen mit 2–4 Antworten, richtige Antwort, Zeitlimit
 4. **Starten** → **Host-Bildschirm** (`/host?pin=…`) mit QR-Code, PIN und Teilnehmerliste
 5. Teilnehmende scannen den QR-Code oder geben die PIN ein (`/play`) – als Gast mit Namen oder eingeloggt mit ihrem Nutzernamen
@@ -60,7 +60,7 @@ server.js          Lokaler Entwicklungsserver (API + statische Seiten)
 src/app.js         Express-App mit allen API-Routen
 src/db.js          Postgres-Verbindung
 src/auth.js        Registrierung, Login, Sessions (httpOnly-Cookie, bcrypt)
-src/quizzes.js     Quizze erstellen/bearbeiten/löschen
+src/quizzes.js     Quiz erstellen/bearbeiten/löschen
 src/game.js        Live-Spiele: PIN, QR-Code, Spielablauf, Gäste, Punkte
 src/config.js      Spielregeln (Mindestteilnehmer für die Wertung)
 src/achievements.js Erfolge: Definitionen, Vergabe am Spielende, API
@@ -78,7 +78,7 @@ Jedes Quiz gehört zu einem Fach. Die Fächer liegen in der Tabelle `quiz.subjec
 INSERT INTO quiz.subjects (name, position) VALUES ('Statistik', 4);
 ```
 
-`position` bestimmt die Reihenfolge. Das Dashboard zeigt eingeloggten Spielern ihre Gesamtpunkte und die Punkte je Fach. Quizze aus der Zeit vor den Fächern erscheinen unter „Ohne Fach“.
+`position` bestimmt die Reihenfolge. Das Dashboard zeigt eingeloggten Spielern ihre Gesamtpunkte und die Punkte je Fach. Quiz aus der Zeit vor den Fächern erscheinen unter „Ohne Fach“.
 
 **Mindestteilnehmer:** In Gesamtpunkte und Fächer-Statistik fließen nur Spiele mit mindestens 10 Teilnehmern ein (Gäste mitgezählt). Kleinere Spiele bleiben in „Meine Ergebnisse“ sichtbar, sind dort aber als „zählt nicht“ markiert. Der Wert steht in `src/config.js` (`MIN_PLAYERS_FOR_SCORING`) und wird beim Abruf der Statistik angewendet, eine Änderung gilt also auch rückwirkend.
 
@@ -92,7 +92,7 @@ Wer mehrere Fragen in Folge richtig beantwortet, bekommt Extrapunkte: ab der 2. 
 
 ## Team-Modus
 
-Der Spielmodus wird beim Erstellen (und Bearbeiten) eines Quiz festgelegt: **Einzel** oder **Team**. Bei einem Team-Quiz werden die Teilnehmer nach dem Klick auf „Teams bilden“ zufällig in **zwei Teams** (🦊 Füchse, 🦉 Eulen) verteilt, mindestens 4 Teilnehmer. Danach werden die Teams auf dem großen Bildschirm vorgestellt, jeder sieht auf dem Handy sein Team. Im Dashboard sind Team-Quizze mit „👥 Team“ gekennzeichnet.
+Der Spielmodus wird beim Erstellen (und Bearbeiten) eines Quiz festgelegt: **Einzel** oder **Team**. Bei einem Team-Quiz werden die Teilnehmer nach dem Klick auf „Teams bilden“ zufällig in **zwei Teams** (🦊 Füchse, 🦉 Eulen) verteilt, mindestens 4 Teilnehmer. Danach werden die Teams auf dem großen Bildschirm vorgestellt, jeder sieht auf dem Handy sein Team. Im Dashboard sind Team-Quiz mit „👥 Team“ gekennzeichnet.
 
 - **Teampunkte** = Summe der Punkte aller Mitglieder; die Rangliste nach jeder Runde und die Siegerehrung zeigen die Teams (darunter die besten Einzelspieler).
 - **Ungerade Teilnehmerzahl:** Ein Team hat dann genau einen Spieler mehr. Das kleinere Team bekommt einen **Geist-Spieler 👻**, der immer so viele Punkte hat wie der Durchschnitt seiner echten Mitspieler (aufgerundet auf ganze Punkte). Bei gerader Zahl gibt es keinen Geist.
@@ -105,7 +105,7 @@ Eingeloggte Spieler sammeln Erfolge (Dashboard → „Meine Erfolge“, am Spiel
 | Gruppe | Erfolg | Bedingung |
 |---|---|---|
 | Dabeisein | 🌱 Neuling | erstes gewertetes Quiz gespielt |
-| | 📚 Stammgast / 🎓 Veteran | 5 / 20 gewertete Quizze |
+| | 📚 Stammgast / 🎓 Veteran | 5 / 20 gewertete Quiz |
 | | 🧭 Allrounder | in jedem Fach ein gewertetes Quiz |
 | | 💎 Punktesammler | 10.000 Punkte insgesamt |
 | Siege | 🥉 Treppchen | unter den ersten 3 |

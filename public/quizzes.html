@@ -3,19 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Quiz – Meine Quizze</title>
+  <title>Quiz – Meine Quiz</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
   <header class="top">
     <a class="brand" href="/dashboard">Quiz</a>
-    <strong>Meine Quizze</strong>
+    <strong>Meine Quiz</strong>
     <span class="muted hide-small" id="me"></span>
   </header>
   <main>
     <div class="card">
       <div class="row spread">
-        <h2>Meine Quizze</h2>
+        <h2>Meine Quiz</h2>
         <a class="btn primary" href="/edit">+ Neues Quiz</a>
       </div>
       <p class="error" id="error"></p>
@@ -39,7 +39,7 @@
             <a class="btn" href="/edit?id=${q.id}">Bearbeiten</a>
             <button class="danger" type="button" data-delete="${q.id}">Löschen</button>
           </div>
-        </li>`).join('') : '<li class="muted">Noch keine Quizze – leg dein erstes an.</li>';
+        </li>`).join('') : '<li class="muted">Noch kein Quiz – leg dein erstes an.</li>';
     }
 
     $('#quizzes').onclick = async (e) => {

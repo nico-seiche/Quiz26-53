@@ -17,7 +17,7 @@ router.get('/', requireAuth, async (req, res) => {
     GROUP BY s.id ORDER BY s.position, s.id
   `, [req.user.id, MIN_PLAYERS_FOR_SCORING]);
 
-  // Ergebnisse aus Quizzen ohne Fach (z. B. vor Einführung der Fächer)
+  // Ergebnisse aus Spielen ohne Fach (z. B. vor Einführung der Fächer)
   const other = await db.one(`
     SELECT COALESCE(SUM(score), 0)::int AS points, COUNT(*)::int AS games
     FROM quiz.game_results WHERE user_id = $1 AND subject_id IS NULL AND player_count >= $2
