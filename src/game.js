@@ -4,6 +4,7 @@ const db = require('./db');
 const { requireAuth } = require('./auth');
 const { loadQuiz } = require('./quizzes');
 const { MIN_PLAYERS_FOR_SCORING } = require('./config');
+const { awardForGame, publicInfo } = require('./achievements');
 
 // Der Spielstand liegt in der Datenbank. Nach jeder Änderung wird per Supabase Realtime
 // ein "update"-Signal an den Kanal game:<pin> geschickt; die Browser laden dann ihren Stand neu.
@@ -91,6 +92,7 @@ async function finish(client, game) {
       VALUES ($1, $2, $3, $4, $5, $6, $7)
     `, [p.user_id, game.quiz_id, game.quiz.title, game.quiz.subjectId || null, p.score, i + 1, players.length]);
   }
+  await awardForGame(client, game, players);
 }
 
 // Führt eine Änderung am Spiel unter Sperre aus; löst vorher fällige Fragen auf und benachrichtigt danach
@@ -126,7 +128,15 @@ async function loadGame(pin) {
     'SELECT player_key, choice, points FROM quiz.game_answers WHERE game_pin = $1 AND question_index = $2',
     [pin, game.question_index],
   );
-  return { game, players, answers };
+  // Erfolge, die in diesem Spiel erreicht wurden (erst nach Spielende vorhanden)
+  const achievements = game.state === 'finished'
+    ? await db.query(`
+        SELECT a.user_id, a.achievement_key, u.username
+        FROM quiz.user_achievements a JOIN quiz.users u ON u.id = a.user_id
+        WHERE a.game_pin = $1 ORDER BY a.earned_at, a.achievement_key
+      `, [pin])
+    : [];
+  return { game, players, answers, achievements };
 }
 
 // Ergänzt jeden Spieler um Platz, Punkte und Platz vor der aktuellen Frage ("Zwischenstand")
@@ -176,6 +186,14 @@ function hostView(data) {
     prevRank: p.prevRank,
   }));
   view.answeredCount = data.answers.length;
+  if (data.game.state === 'finished') {
+    const byUser = new Map();
+    for (const a of data.achievements) {
+      if (!byUser.has(a.username)) byUser.set(a.username, []);
+      byUser.get(a.username).push(publicInfo(a.achievement_key));
+    }
+    view.achievements = [...byUser].map(([name, items]) => ({ name, items }));
+  }
   if (data.game.state === 'reveal') {
     view.distribution = view.question.answers.map(() => 0);
     for (const a of data.answers) view.distribution[a.choice]++;
@@ -202,6 +220,11 @@ function playerView(data, key) {
     if (data.game.state === 'reveal') view.lastPoints = mine ? mine.points : 0;
   }
   if (data.game.state === 'scoreboard') view.lastPoints = player.gained;
+  if (data.game.state === 'finished') {
+    view.achievements = player.user_id
+      ? data.achievements.filter((a) => a.user_id === player.user_id).map((a) => publicInfo(a.achievement_key))
+      : [];
+  }
   return view;
 }
 

@@ -146,6 +146,14 @@
               `<li>${escapeHtml(p.name)} – ${p.score} Punkte</li>`).join('')}</ol>
             ${rest.length > 10 ? `<p class="muted">… und ${rest.length - 10} weitere</p>` : ''}
           </div>` : ''}
+        ${s.achievements && s.achievements.length ? `
+          <div class="card fade-in" style="--delay:${winnerDelay + 2.6}s; max-width:760px; margin:0 auto 1rem">
+            <h3>🏆 Neue Erfolge</h3>
+            <ul class="list">${s.achievements.map((p) => `
+              <li><strong>${escapeHtml(p.name)}</strong>
+                <span>${p.items.map((a) => `<span title="${escapeHtml(a.description)}">${a.icon} ${escapeHtml(a.name)}</span>`).join(' · ')}</span>
+              </li>`).join('')}</ul>
+          </div>` : ''}
         <p class="center fade-in" style="--delay:${winnerDelay + 1.8}s"><a class="btn" href="/dashboard">Zurück zum Dashboard</a></p>`;
     }
 

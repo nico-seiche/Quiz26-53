@@ -36,6 +36,7 @@
     let tick = null;  // Intervall bzw. Animationsframe des Countdown-Rings
     let live = null;
     let joinedPin = null;
+    let lastKey = null;  // Endansicht nur einmal aufbauen, damit Animationen nicht bei jedem Nachladen neu starten
 
     // Zufällige Gast-ID pro Tab, damit man nach einem Reload im selben Spiel bleibt
     function guestId() {
@@ -63,6 +64,9 @@
     function render() {
       const s = state;
       $('#status').textContent = `${s.name}${s.guest ? ' (Gast)' : ''} · ${s.score} Punkte`;
+      const key = `${s.state}:${s.questionIndex}`;
+      if (s.state === 'finished' && key === lastKey) return;
+      lastKey = key;
       stopTimer();
       let html = '';
 
@@ -115,10 +119,19 @@
           <h1>${s.rank === 1 ? 'Du hast gewonnen! 🏆' : 'Quiz beendet'}</h1>
           <p class="big">${medal ? medal + ' ' : ''}${s.score} Punkte</p>
           <p>Platz ${s.rank} von ${s.playerCount}</p>
+          ${s.achievements && s.achievements.length ? `
+            <div class="ach-new">
+              <h3>${s.achievements.length === 1 ? 'Neuer Erfolg!' : 'Neue Erfolge!'}</h3>
+              ${s.achievements.map((a, i) => `
+                <div class="ach-toast pop-in" style="--delay:${0.3 + i * 0.3}s">
+                  <span class="icon" aria-hidden="true">${a.icon}</span>
+                  <div><strong>${escapeHtml(a.name)}</strong><br><span class="muted">${escapeHtml(a.description)}</span></div>
+                </div>`).join('')}
+            </div>` : ''}
           ${s.guest
-            ? '<p class="muted">Als Gast werden deine Punkte nicht gespeichert.</p><p><a class="btn" href="/">Konto erstellen</a></p>'
+            ? '<p class="muted">Als Gast werden deine Punkte und Erfolge nicht gespeichert.</p><p><a class="btn" href="/">Konto erstellen</a></p>'
             : `<p class="muted">Deine Punkte wurden gespeichert${s.playerCount < s.minPlayers
-                ? `, zählen aber nicht für die Gesamtwertung (dafür braucht es mindestens ${s.minPlayers} Teilnehmer).`
+                ? `, zählen aber nicht für Gesamtwertung und Erfolge (dafür braucht es mindestens ${s.minPlayers} Teilnehmer).`
                 : '.'}</p><p><a class="btn" href="/dashboard">Zu meinen Ergebnissen</a></p>`}
         </div>`;
       }

@@ -3,6 +3,7 @@ const auth = require('./auth');
 const quizzes = require('./quizzes');
 const game = require('./game');
 const results = require('./results');
+const achievements = require('./achievements');
 const db = require('./db');
 
 // Die API; lokal von server.js gestartet, auf Vercel als Serverless-Funktion (api/index.js)
@@ -39,6 +40,7 @@ app.use('/api/auth', auth.router);
 app.use('/api/quizzes', quizzes.router);
 app.use('/api/games', game.router);
 app.use('/api/results', results.router);
+app.use('/api/achievements', achievements.router);
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Nicht gefunden' }));
 

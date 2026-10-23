@@ -34,6 +34,15 @@
     </div>
 
     <div class="card">
+      <div class="row spread">
+        <h2>Meine Erfolge</h2>
+        <span class="muted" id="ach-count"></span>
+      </div>
+      <div class="ach-grid" id="achievements"></div>
+      <p class="muted" id="ach-rule" style="margin-bottom:0"></p>
+    </div>
+
+    <div class="card">
       <h2>Meine Ergebnisse</h2>
       <ul class="list" id="results"></ul>
     </div>
@@ -113,10 +122,29 @@
         </li>`).join('') : '<li class="muted">Noch keine Ergebnisse – spiel eingeloggt mit, dann werden deine Punkte hier gespeichert.</li>';
     }
 
+    async function loadAchievements() {
+      const { minPlayers, earned, total, achievements } = await api('/api/achievements');
+      $('#ach-count').textContent = `${earned} / ${total} erreicht`;
+      $('#ach-rule').textContent = `Erfolge gibt es nur in Spielen mit mindestens ${minPlayers} Teilnehmern.`;
+      $('#achievements').innerHTML = achievements.map((a) => `
+        <div class="ach-tile ${a.earned ? 'earned' : 'locked'}">
+          <span class="icon" aria-hidden="true">${a.icon}</span>
+          <strong>${escapeHtml(a.name)}</strong>
+          <span class="muted">${escapeHtml(a.description)}</span>
+          ${a.earned
+            ? `<span class="tag">Erreicht am ${new Date(a.earnedAt).toLocaleDateString('de-DE')}</span>`
+            : a.progress
+              ? `<div class="stat-bar"><span style="width:${(a.progress.value / a.progress.target) * 100}%"></span></div>
+                 <span class="muted">${a.progress.value.toLocaleString('de-DE')} / ${a.progress.target.toLocaleString('de-DE')}</span>`
+              : '<span class="tag">🔒 Noch offen</span>'}
+        </div>`).join('');
+    }
+
     requireLogin().then((me) => {
       $('#me').textContent = me.username;
       load();
       loadResults();
+      loadAchievements();
     });
   </script>
 </body>

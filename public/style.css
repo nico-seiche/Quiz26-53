@@ -142,7 +142,7 @@ ol.ranking li { padding: .25rem 0; }
 @keyframes fall { to { transform: translateY(110vh) rotate(720deg); } }
 @media (prefers-reduced-motion: reduce) {
   .board-row { transition: none; }
-  .slot, .winner-title, .fade-in, .slot .crown { animation: none; }
+  .slot, .winner-title, .fade-in, .pop-in, .slot .crown { animation: none; }
   .confetti { display: none; }
 }
 
@@ -158,6 +158,26 @@ ol.ranking li { padding: .25rem 0; }
   font-size: 2rem; font-weight: 800; font-variant-numeric: tabular-nums;
 }
 .timer-ring.urgent span { color: var(--danger); }
+
+/* Erfolge */
+.pop-in { animation: pop .8s cubic-bezier(.34, 1.56, .64, 1) both; animation-delay: var(--delay, 0s); }
+.ach-new { margin-top: 1.25rem; text-align: left; }
+.ach-new h3 { text-align: center; margin-bottom: .5rem; }
+.ach-toast {
+  display: flex; align-items: center; gap: .75rem; margin-top: .5rem; padding: .75rem 1rem;
+  border: 2px solid var(--primary); border-radius: 12px; background: var(--bg);
+}
+.ach-toast .icon { font-size: 2rem; line-height: 1; }
+.ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: .75rem; margin: 1rem 0; }
+.ach-tile {
+  display: flex; flex-direction: column; align-items: center; gap: .25rem; text-align: center;
+  padding: .9rem .75rem; border: 1px solid var(--border); border-radius: 12px; background: var(--bg);
+}
+.ach-tile .icon { font-size: 2.25rem; line-height: 1.1; }
+.ach-tile .muted { font-size: .9rem; }
+.ach-tile .stat-bar { width: 100%; margin-top: .25rem; }
+.ach-tile.earned { border: 2px solid var(--primary); background: var(--card); }
+.ach-tile.locked .icon { filter: grayscale(1); opacity: .45; }
 
 /* Statistik im Dashboard */
 .stat-total { font-size: 2.5rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
