@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quiz – Meine Quizze</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/dashboard">Quiz</a>
+    <strong>Meine Quizze</strong>
+    <span class="muted hide-small" id="me"></span>
+  </header>
+  <main>
+    <div class="card">
+      <div class="row spread">
+        <h2>Meine Quizze</h2>
+        <a class="btn primary" href="/edit">+ Neues Quiz</a>
+      </div>
+      <p class="error" id="error"></p>
+      <ul class="list" id="quizzes"></ul>
+    </div>
+  </main>
+  <script src="/js/common.js"></script>
+  <script>
+    async function load() {
+      const quizzes = await api('/api/quizzes');
+      $('#quizzes').innerHTML = quizzes.length ? quizzes.map((q) => `
+        <li>
+          <div>
+            <strong>${escapeHtml(q.title)}</strong><br>
+            <span class="muted">${q.question_count} Fragen</span>
+            ${q.subject ? `<span class="tag">${escapeHtml(q.subject)}</span>` : '<span class="tag">Kein Fach</span>'}
+            <span class="tag">${q.mode === 'team' ? '👥 Team' : '👤 Einzel'}</span>
+          </div>
+          <div class="row">
+            <button class="primary" type="button" data-start="${q.id}" ${q.question_count ? '' : 'disabled'}>Starten</button>
+            <a class="btn" href="/edit?id=${q.id}">Bearbeiten</a>
+            <button class="danger" type="button" data-delete="${q.id}">Löschen</button>
+          </div>
+        </li>`).join('') : '<li class="muted">Noch keine Quizze – leg dein erstes an.</li>';
+    }
+
+    $('#quizzes').onclick = async (e) => {
+      const start = e.target.dataset.start;
+      const del = e.target.dataset.delete;
+      try {
+        if (start) {
+          const { pin } = await api('/api/games', { method: 'POST', body: { quizId: Number(start) } });
+          location.href = `/host?pin=${pin}`;
+        } else if (del && confirm('Quiz wirklich löschen?')) {
+          await api(`/api/quizzes/${del}`, { method: 'DELETE' });
+          load();
+        }
+      } catch (err) {
+        $('#error').textContent = err.message;
+      }
+    };
+
+    requireLogin().then((me) => {
+      $('#me').textContent = me.username;
+      mountNav('quizzes');
+      load();
+    });
+  </script>
+</body>
+</html>

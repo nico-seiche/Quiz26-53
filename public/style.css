@@ -4,6 +4,7 @@
   --text: #1d1f2b;
   --muted: #6b6f80;
   --primary: #4f46e5;
+  --link: #4338ca;
   --primary-text: #ffffff;
   --border: #dfe1ec;
   --danger: #dc2626;
@@ -20,9 +21,11 @@
     --text: #eceef6;
     --muted: #9a9eb2;
     --border: #2f3242;
+    --link: #a5b4fc;
   }
 }
 * { box-sizing: border-box; }
+a { color: var(--link); }
 [hidden] { display: none !important; }
 body {
   margin: 0;
@@ -220,6 +223,38 @@ ol.ranking li { padding: .25rem 0; }
 .lb-points { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
 .lb-gap { text-align: center; padding: .25rem 0; }
 @media (max-width: 640px) { .lb-games { display: none; } .lb-row { grid-template-columns: 2.5rem 1fr 6ch; } }
+
+/* Schwebende Navigation unten */
+body.has-nav main { padding-bottom: 7.5rem; }
+.bottom-nav {
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 40;
+  bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
+  width: min(94vw, 480px); display: flex; gap: .25rem; padding: .35rem;
+  background: var(--card); background: color-mix(in srgb, var(--card) 90%, transparent);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  border: 1px solid var(--border); border-radius: 999px; box-shadow: 0 8px 28px rgba(0, 0, 0, .2);
+}
+.bottom-nav a {
+  flex: 1 1 0; min-width: 0; min-height: 3.25rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .1rem;
+  border-radius: 999px; color: var(--muted); text-decoration: none; font-size: .72rem; font-weight: 600;
+  transition: background-color .2s, color .2s;
+}
+.bottom-nav a svg { width: 1.4rem; height: 1.4rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.bottom-nav a:hover { color: var(--text); }
+.bottom-nav a[aria-current="page"] { background: var(--primary); color: var(--primary-text); }
+.bottom-nav a:focus-visible { outline: 3px solid var(--text); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .bottom-nav a { transition: none; } }
+
+/* Home: Kennzahlen als Kacheln */
+.tile-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; margin-bottom: 1rem; }
+.tile {
+  display: flex; flex-direction: column; gap: .15rem; padding: 1rem .75rem; text-align: center;
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px; color: var(--text); text-decoration: none;
+}
+.tile:hover { border-color: var(--primary); }
+.tile-value { font-size: 1.7rem; font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.tile .muted { font-size: .9rem; }
+#erfolge { scroll-margin-top: 1rem; }
 
 /* Statistik im Dashboard */
 .stat-total { font-size: 2.5rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }

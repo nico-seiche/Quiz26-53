@@ -8,7 +8,7 @@
 </head>
 <body>
   <header class="top">
-    <a class="brand" href="/dashboard">← Meine Quizze</a>
+    <a class="brand" href="/quizzes">← Meine Quizze</a>
     <button class="primary" type="button" id="save">Speichern</button>
   </header>
   <main>
@@ -142,7 +142,7 @@
         const body = { title: $('#title').value, subjectId: Number($('#subject').value) || null, mode: $('#mode').value, questions: payload };
         if (id) await api(`/api/quizzes/${id}`, { method: 'PUT', body });
         else await api('/api/quizzes', { method: 'POST', body });
-        location.href = '/dashboard';
+        location.href = '/quizzes';
       } catch (err) {
         $('#error').textContent = err.message;
         // Fehler in einer Frage ("Frage 3: …"): diese Frage aufklappen

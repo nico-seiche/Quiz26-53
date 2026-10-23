@@ -100,3 +100,28 @@ function liveGame(pin, load, render) {
   refresh();
   return { refresh, apply, remaining };
 }
+
+// Schwebende Navigation am unteren Rand (Home, Quizze, Bestenliste, Profil)
+const NAV_ITEMS = [
+  { id: 'home', href: '/dashboard', label: 'Home',
+    icon: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>' },
+  { id: 'quizzes', href: '/quizzes', label: 'Quizze',
+    icon: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>' },
+  { id: 'leaderboard', href: '/leaderboard', label: 'Bestenliste',
+    icon: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/>' },
+  { id: 'profile', href: '/profile', label: 'Profil',
+    icon: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>' },
+];
+
+function mountNav(active) {
+  document.body.classList.add('has-nav');
+  const nav = document.createElement('nav');
+  nav.className = 'bottom-nav';
+  nav.setAttribute('aria-label', 'Hauptnavigation');
+  nav.innerHTML = NAV_ITEMS.map((item) => `
+    <a href="${item.href}" ${item.id === active ? 'aria-current="page"' : ''}>
+      <svg viewBox="0 0 24 24" aria-hidden="true">${item.icon}</svg>
+      <span>${item.label}</span>
+    </a>`).join('');
+  document.body.appendChild(nav);
+}

@@ -155,7 +155,7 @@
             ? '<p class="muted">Als Gast werden deine Punkte und Erfolge nicht gespeichert.</p><p><a class="btn" href="/">Konto erstellen</a></p>'
             : `<p class="muted">Deine Punkte wurden gespeichert${s.playerCount < s.minPlayers
                 ? `, zählen aber nicht für Gesamtwertung und Erfolge (dafür braucht es mindestens ${s.minPlayers} Teilnehmer).`
-                : '.'}</p><p><a class="btn" href="/dashboard">Zu meinen Ergebnissen</a></p>`}
+                : '.'}</p><p><a class="btn" href="/profile">Zu meinen Ergebnissen</a></p>`}
         </div>`;
       }
       $('#view').innerHTML = html;

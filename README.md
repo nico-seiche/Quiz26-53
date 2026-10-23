@@ -46,7 +46,7 @@ Ohne `SUPABASE_URL`/`SUPABASE_PUBLISHABLE_KEY` läuft alles per Polling.
 ## Ablauf
 
 1. **Konto** erstellen bzw. anmelden (`/`) – nur zum Erstellen/Hosten und Punktesammeln nötig
-2. **Dashboard** (`/dashboard`): eigene Quizze verwalten, gespeicherte Ergebnisse ansehen, per PIN beitreten
+2. **Navigation:** Nach dem Login führt eine schwebende Leiste am unteren Bildschirmrand zu **Home** (`/dashboard`: PIN eingeben, Kennzahlen, zuletzt gespielt), **Quizze** (`/quizzes`: eigene Quizze verwalten und starten), **Bestenliste** (`/leaderboard`) und **Profil** (`/profile`: Statistik, Erfolge, Ergebnisse, Abmelden). Sie steht nicht im Editor und nicht im Spiel selbst (Host-Bildschirm, Handy-Ansicht).
 3. **Editor** (`/edit`): Titel, Fach, Fragen mit 2–4 Antworten, richtige Antwort, Zeitlimit
 4. **Starten** → **Host-Bildschirm** (`/host?pin=…`) mit QR-Code, PIN und Teilnehmerliste
 5. Teilnehmende scannen den QR-Code oder geben die PIN ein (`/play`) – als Gast mit Namen oder eingeloggt mit ihrem Nutzernamen
@@ -66,7 +66,7 @@ src/config.js      Spielregeln (Mindestteilnehmer für die Wertung)
 src/achievements.js Erfolge: Definitionen, Vergabe am Spielende, API
 src/leaderboard.js Bestenliste (gesamt und je Fach)
 src/results.js     Statistik und gespeicherte Ergebnisse eingeloggter Spieler
-public/            Frontend (reines HTML/CSS/JS, kein Build-Schritt)
+public/            Frontend (reines HTML/CSS/JS, kein Build-Schritt); js/common.js enthält u. a. die Navigation
 supabase/          Datenbank-Migrationen
 ```
 
@@ -84,7 +84,7 @@ INSERT INTO quiz.subjects (name, position) VALUES ('Statistik', 4);
 
 ## Bestenliste
 
-Unter `/leaderboard` (Dashboard → „🏆 Bestenliste“) sehen eingeloggte Nutzer alle registrierten Konten nach Punkten. Oben wählt man zwischen **Gesamt** und den einzelnen **Fächern**; die Auswahl steckt in der Adresse (`/leaderboard?subject=2`). Gleiche Punkte teilen sich den Platz, wer noch nichts gespielt hat, steht mit 0 Punkten am Ende. Die eigene Zeile ist hervorgehoben. Es zählen dieselben Spiele wie in der persönlichen Statistik (mindestens 10 Teilnehmer). Die Liste ist nur für eingeloggte Nutzer sichtbar.
+Unter `/leaderboard` (Navigation → „Bestenliste“) sehen eingeloggte Nutzer alle registrierten Konten nach Punkten. Oben wählt man zwischen **Gesamt** und den einzelnen **Fächern**; die Auswahl steckt in der Adresse (`/leaderboard?subject=2`). Gleiche Punkte teilen sich den Platz, wer noch nichts gespielt hat, steht mit 0 Punkten am Ende. Die eigene Zeile ist hervorgehoben. Es zählen dieselben Spiele wie in der persönlichen Statistik (mindestens 10 Teilnehmer). Die Liste ist nur für eingeloggte Nutzer sichtbar.
 
 ## Serien-Bonus
 
