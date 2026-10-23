@@ -189,6 +189,23 @@ ol.ranking li { padding: .25rem 0; }
 .ach-tile.earned { border: 2px solid var(--primary); background: var(--card); }
 .ach-tile.locked .icon { filter: grayscale(1); opacity: .45; }
 
+/* Serien-Bonus und Teams */
+.streak-pill {
+  display: inline-block; padding: .15rem .65rem; border-radius: 999px; font-size: .9rem; font-weight: 700;
+  background: var(--bg); border: 1px solid var(--a2); color: var(--text);
+}
+.teams-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1rem; max-width: 1000px; margin: 1.5rem auto 0; }
+.team-card {
+  background: var(--card); border: 1px solid var(--border); border-top: 6px solid var(--team);
+  border-radius: 12px; padding: 1rem 1.25rem;
+}
+.team-card h2 { margin-bottom: .25rem; }
+.team-card ul { list-style: none; padding: 0; margin: .5rem 0 0; font-size: 1.15rem; }
+.team-card li { padding: .15rem 0; }
+.board-row[data-team] { border-left: 8px solid var(--team); }
+.team-standing { margin: .75rem 0; padding: .6rem .9rem; border: 2px solid var(--border); border-radius: 12px; text-align: center; }
+.slot .members { font-size: .85rem; max-width: 12rem; margin-bottom: .5rem; overflow-wrap: anywhere; }
+
 /* Statistik im Dashboard */
 .stat-total { font-size: 2.5rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .stat-row { display: grid; grid-template-columns: 8rem 1fr auto; align-items: center; gap: .75rem; margin: .6rem 0; }

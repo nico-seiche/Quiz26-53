@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('./db');
 const { requireAuth } = require('./auth');
 const { MIN_PLAYERS_FOR_SCORING } = require('./config');
+const { buildTeams, rankTeams } = require('./teams');
 
 // Erfolge gibt es nur für eingeloggte Spieler in Spielen, die für die Gesamtwertung zählen.
 // progress: Fortschrittsanzeige im Dashboard (stat = Wert aus loadStats, target = Zielwert)
@@ -22,6 +23,7 @@ const ACHIEVEMENTS = [
   { key: 'speedy', icon: '⚡', name: 'Blitzmerker', description: 'Antworte dreimal in einem Quiz richtig und innerhalb der ersten 10 % der Zeit.' },
   { key: 'rocket', icon: '🚀', name: 'Raketenstart', description: 'Steige in einer einzigen Runde um mindestens 3 Plätze auf.' },
   // Spielleitung
+  { key: 'team_win', icon: '🤝', name: 'Teamgeist', description: 'Gewinne ein Quiz im Team-Modus mit deinem Team.' },
   { key: 'host', icon: '🎤', name: 'Quizmaster', description: 'Leite ein gewertetes Quiz als Host.' },
 ];
 const BY_KEY = new Map(ACHIEVEMENTS.map((a) => [a.key, a]));
@@ -72,8 +74,8 @@ function gameAchievements(game, player, rank, answers, history) {
   for (const ok of correct) { run = ok ? run + 1 : 0; best = Math.max(best, run); }
   if (best >= 5) keys.push('streak_5');
 
-  // Punkte ab 950 bedeuten: richtig und in den ersten 10 % der Zeit
-  const fast = questions.filter((q, i) => correct[i] && answers.get(i).points >= 950).length;
+  // Basispunkte ab 950 (ohne Serien-Bonus) bedeuten: richtig und in den ersten 10 % der Zeit
+  const fast = questions.filter((q, i) => correct[i] && answers.get(i).points - answers.get(i).bonus >= 950).length;
   if (fast >= 3) keys.push('speedy');
 
   for (let q = 1; q < history.length; q++) {
@@ -92,7 +94,7 @@ async function awardForGame(client, game, players) {
   const [{ count: subjectCount }] = await run('SELECT COUNT(*)::int AS count FROM quiz.subjects');
 
   const answerRows = await run(
-    'SELECT player_key, question_index, choice, points FROM quiz.game_answers WHERE game_pin = $1',
+    'SELECT player_key, question_index, choice, points, bonus FROM quiz.game_answers WHERE game_pin = $1',
     [game.pin],
   );
   const answersByPlayer = new Map();
@@ -101,6 +103,13 @@ async function awardForGame(client, game, players) {
     answersByPlayer.get(a.player_key).set(a.question_index, a);
   }
   const history = rankHistory(players, answersByPlayer, game.quiz.questions.length);
+
+  // Team-Modus: das Team mit den meisten Punkten (eindeutig, nicht gleichauf) gewinnt
+  let winningTeam = null;
+  if (game.team_count > 0) {
+    const ranked = rankTeams(buildTeams(players, game.team_count));
+    if (ranked[0].score > 0 && (!ranked[1] || ranked[0].score > ranked[1].score)) winningTeam = ranked[0].index;
+  }
 
   const awards = []; // [userId, key]
   for (const [i, p] of players.entries()) {
@@ -114,6 +123,7 @@ async function awardForGame(client, game, players) {
     if (s.wins >= 3) keys.push('winner_3');
     if (s.points >= 10000) keys.push('points_10000');
     if (subjectCount > 0 && s.subjects >= subjectCount) keys.push('all_subjects');
+    if (winningTeam !== null && p.team === winningTeam) keys.push('team_win');
     for (const key of keys) awards.push([p.user_id, key]);
   }
   awards.push([game.host_user_id, 'host']);

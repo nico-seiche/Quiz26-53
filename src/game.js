@@ -3,7 +3,8 @@ const QRCode = require('qrcode');
 const db = require('./db');
 const { requireAuth } = require('./auth');
 const { loadQuiz } = require('./quizzes');
-const { MIN_PLAYERS_FOR_SCORING } = require('./config');
+const { MIN_PLAYERS_FOR_SCORING, TEAM_COUNTS, MIN_PLAYERS_PER_TEAM, streakBonus } = require('./config');
+const { standings } = require('./teams');
 const { awardForGame, publicInfo } = require('./achievements');
 
 // Der Spielstand liegt in der Datenbank. Nach jeder Änderung wird per Supabase Realtime
@@ -63,11 +64,31 @@ async function reveal(client, game) {
     'SELECT * FROM quiz.game_answers WHERE game_pin = $1 AND question_index = $2',
     [game.pin, game.question_index],
   );
+  // Welche früheren Fragen hat jeder richtig beantwortet? (für die Serie; unbeantwortet zählt als falsch)
+  const { rows: earlier } = await client.query(
+    'SELECT player_key, question_index, choice FROM quiz.game_answers WHERE game_pin = $1 AND question_index < $2',
+    [game.pin, game.question_index],
+  );
+  const correctBefore = new Map();
+  for (const a of earlier) {
+    if (a.choice !== game.quiz.questions[a.question_index].correct) continue;
+    if (!correctBefore.has(a.player_key)) correctBefore.set(a.player_key, new Set());
+    correctBefore.get(a.player_key).add(a.question_index);
+  }
   for (const answer of answers) {
-    const points = scoreAnswer(q, answer, game.question_started_at);
+    const base = scoreAnswer(q, answer, game.question_started_at);
+    let streak = 0;
+    if (base > 0) {  // richtig beantwortet: Serie = diese Antwort plus die richtigen Antworten direkt davor
+      streak = 1;
+      const before = correctBefore.get(answer.player_key) || new Set();
+      for (let i = game.question_index - 1; before.has(i); i--) streak++;
+    }
+    const bonus = base > 0 ? streakBonus(streak) : 0;
+    const points = base + bonus;
     await client.query(
-      'UPDATE quiz.game_answers SET points = $4 WHERE game_pin = $1 AND question_index = $2 AND player_key = $3',
-      [game.pin, game.question_index, answer.player_key, points],
+      `UPDATE quiz.game_answers SET points = $4, streak = $5, bonus = $6
+       WHERE game_pin = $1 AND question_index = $2 AND player_key = $3`,
+      [game.pin, game.question_index, answer.player_key, points, streak, bonus],
     );
     await client.query(
       'UPDATE quiz.game_players SET score = score + $3 WHERE game_pin = $1 AND key = $2',
@@ -75,6 +96,21 @@ async function reveal(client, game) {
     );
   }
   await client.query("UPDATE quiz.games SET state = 'reveal' WHERE pin = $1", [game.pin]);
+}
+
+// Team-Modus: Spieler mischen und reihum auf die Teams verteilen (Teamgrößen unterscheiden sich um höchstens 1)
+async function assignTeams(client, game) {
+  const { rows } = await client.query('SELECT key FROM quiz.game_players WHERE game_pin = $1', [game.pin]);
+  const keys = rows.map((r) => r.key);
+  for (let i = keys.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [keys[i], keys[j]] = [keys[j], keys[i]];
+  }
+  await client.query(`
+    UPDATE quiz.game_players p SET team = t.team
+    FROM unnest($2::text[], $3::int[]) AS t(key, team)
+    WHERE p.game_pin = $1 AND p.key = t.key
+  `, [game.pin, keys, keys.map((_, i) => i % game.team_count)]);
 }
 
 // Spiel beenden und Punkte aller eingeloggten Spieler dauerhaft speichern (Gäste nicht)
@@ -121,13 +157,20 @@ async function loadGame(pin) {
   }
   if (!game) return null;
   const players = await db.query(
-    'SELECT key, user_id, name, score, joined_at FROM quiz.game_players WHERE game_pin = $1 ORDER BY score DESC, joined_at',
+    'SELECT key, user_id, name, score, team, joined_at FROM quiz.game_players WHERE game_pin = $1 ORDER BY score DESC, joined_at',
     [pin],
   );
   const answers = await db.query(
-    'SELECT player_key, choice, points FROM quiz.game_answers WHERE game_pin = $1 AND question_index = $2',
+    'SELECT player_key, choice, points, streak, bonus FROM quiz.game_answers WHERE game_pin = $1 AND question_index = $2',
     [pin, game.question_index],
   );
+  // Serien nach der vorherigen Frage (zeigt während einer Frage, welche Serie man gerade hat)
+  const previous = game.question_index > 0
+    ? await db.query(
+      'SELECT player_key, streak FROM quiz.game_answers WHERE game_pin = $1 AND question_index = $2',
+      [pin, game.question_index - 1],
+    )
+    : [];
   // Erfolge, die in diesem Spiel erreicht wurden (erst nach Spielende vorhanden)
   const achievements = game.state === 'finished'
     ? await db.query(`
@@ -136,7 +179,7 @@ async function loadGame(pin) {
         WHERE a.game_pin = $1 ORDER BY a.earned_at, a.achievement_key
       `, [pin])
     : [];
-  return { game, players, answers, achievements };
+  return { game, players, answers, previous, achievements };
 }
 
 // Ergänzt jeden Spieler um Platz, Punkte und Platz vor der aktuellen Frage ("Zwischenstand")
@@ -163,6 +206,7 @@ function baseView({ game }) {
     questionIndex: game.question_index,
     total: game.quiz.questions.length,
     minPlayers: MIN_PLAYERS_FOR_SCORING,
+    teamCount: game.team_count,
     serverNow: Date.now(),
   };
   if (game.state === 'question' || game.state === 'reveal') {
@@ -184,8 +228,26 @@ function hostView(data) {
     gained: p.gained,
     rank: p.rank,
     prevRank: p.prevRank,
+    team: p.team,
   }));
   view.answeredCount = data.answers.length;
+  if (data.game.team_count > 0 && data.game.state !== 'lobby') {
+    view.teams = standings(rankPlayers(data), data.game.team_count).map((t) => ({
+      index: t.index,
+      name: t.name,
+      emoji: t.emoji,
+      color: t.color,
+      size: t.size,
+      members: t.members.map((m) => ({ name: m.name, guest: !m.user_id, score: m.score })),
+      score: t.score,
+      prevScore: t.prevScore,
+      gained: t.gained,
+      rank: t.rank,
+      prevRank: t.prevRank,
+      bonus: t.bonus,
+      bonusFrom: t.bonusFrom,
+    }));
+  }
   if (data.game.state === 'finished') {
     const byUser = new Map();
     for (const a of data.achievements) {
@@ -219,7 +281,23 @@ function playerView(data, key) {
     view.myAnswer = mine ? mine.choice : null;
     if (data.game.state === 'reveal') view.lastPoints = mine ? mine.points : 0;
   }
+  // Serie: vor der Antwort die laufende Serie, nach der Auflösung die Serie samt Bonus dieser Frage
+  if (data.game.state === 'question') {
+    const prev = data.previous.find((a) => a.player_key === key);
+    view.streak = prev ? prev.streak : 0;
+    view.nextBonus = streakBonus(view.streak + 1);
+  } else if (data.game.state === 'reveal' || data.game.state === 'scoreboard') {
+    view.streak = mine ? mine.streak : 0;
+    view.lastBonus = mine ? mine.bonus : 0;
+  }
   if (data.game.state === 'scoreboard') view.lastPoints = player.gained;
+  if (data.game.team_count > 0 && player.team !== null) {
+    const teams = standings(players, data.game.team_count);
+    const mineTeam = teams.find((t) => t.index === player.team);
+    view.team = { index: mineTeam.index, name: mineTeam.name, emoji: mineTeam.emoji, color: mineTeam.color };
+    view.teammates = mineTeam.members.filter((m) => m.key !== key).map((m) => m.name);
+    view.teamStanding = { rank: mineTeam.rank, prevRank: mineTeam.prevRank, score: mineTeam.score, teams: teams.length };
+  }
   if (data.game.state === 'finished') {
     view.achievements = player.user_id
       ? data.achievements.filter((a) => a.user_id === player.user_id).map((a) => publicInfo(a.achievement_key))
@@ -276,9 +354,30 @@ router.get('/:pin/host', requireAuth, requireHost, async (req, res) => {
   res.json(hostView(await loadGame(req.params.pin)));
 });
 
+// Team-Modus ein-/ausschalten (nur in der Lobby): count = 0 (aus) oder Anzahl der Teams
+router.post('/:pin/teams', requireAuth, requireHost, async (req, res) => {
+  const count = Number(req.body.count);
+  if (count !== 0 && !TEAM_COUNTS.includes(count)) return res.status(400).json({ error: 'Ungültige Teamanzahl' });
+  const result = await updateGame(req.params.pin, async (client, game) => {
+    if (game.state !== 'lobby') return { error: 'Die Teams lassen sich nur vor dem Start ändern', status: 409 };
+    await client.query('UPDATE quiz.games SET team_count = $2 WHERE pin = $1', [game.pin, count]);
+    return { changed: true };
+  });
+  if (result.error) return res.status(result.status).json({ error: result.error });
+  res.json(hostView(await loadGame(req.params.pin)));
+});
+
 router.post('/:pin/next', requireAuth, requireHost, async (req, res) => {
-  await updateGame(req.params.pin, async (client, game) => {
-    if (game.state === 'lobby') {
+  const result = await updateGame(req.params.pin, async (client, game) => {
+    if (game.state === 'lobby' && game.team_count > 0) {
+      const { rows } = await client.query('SELECT COUNT(*)::int AS n FROM quiz.game_players WHERE game_pin = $1', [game.pin]);
+      const needed = game.team_count * MIN_PLAYERS_PER_TEAM;
+      if (rows[0].n < needed) {
+        return { error: `Für ${game.team_count} Teams braucht es mindestens ${needed} Teilnehmer.`, status: 409 };
+      }
+      await assignTeams(client, game);
+      await client.query("UPDATE quiz.games SET state = 'teams' WHERE pin = $1", [game.pin]);
+    } else if (game.state === 'lobby' || game.state === 'teams') {
       await startQuestion(client, game, 0);
     } else if (game.state === 'question') {
       await reveal(client, game);
@@ -293,6 +392,7 @@ router.post('/:pin/next', requireAuth, requireHost, async (req, res) => {
     }
     return { changed: true };
   });
+  if (result.error) return res.status(result.status).json({ error: result.error });
   res.json(hostView(await loadGame(req.params.pin)));
 });
 

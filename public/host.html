@@ -18,6 +18,18 @@
   <main class="host">
     <p class="error" id="error"></p>
     <div id="view"></div>
+    <div class="card" id="team-options" hidden>
+      <div class="row spread">
+        <label for="team-count" style="margin:0">👥 Team-Modus</label>
+        <select id="team-count" style="width:auto">
+          <option value="0">Aus (jeder für sich)</option>
+          <option value="2">2 Teams</option>
+          <option value="3">3 Teams</option>
+          <option value="4">4 Teams</option>
+        </select>
+      </div>
+      <p class="muted" id="team-hint" style="margin:.75rem 0 0"></p>
+    </div>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   <script src="/js/common.js"></script>
@@ -72,39 +84,79 @@
 
     // --- Zwischenstand nach jeder Runde ---
 
+    // Einträge der Rangliste: im Team-Modus die Teams, sonst die Spieler
+    function boardEntries(s) {
+      if (s.teams) {
+        return s.teams.map((t) => ({
+          name: `${t.emoji} ${t.name}`, tag: `${t.size} Spieler`, color: t.color,
+          rank: t.rank, prevRank: t.prevRank, score: t.score, prevScore: t.prevScore, gained: t.gained,
+        }));
+      }
+      return s.players.map((p) => ({
+        name: p.name, tag: p.guest ? 'Gast' : '', rank: p.rank, prevRank: p.prevRank,
+        score: p.score, prevScore: p.prevScore, gained: p.gained,
+      }));
+    }
+
+    function visibleBoard(s) {
+      return boardEntries(s).filter((p) => p.rank <= BOARD_ROWS || p.prevRank <= BOARD_ROWS);
+    }
+
+    // --- Zwischenstand nach jeder Runde ---
+
     function scoreboardHtml(s) {
-      const players = s.players.filter((p) => p.rank <= BOARD_ROWS || p.prevRank <= BOARD_ROWS);
-      const rows = Math.min(BOARD_ROWS, s.players.length);
+      const entries = visibleBoard(s);
+      const total = boardEntries(s).length;
+      const rows = Math.min(BOARD_ROWS, total);
       const start = !reducedMotion;  // erst an alter Position zeigen, dann umsortieren
       return `
         <div class="row spread">
           <span class="muted">Frage ${s.questionIndex + 1} / ${s.total} · PIN ${escapeHtml(s.pin)}</span>
         </div>
-        <h2 class="center" style="margin-top:1rem">Zwischenstand</h2>
+        <h2 class="center" style="margin-top:1rem">${s.teams ? 'Zwischenstand der Teams' : 'Zwischenstand'}</h2>
         <div class="board" id="board" style="height: calc(${rows} * var(--slot) - .5rem)">
-          ${players.map((p, i) => `
-            <div class="board-row" data-i="${i}" style="--pos:${(start ? p.prevRank : p.rank) - 1}">
+          ${entries.map((p, i) => `
+            <div class="board-row" data-i="${i}" ${p.color ? `data-team style="--team:${p.color};--pos:${(start ? p.prevRank : p.rank) - 1}"` : `style="--pos:${(start ? p.prevRank : p.rank) - 1}"`}>
               <span class="place">${start ? p.prevRank : p.rank}</span>
-              <span class="who">${escapeHtml(p.name)}${guestTag(p)}</span>
+              <span class="who">${escapeHtml(p.name)}${p.tag ? ` <span class="muted">(${escapeHtml(p.tag)})</span>` : ''}</span>
               <span class="gain">${p.gained ? '+' + p.gained : ''}</span>
               <span class="pts">${start ? p.prevScore : p.score}</span>
               <span class="move"></span>
             </div>`).join('')}
         </div>
-        ${s.players.length > BOARD_ROWS ? `<p class="center muted">… und ${s.players.length - BOARD_ROWS} weitere</p>` : ''}`;
+        ${total > BOARD_ROWS ? `<p class="center muted">… und ${total - BOARD_ROWS} weitere</p>` : ''}
+        ${s.teams ? teamExtras(s) : ''}`;
+    }
+
+    // Team-Modus unter der Rangliste: Ausgleich und die besten Einzelspieler
+    function teamExtras(s) {
+      const compensated = s.teams.filter((t) => t.bonus > 0);
+      return `
+        ${compensated.length ? `<p class="center muted" style="margin-top:1rem">⚖️ Ausgleich für die kleineren Teams: ${compensated.map((t) =>
+          `${t.emoji} ${escapeHtml(t.name)} +${t.bonus} (Punkte von ${escapeHtml(t.bonusFrom)}, dem schwächsten Spieler der größeren Teams)`).join(' · ')}</p>` : ''}
+        <div class="card" style="max-width:760px;margin:1.5rem auto 0">
+          <h3>Beste Einzelspieler</h3>
+          <ol class="ranking" style="font-size:1.1rem">${s.players.slice(0, 3).map((p) =>
+            `<li>${teamEmoji(s, p)} ${escapeHtml(p.name)} – ${p.score} Punkte</li>`).join('')}</ol>
+        </div>`;
+    }
+
+    function teamEmoji(s, p) {
+      const t = s.teams && s.teams.find((x) => x.index === p.team);
+      return t ? t.emoji : '';
     }
 
     function animateScoreboard(s) {
-      const players = s.players.filter((p) => p.rank <= BOARD_ROWS || p.prevRank <= BOARD_ROWS);
+      const entries = visibleBoard(s);
       if (reducedMotion) {
         document.querySelectorAll('.board-row').forEach((row) => {
-          if (players[row.dataset.i].rank < players[row.dataset.i].prevRank) row.classList.add('climbed');
+          if (entries[row.dataset.i].rank < entries[row.dataset.i].prevRank) row.classList.add('climbed');
         });
         return;
       }
       later(() => {
         document.querySelectorAll('.board-row').forEach((row) => {
-          const p = players[row.dataset.i];
+          const p = entries[row.dataset.i];
           row.style.setProperty('--pos', p.rank - 1);
           countUp(row.querySelector('.pts'), p.prevScore, p.score, 1100);
           if (p.rank < p.prevRank) {
@@ -116,11 +168,35 @@
       }, 1500);
     }
 
+    // --- Die Teams vorstellen ---
+
+    function teamsHtml(s) {
+      const sizes = new Set(s.teams.map((t) => t.size));
+      return `
+        <h1 class="center">Die Teams</h1>
+        <div class="teams-grid">${s.teams.map((t, i) => `
+          <div class="team-card pop-in" style="--delay:${reducedMotion ? 0 : 0.3 + i * 0.5}s;--team:${t.color}">
+            <h2>${t.emoji} ${escapeHtml(t.name)}</h2>
+            <p class="muted">${t.size} Spieler</p>
+            <ul>${t.members.map((m) => `<li>${escapeHtml(m.name)}${guestTag(m)}</li>`).join('')}</ul>
+          </div>`).join('')}</div>
+        ${sizes.size > 1 ? `<p class="center muted" style="margin-top:1.5rem">⚖️ Ungleich große Teams: Das kleinere Team bekommt als Ausgleich die Punkte des schwächsten Spielers aus den größeren Teams.</p>` : ''}`;
+    }
+
     // --- Siegerehrung ---
 
+    // Podiumsplätze: im Team-Modus die Teams, sonst die Spieler
+    function podiumEntries(s) {
+      if (s.teams) {
+        return s.teams.map((t) => ({ name: `${t.emoji} ${t.name}`, score: t.score, sub: t.members.map((m) => m.name).join(', ') }));
+      }
+      return s.players.map((p) => ({ name: p.name, score: p.score }));
+    }
+
     function podiumHtml(s) {
-      if (!s.players.length) return '<div class="card center"><h2>Keine Teilnehmer</h2></div>';
-      const top = s.players.slice(0, 3);
+      const entries = podiumEntries(s);
+      if (!entries.length) return '<div class="card center"><h2>Keine Teilnehmer</h2></div>';
+      const top = entries.slice(0, 3);
       const medals = ['🥇', '🥈', '🥉'];
       // Reihenfolge des Aufpoppens: Platz 3, dann 2, dann 1
       const delay = (i) => reducedMotion ? 0 : 0.6 + (top.length - 1 - i) * 1.8;
@@ -130,14 +206,15 @@
           ${i === 0 ? `<div class="crown" aria-hidden="true">👑</div>` : `<div class="medal" aria-hidden="true">${medals[i]}</div>`}
           <div class="who">${escapeHtml(top[i].name)}</div>
           <div class="score">${top[i].score} Punkte</div>
+          ${top[i].sub ? `<div class="members muted">${escapeHtml(top[i].sub)}</div>` : ''}
           <div class="step">${i + 1}</div>
         </div>`;
       // Sichtbare Reihenfolge: 2 – 1 – 3
       const order = [1, 0, 2].filter((i) => top[i]);
-      const rest = s.players.slice(3);
+      const rest = entries.slice(3);
       return `
         <h1 class="center">Siegerehrung</h1>
-        <div class="winner-title" style="--delay:${winnerDelay + 0.9}s">🏆 ${escapeHtml(top[0].name)} gewinnt!</div>
+        <div class="winner-title" style="--delay:${winnerDelay + 0.9}s">🏆 ${escapeHtml(top[0].name)} ${s.teams ? 'gewinnen' : 'gewinnt'}!</div>
         <div class="podium">${order.map(slot).join('')}</div>
         ${rest.length ? `
           <div class="card fade-in" style="--delay:${winnerDelay + 1.8}s; max-width:760px; margin:0 auto 1rem">
@@ -145,6 +222,12 @@
             <ol class="ranking" start="4" style="font-size:1.1rem">${rest.slice(0, 10).map((p) =>
               `<li>${escapeHtml(p.name)} – ${p.score} Punkte</li>`).join('')}</ol>
             ${rest.length > 10 ? `<p class="muted">… und ${rest.length - 10} weitere</p>` : ''}
+          </div>` : ''}
+        ${s.teams ? `
+          <div class="card fade-in" style="--delay:${winnerDelay + 1.8}s; max-width:760px; margin:0 auto 1rem">
+            <h3>Beste Einzelspieler</h3>
+            <ol class="ranking" style="font-size:1.1rem">${s.players.slice(0, 5).map((p) =>
+              `<li>${teamEmoji(s, p)} ${escapeHtml(p.name)} – ${p.score} Punkte</li>`).join('')}</ol>
           </div>` : ''}
         ${s.achievements && s.achievements.length ? `
           <div class="card fade-in" style="--delay:${winnerDelay + 2.6}s; max-width:760px; margin:0 auto 1rem">
@@ -176,27 +259,53 @@
 
     // --- Hauptansicht ---
 
+    // --- Team-Modus in der Lobby ---
+
+    function teamHint(s) {
+      const n = s.players.length;
+      const k = s.teamCount;
+      if (!k) return 'Alle spielen einzeln. Mit Teams werden die Teilnehmer beim Start zufällig in gleich große Teams gelost.';
+      const need = k * 2;
+      if (n < need) return `Für ${k} Teams braucht es mindestens ${need} Teilnehmer (aktuell ${n}).`;
+      const base = Math.floor(n / k);
+      const extra = n % k;
+      const sizes = Array.from({ length: k }, (_, i) => base + (i < extra ? 1 : 0)).join(' + ');
+      return `${n} Teilnehmer → Teams mit ${sizes} Spielern.${extra
+        ? ' Ausgleich: Das kleinere Team bekommt die Punkte des schwächsten Spielers aus den größeren Teams.' : ''}`;
+    }
+
+    function updateTeamOptions(s) {
+      const box = $('#team-options');
+      box.hidden = s.state !== 'lobby';
+      if (s.state !== 'lobby') return;
+      const select = $('#team-count');
+      if (document.activeElement !== select) select.value = String(s.teamCount);  // nicht stören, solange man auswählt
+      $('#team-hint').textContent = teamHint(s);
+    }
+
     function updateControls(s) {
       $('#title').textContent = s.title;
       const nextBtn = $('#next');
       nextBtn.hidden = s.state === 'finished';
       $('#end').hidden = s.state === 'finished';
       nextBtn.textContent = {
-        lobby: 'Quiz starten',
+        lobby: s.teamCount ? 'Teams bilden' : 'Quiz starten',
+        teams: 'Erste Frage',
         question: 'Auflösen',
         reveal: 'Rangliste zeigen',
         scoreboard: s.questionIndex + 1 < s.total ? 'Nächste Frage' : 'Siegerehrung',
       }[s.state] || '';
-      nextBtn.disabled = s.state === 'lobby' && !s.players.length;
+      nextBtn.disabled = s.state === 'lobby' && s.players.length < Math.max(1, s.teamCount * 2);
+      updateTeamOptions(s);
     }
 
     function render() {
       const s = state;
       updateControls(s);
 
-      // Zwischenstand und Siegerehrung nur einmal aufbauen, sonst startet die Animation bei jedem Nachladen neu
+      // Zwischenstand, Teams und Siegerehrung nur einmal aufbauen, sonst startet die Animation bei jedem Nachladen neu
       const key = `${s.state}:${s.questionIndex}`;
-      if ((s.state === 'scoreboard' || s.state === 'finished') && key === lastKey) return;
+      if (['scoreboard', 'finished', 'teams'].includes(s.state) && key === lastKey) return;
       lastKey = key;
 
       stopAnimations();
@@ -222,6 +331,8 @@
               `<span class="chip">${escapeHtml(p.name)}${guestTag(p)}</span>`).join('') ||
               '<span class="muted">Warte auf Teilnehmer …</span>'}</div>
           </div>`;
+      } else if (s.state === 'teams') {
+        html = teamsHtml(s);
       } else if (s.state === 'question' || s.state === 'reveal') {
         const reveal = s.state === 'reveal';
         html = `
@@ -250,7 +361,8 @@
       } else if (s.state === 'scoreboard') {
         animateScoreboard(s);
       } else if (s.state === 'finished' && s.players.length && !reducedMotion) {
-        later(confetti, (0.6 + (Math.min(3, s.players.length) - 1) * 1.8) * 1000 + 300);
+        const places = Math.min(3, podiumEntries(s).length);
+        later(confetti, (0.6 + (places - 1) * 1.8) * 1000 + 300);
       }
     }
 
@@ -266,12 +378,22 @@
         render();
       });
       const act = async (action) => {
+        $('#error').textContent = '';
         $('#next').disabled = true;
         try {
           live.apply(await api(`/api/games/${encodeURIComponent(pin)}/${action}`, { method: 'POST' }));
         } catch (err) {
           $('#error').textContent = err.message;
           $('#next').disabled = false;
+        }
+      };
+      $('#team-count').onchange = async (e) => {
+        $('#error').textContent = '';
+        try {
+          live.apply(await api(`/api/games/${encodeURIComponent(pin)}/teams`, { method: 'POST', body: { count: Number(e.target.value) } }));
+        } catch (err) {
+          $('#error').textContent = err.message;
+          live.refresh();
         }
       };
       $('#next').onclick = () => act('next');

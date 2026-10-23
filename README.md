@@ -81,6 +81,18 @@ INSERT INTO quiz.subjects (name, position) VALUES ('Statistik', 4);
 
 **Mindestteilnehmer:** In Gesamtpunkte und Fächer-Statistik fließen nur Spiele mit mindestens 10 Teilnehmern ein (Gäste mitgezählt). Kleinere Spiele bleiben in „Meine Ergebnisse“ sichtbar, sind dort aber als „zählt nicht“ markiert. Der Wert steht in `src/config.js` (`MIN_PLAYERS_FOR_SCORING`) und wird beim Abruf der Statistik angewendet, eine Änderung gilt also auch rückwirkend.
 
+## Serien-Bonus
+
+Wer mehrere Fragen in Folge richtig beantwortet, bekommt Extrapunkte: ab der 2. richtigen Antwort in Folge +50 pro Serienschritt, höchstens +250 (also 2 in Folge: +50, 3: +100, … ab 6: +250). Eine falsche oder unbeantwortete Frage beendet die Serie. Auf dem Handy steht vor der Frage die aktuelle Serie samt möglichem Bonus, nach der Auflösung der erhaltene Bonus. Die Werte stehen in `src/config.js` (`STREAK_BONUS_PER_STEP`, `STREAK_BONUS_MAX`). Der Bonus zählt zu den normalen Punkten (Rangliste, Gesamtwertung); der Erfolg „Blitzmerker“ berücksichtigt nur die Basispunkte.
+
+## Team-Modus
+
+Der Host wählt in der Lobby unter „Team-Modus“ 2, 3 oder 4 Teams (🦊 Füchse, 🦉 Eulen, 🐸 Frösche, 🐝 Bienen). Mit „Teams bilden“ werden die Teilnehmer zufällig in Teams verteilt; die Teamgrößen unterscheiden sich höchstens um 1, jedes Team braucht mindestens 2 Spieler. Danach werden die Teams auf dem großen Bildschirm vorgestellt, jeder sieht auf dem Handy sein Team.
+
+- **Teampunkte** = Summe der Punkte aller Mitglieder; die Rangliste nach jeder Runde und die Siegerehrung zeigen die Teams (darunter die besten Einzelspieler).
+- **Ausgleich bei ungleichen Teams:** Hat ein Team weniger Mitglieder als die größten, bekommt es zusätzlich die Punkte des schwächsten Spielers aller größeren Teams. Der Ausgleich steht auf dem Bildschirm unter der Rangliste.
+- Jeder sammelt weiter seine Einzelpunkte (Gesamtwertung, Erfolge). Wertung und Mindestteilnehmerzahl gelten wie im normalen Spiel.
+
 ## Erfolge
 
 Eingeloggte Spieler sammeln Erfolge (Dashboard → „Meine Erfolge“, am Spielende poppen neue auf dem Handy auf, der Host sieht sie unter der Siegerehrung). Sie werden nur in Spielen vergeben, die für die Gesamtwertung zählen (mindestens 10 Teilnehmer), und nur für Konten, nie für Gäste.
@@ -98,6 +110,7 @@ Eingeloggte Spieler sammeln Erfolge (Dashboard → „Meine Erfolge“, am Spiel
 | | ⚡ Blitzmerker | 3 richtige Antworten in den ersten 10 % der Zeit |
 | | 🚀 Raketenstart | in einer Runde um 3 Plätze aufgestiegen |
 | Spielleitung | 🎤 Quizmaster | ein gewertetes Quiz als Host geleitet |
+| Team | 🤝 Teamgeist | ein Quiz im Team-Modus mit dem eigenen Team gewonnen |
 
 Die Erfolge sind in `src/achievements.js` definiert (Name, Symbol, Beschreibung); ein neuer Erfolg braucht dort einen Eintrag und eine Bedingung in `awardForGame`. Vergeben wird am Spielende, einmal pro Nutzer und Erfolg (`quiz.user_achievements`).
 
