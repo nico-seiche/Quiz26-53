@@ -6,6 +6,7 @@ const { Server } = require('socket.io');
 const auth = require('./src/auth');
 const quizzes = require('./src/quizzes');
 const game = require('./src/game');
+const results = require('./src/results');
 
 const app = express();
 app.set('trust proxy', true);
@@ -15,6 +16,7 @@ app.use(auth.loadUser);
 app.use('/api/auth', auth.router);
 app.use('/api/quizzes', quizzes.router);
 app.use('/api/games', game.router);
+app.use('/api/results', results.router);
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
 
 const server = http.createServer(app);

@@ -8,7 +8,7 @@
 </head>
 <body>
   <header class="top">
-    <a class="brand" href="/dashboard">Quiz</a>
+    <a class="brand" href="/">Quiz</a>
     <span class="muted" id="status"></span>
   </header>
   <main>
@@ -17,6 +17,11 @@
       <form id="join-form">
         <label for="pin">Game-PIN</label>
         <input type="text" id="pin" inputmode="numeric" autocomplete="off">
+        <div id="name-field">
+          <label for="name">Dein Name</label>
+          <input type="text" id="name" maxlength="20" autocomplete="nickname">
+        </div>
+        <p class="muted" id="account-hint"></p>
         <p class="error" id="error"></p>
         <button class="primary" type="submit">Beitreten</button>
       </form>
@@ -27,13 +32,36 @@
   <script src="/js/common.js"></script>
   <script>
     let socket;
+    let me = null;
     let state = null;
     let tick = null;
     let joinedPin = null;
 
+    // Zufällige Gast-ID pro Tab, damit man nach einem Reload im selben Spiel bleibt
+    function guestId() {
+      let id = sessionStorage.getItem('guestId');
+      if (!id) {
+        const bytes = crypto.getRandomValues(new Uint8Array(16));
+        id = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+        sessionStorage.setItem('guestId', id);
+      }
+      return id;
+    }
+
+    function showJoinForm() {
+      $('#join').hidden = false;
+      $('#name-field').hidden = !!me;
+      $('#name').value = sessionStorage.getItem('guestName') || '';
+      const loginLink = `/?next=${encodeURIComponent(location.pathname + location.search)}`;
+      $('#account-hint').innerHTML = me
+        ? `Du spielst als <strong>${escapeHtml(me.username)}</strong> – deine Punkte werden gespeichert.`
+        : `Du spielst als Gast. <a href="${loginLink}">Anmelden</a>, um deine Punkte zu speichern.`;
+      ($('#pin').value ? (me ? $('#pin') : $('#name')) : $('#pin')).focus();
+    }
+
     function render() {
       const s = state;
-      $('#status').textContent = `${s.username} · ${s.score} Punkte`;
+      $('#status').textContent = `${s.name}${s.guest ? ' (Gast)' : ''} · ${s.score} Punkte`;
       clearInterval(tick);
       let html = '';
 
@@ -69,7 +97,9 @@
           <h1>Quiz beendet</h1>
           <p class="big">${s.score} Punkte</p>
           <p>Platz ${s.rank} von ${s.playerCount}</p>
-          <p><a class="btn" href="/dashboard">Zum Dashboard</a></p>
+          ${s.guest
+            ? '<p class="muted">Als Gast werden deine Punkte nicht gespeichert.</p><p><a class="btn" href="/">Konto erstellen</a></p>'
+            : '<p class="muted">Deine Punkte wurden gespeichert.</p><p><a class="btn" href="/dashboard">Zu meinen Ergebnissen</a></p>'}
         </div>`;
       }
       $('#view').innerHTML = html;
@@ -84,14 +114,17 @@
       }
     }
 
-    function join(pin) {
-      socket.emit('player:join', { pin }, (res) => {
+    function join(pin, name) {
+      socket.emit('player:join', { pin, name, guestId: guestId() }, (res) => {
         if (res.error) {
-          $('#join').hidden = false;
+          joinedPin = null;
+          showJoinForm();
           $('#error').textContent = res.error;
           return;
         }
         $('#join').hidden = true;
+        $('#error').textContent = '';
+        if (name) sessionStorage.setItem('guestName', name);
         history.replaceState(null, '', `/play?pin=${encodeURIComponent(pin)}`);
         joinedPin = pin;
       });
@@ -104,21 +137,21 @@
 
     $('#join-form').onsubmit = (e) => {
       e.preventDefault();
-      join($('#pin').value.trim());
+      join($('#pin').value.trim(), me ? undefined : $('#name').value.trim());
     };
 
-    requireLogin().then(() => {
+    api('/api/auth/me').catch(() => null).then((user) => {
+      me = user;
       socket = io();
       socket.on('game:state', (s) => { state = s; render(); });
-      // Bei Verbindungsabbruch automatisch wieder beitreten
       socket.on('connect', () => {
-        const pin = joinedPin || new URLSearchParams(location.search).get('pin');
-        if (pin) {
-          $('#pin').value = pin;
-          join(pin);
-        } else {
-          $('#join').hidden = false;
-        }
+        // Nach Verbindungsabbruch automatisch wieder beitreten
+        if (joinedPin) return join(joinedPin);
+        const pin = new URLSearchParams(location.search).get('pin');
+        if (pin) $('#pin').value = pin;
+        // Eingeloggte (oder Gäste, die schon drin waren) treten direkt bei
+        if (pin && (me || sessionStorage.getItem('guestName'))) join(pin, sessionStorage.getItem('guestName'));
+        else showJoinForm();
       });
     });
   </script>

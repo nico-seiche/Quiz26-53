@@ -41,6 +41,18 @@ db.exec(`
     correct    INTEGER NOT NULL,
     time_limit INTEGER NOT NULL DEFAULT 20
   );
+
+  -- Ergebnisse eingeloggter Spieler; Titel wird kopiert, damit Ergebnisse gelöschte Quizze überleben
+  CREATE TABLE IF NOT EXISTS game_results (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    quiz_id      INTEGER,
+    quiz_title   TEXT NOT NULL,
+    score        INTEGER NOT NULL,
+    rank         INTEGER NOT NULL,
+    player_count INTEGER NOT NULL,
+    played_at    TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
 
 module.exports = db;

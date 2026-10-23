@@ -27,6 +27,14 @@
 
     <div class="card">
       <div class="row spread">
+        <h2>Meine Ergebnisse</h2>
+        <span class="muted" id="total"></span>
+      </div>
+      <ul class="list" id="results"></ul>
+    </div>
+
+    <div class="card">
+      <div class="row spread">
         <h2>Meine Quizze</h2>
         <a class="btn primary" href="/edit">+ Neues Quiz</a>
       </div>
@@ -74,9 +82,23 @@
       }
     };
 
+    async function loadResults() {
+      const { total, results } = await api('/api/results');
+      $('#total').textContent = `${total} Punkte insgesamt`;
+      $('#results').innerHTML = results.length ? results.map((r) => `
+        <li>
+          <div>
+            <strong>${escapeHtml(r.quiz_title)}</strong><br>
+            <span class="muted">${new Date(r.played_at.replace(' ', 'T') + 'Z').toLocaleString('de-DE')}</span>
+          </div>
+          <div>${r.score} Punkte · Platz ${r.rank}/${r.player_count}</div>
+        </li>`).join('') : '<li class="muted">Noch keine Ergebnisse – spiel eingeloggt mit, dann werden deine Punkte hier gespeichert.</li>';
+    }
+
     requireLogin().then((me) => {
       $('#me').textContent = me.username;
       load();
+      loadResults();
     });
   </script>
 </body>

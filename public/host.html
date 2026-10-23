@@ -62,7 +62,7 @@
           <div class="card">
             <h3>${s.players.length} Teilnehmer</h3>
             <div class="players">${s.players.map((p) =>
-              `<span class="chip ${p.connected ? '' : 'offline'}">${escapeHtml(p.username)}</span>`).join('') ||
+              `<span class="chip ${p.connected ? '' : 'offline'}">${escapeHtml(p.name)}${p.guest ? ' <span class="muted">(Gast)</span>' : ''}</span>`).join('') ||
               '<span class="muted">Warte auf Teilnehmer …</span>'}</div>
           </div>`;
       } else if (s.state === 'question' || s.state === 'reveal') {
@@ -79,14 +79,14 @@
             <div class="card" style="margin-top:1.5rem">
               <h3>Zwischenstand</h3>
               <ol class="ranking">${s.players.slice(0, 5).map((p) =>
-                `<li>${escapeHtml(p.username)} – ${p.score}</li>`).join('')}</ol>
+                `<li>${escapeHtml(p.name)} – ${p.score}</li>`).join('')}</ol>
             </div>` : ''}`;
       } else if (s.state === 'finished') {
         html = `
           <div class="card center">
             <h1>Endstand</h1>
             <ol class="ranking" style="display:inline-block;text-align:left">${s.players.map((p) =>
-              `<li>${escapeHtml(p.username)} – ${p.score} Punkte</li>`).join('')}</ol>
+              `<li>${escapeHtml(p.name)} – ${p.score} Punkte</li>`).join('')}</ol>
             <p><a class="btn" href="/dashboard">Zurück zum Dashboard</a></p>
           </div>`;
       }
