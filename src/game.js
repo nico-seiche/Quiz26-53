@@ -157,7 +157,7 @@ function baseView({ game }) {
   };
   if (game.state === 'question' || game.state === 'reveal') {
     const q = currentQuestion(game);
-    view.question = { text: q.text, answers: q.answers };
+    view.question = { text: q.text, answers: q.answers, timeLimit: q.timeLimit };
     view.endsAt = game.ends_at.getTime();
     if (game.state === 'reveal') view.question.correct = q.correct;
   }

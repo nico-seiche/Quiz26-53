@@ -33,7 +33,7 @@
   <script>
     let me = null;
     let state = null;
-    let tick = null;
+    let tick = null;  // Intervall bzw. Animationsframe des Countdown-Rings
     let live = null;
     let joinedPin = null;
 
@@ -63,7 +63,7 @@
     function render() {
       const s = state;
       $('#status').textContent = `${s.name}${s.guest ? ' (Gast)' : ''} · ${s.score} Punkte`;
-      clearInterval(tick);
+      stopTimer();
       let html = '';
 
       if (s.state === 'lobby') {
@@ -77,12 +77,18 @@
         html = `
           <div class="row spread">
             <span class="muted">Frage ${s.questionIndex + 1} / ${s.total}</span>
-            <strong id="timer"></strong>
           </div>
           <h2>${escapeHtml(s.question.text)}</h2>
           <div class="answers">${s.question.answers.map((a, i) => `
             <button type="button" class="answer c${i} ${answered && s.myAnswer !== i ? 'dim' : ''} ${s.myAnswer === i ? 'chosen' : ''}"
               data-choice="${i}" ${answered ? 'disabled' : ''}>${escapeHtml(a)}</button>`).join('')}
+          </div>
+          <div class="timer-ring" id="ring" role="timer" aria-label="Verbleibende Zeit">
+            <svg viewBox="0 0 100 100" aria-hidden="true">
+              <circle class="track" cx="50" cy="50" r="45"></circle>
+              <circle class="bar" id="ring-bar" cx="50" cy="50" r="45" pathLength="1"></circle>
+            </svg>
+            <span id="timer"></span>
           </div>
           ${answered ? '<p class="center muted">Antwort abgegeben – warte auf die anderen …</p>' : ''}`;
       } else if (s.state === 'reveal') {
@@ -118,14 +124,33 @@
       }
       $('#view').innerHTML = html;
 
-      if (s.state === 'question') {
-        const update = () => {
-          const el = $('#timer');
-          if (el) el.textContent = `${Math.ceil(live.remaining(s))} s`;
-        };
-        update();
-        tick = setInterval(update, 250);
-      }
+      if (s.state === 'question') startTimer(s);
+    }
+
+    // Der Ring läuft aus der Restzeit (Serveruhr) herunter; bei reduzierter Bewegung nur einmal pro Sekunde
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const URGENT_SECONDS = 5;
+
+    function stopTimer() {
+      clearInterval(tick);
+      cancelAnimationFrame(tick);
+    }
+
+    function startTimer(s) {
+      const ring = $('#ring');
+      const bar = $('#ring-bar');
+      const label = $('#timer');
+      const frame = () => {
+        const left = live.remaining(s);
+        const fraction = Math.min(1, left / s.question.timeLimit);
+        bar.style.strokeDashoffset = 1 - fraction;
+        bar.style.opacity = fraction > 0 ? 1 : 0;
+        label.textContent = Math.ceil(left);
+        ring.classList.toggle('urgent', left <= URGENT_SECONDS);
+        if (!reducedMotion) tick = requestAnimationFrame(frame);
+      };
+      frame();
+      if (reducedMotion) tick = setInterval(frame, 1000);
     }
 
     function startLive(pin) {
