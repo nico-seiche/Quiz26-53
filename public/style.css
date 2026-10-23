@@ -57,7 +57,7 @@ button:disabled { opacity: .5; cursor: default; }
 .spread { justify-content: space-between; }
 .muted { color: var(--muted); }
 .error { color: var(--danger); min-height: 1.5em; }
-.tabs { display: flex; gap: .5rem; margin-bottom: 1rem; }
+.tabs { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
 .tabs button.active { background: var(--primary); color: var(--primary-text); border-color: var(--primary); }
 ul.list { list-style: none; padding: 0; margin: 0; }
 ul.list li { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; padding: .75rem 0; border-bottom: 1px solid var(--border); }
@@ -206,6 +206,21 @@ ol.ranking li { padding: .25rem 0; }
 .team-standing { margin: .75rem 0; padding: .6rem .9rem; border: 2px solid var(--border); border-radius: 12px; text-align: center; }
 .slot .members { font-size: .85rem; max-width: 12rem; margin-bottom: .5rem; overflow-wrap: anywhere; }
 
+/* Bestenliste */
+.leaderboard { list-style: none; padding: 0; margin: 0 0 1rem; }
+.lb-row {
+  display: grid; grid-template-columns: 3rem 1fr auto 6ch; align-items: center; gap: .75rem;
+  padding: .65rem .5rem; border-bottom: 1px solid var(--border);
+}
+.lb-row.me { background: var(--bg); border-left: 4px solid var(--primary); font-weight: 700; }
+.lb-row.zero .lb-name, .lb-row.zero .lb-points { color: var(--muted); }
+.lb-rank { text-align: center; font-weight: 800; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.lb-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-games { font-size: .9rem; white-space: nowrap; }
+.lb-points { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+.lb-gap { text-align: center; padding: .25rem 0; }
+@media (max-width: 640px) { .lb-games { display: none; } .lb-row { grid-template-columns: 2.5rem 1fr 6ch; } }
+
 /* Statistik im Dashboard */
 .stat-total { font-size: 2.5rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .stat-row { display: grid; grid-template-columns: 8rem 1fr auto; align-items: center; gap: .75rem; margin: .6rem 0; }
@@ -240,3 +255,6 @@ select {
   }
   .question-head > .row { margin-left: auto; }
 }
+
+/* Auf schmalen Bildschirmen weniger wichtige Elemente ausblenden */
+@media (max-width: 640px) { .hide-small { display: none; } }

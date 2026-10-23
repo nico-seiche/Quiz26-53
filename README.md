@@ -64,6 +64,7 @@ src/quizzes.js     Quizze erstellen/bearbeiten/löschen
 src/game.js        Live-Spiele: PIN, QR-Code, Spielablauf, Gäste, Punkte
 src/config.js      Spielregeln (Mindestteilnehmer für die Wertung)
 src/achievements.js Erfolge: Definitionen, Vergabe am Spielende, API
+src/leaderboard.js Bestenliste (gesamt und je Fach)
 src/results.js     Statistik und gespeicherte Ergebnisse eingeloggter Spieler
 public/            Frontend (reines HTML/CSS/JS, kein Build-Schritt)
 supabase/          Datenbank-Migrationen
@@ -80,6 +81,10 @@ INSERT INTO quiz.subjects (name, position) VALUES ('Statistik', 4);
 `position` bestimmt die Reihenfolge. Das Dashboard zeigt eingeloggten Spielern ihre Gesamtpunkte und die Punkte je Fach. Quizze aus der Zeit vor den Fächern erscheinen unter „Ohne Fach“.
 
 **Mindestteilnehmer:** In Gesamtpunkte und Fächer-Statistik fließen nur Spiele mit mindestens 10 Teilnehmern ein (Gäste mitgezählt). Kleinere Spiele bleiben in „Meine Ergebnisse“ sichtbar, sind dort aber als „zählt nicht“ markiert. Der Wert steht in `src/config.js` (`MIN_PLAYERS_FOR_SCORING`) und wird beim Abruf der Statistik angewendet, eine Änderung gilt also auch rückwirkend.
+
+## Bestenliste
+
+Unter `/leaderboard` (Dashboard → „🏆 Bestenliste“) sehen eingeloggte Nutzer alle registrierten Konten nach Punkten. Oben wählt man zwischen **Gesamt** und den einzelnen **Fächern**; die Auswahl steckt in der Adresse (`/leaderboard?subject=2`). Gleiche Punkte teilen sich den Platz, wer noch nichts gespielt hat, steht mit 0 Punkten am Ende. Die eigene Zeile ist hervorgehoben. Es zählen dieselben Spiele wie in der persönlichen Statistik (mindestens 10 Teilnehmer). Die Liste ist nur für eingeloggte Nutzer sichtbar.
 
 ## Serien-Bonus
 

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quiz – Bestenliste</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/dashboard">← Dashboard</a>
+    <strong>🏆 Bestenliste</strong>
+    <span class="muted" id="me"></span>
+  </header>
+  <main>
+    <div class="tabs" id="tabs" role="tablist" aria-label="Wertung wählen"></div>
+    <p class="error" id="error"></p>
+    <div class="card" id="summary"></div>
+    <div class="card">
+      <ol class="leaderboard" id="list"></ol>
+      <p class="muted" id="rule" style="margin-bottom:0"></p>
+    </div>
+  </main>
+  <script src="/js/common.js"></script>
+  <script>
+    let selected = new URLSearchParams(location.search).get('subject') || 'all';
+    let myName = '';
+
+    const nf = (n) => n.toLocaleString('de-DE');
+
+    function rankLabel(e) {
+      if (e.points === 0) return '–';
+      return ({ 1: '🥇', 2: '🥈', 3: '🥉' })[e.rank] || e.rank;
+    }
+
+    function rowHtml(e) {
+      return `
+        <li class="lb-row ${e.isMe ? 'me' : ''} ${e.points === 0 ? 'zero' : ''}" ${e.isMe ? 'aria-current="true"' : ''}>
+          <span class="lb-rank">${rankLabel(e)}</span>
+          <span class="lb-name">${escapeHtml(e.username)}${e.isMe ? ' <span class="tag">Du</span>' : ''}</span>
+          <span class="lb-games muted">${e.games} ${e.games === 1 ? 'Spiel' : 'Spiele'}</span>
+          <span class="lb-points">${nf(e.points)}</span>
+        </li>`;
+    }
+
+    function render(d) {
+      selected = String(d.selected);
+      const tabs = [{ id: 'all', name: 'Gesamt' }, ...d.subjects.map((s) => ({ id: String(s.id), name: s.name }))];
+      $('#tabs').innerHTML = tabs.map((t) => `
+        <button type="button" role="tab" aria-selected="${t.id === selected}" class="${t.id === selected ? 'active' : ''}" data-subject="${t.id}">${escapeHtml(t.name)}</button>`).join('');
+
+      const scope = selected === 'all' ? 'insgesamt' : `in ${d.subjects.find((s) => String(s.id) === selected).name}`;
+      $('#summary').innerHTML = d.me.points > 0
+        ? `<div class="stat-total">Platz ${d.me.rank}</div>
+           <div class="muted">von ${d.userCount} · ${nf(d.me.points)} Punkte ${scope} · ${d.me.games} ${d.me.games === 1 ? 'Spiel' : 'Spiele'}</div>`
+        : `<strong>Du hast ${scope} noch keine gewerteten Punkte.</strong>
+           <div class="muted">Spiele ein Quiz mit mindestens ${d.minPlayers} Teilnehmern, dann erscheinst du hier mit deinen Punkten.</div>`;
+
+      let html = d.entries.map(rowHtml).join('');
+      // Eigene Zeile anhängen, falls man wegen der Listenlänge nicht mehr sichtbar ist
+      if (!d.entries.some((e) => e.isMe)) {
+        html += `<li class="lb-gap muted" aria-hidden="true">…</li>` + rowHtml({ ...d.me, username: myName, isMe: true });
+      }
+      $('#list').innerHTML = html;
+      $('#rule').textContent = `Alle registrierten Nutzer · gewertet werden nur Spiele mit mindestens ${d.minPlayers} Teilnehmern.`;
+    }
+
+    async function load() {
+      $('#error').textContent = '';
+      try {
+        render(await api(`/api/leaderboard?subject=${encodeURIComponent(selected)}`));
+      } catch (err) {
+        if (selected !== 'all') { selected = 'all'; return load(); }  // ungültiges Fach in der Adresse
+        $('#error').textContent = err.message;
+      }
+    }
+
+    $('#tabs').addEventListener('click', (e) => {
+      const button = e.target.closest('[data-subject]');
+      if (!button) return;
+      selected = button.dataset.subject;
+      history.replaceState(null, '', selected === 'all' ? '/leaderboard' : `/leaderboard?subject=${selected}`);
+      load();
+    });
+
+    requireLogin().then((me) => {
+      myName = me.username;
+      $('#me').textContent = me.username;
+      load();
+    });
+  </script>
+</body>
+</html>
