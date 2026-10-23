@@ -17,6 +17,12 @@
       <input type="text" id="title" placeholder="z. B. Wahlsysteme im Vergleich">
       <label for="subject">Fach</label>
       <select id="subject"><option value="">Fach wählen …</option></select>
+      <label for="mode">Spielmodus</label>
+      <select id="mode">
+        <option value="single">Einzel – jeder spielt für sich</option>
+        <option value="team">Team – zwei Teams spielen gegeneinander</option>
+      </select>
+      <p class="muted" id="mode-hint" style="margin:.5rem 0 0"></p>
     </div>
     <div id="questions"></div>
     <button type="button" id="add">+ Frage hinzufügen</button>
@@ -27,6 +33,13 @@
     const id = new URLSearchParams(location.search).get('id');
     let questions = [];
     let openIndex = -1;  // Akkordeon: immer höchstens eine Frage ist aufgeklappt
+
+    function updateModeHint() {
+      $('#mode-hint').textContent = $('#mode').value === 'team'
+        ? 'Die Teilnehmer werden beim Start zufällig in zwei Teams gelost (mindestens 4 Teilnehmer). Bei ungerader Zahl bekommt das kleinere Team einen Geist-Spieler 👻 mit dem Punktedurchschnitt seiner Mitspieler.'
+        : 'Jeder Teilnehmer spielt für sich allein.';
+    }
+    $('#mode').onchange = updateModeHint;
 
     function blankQuestion() {
       return { text: '', answers: ['', '', '', ''], correct: 0, timeLimit: 20 };
@@ -126,7 +139,7 @@
         return { ...q, answers };
       });
       try {
-        const body = { title: $('#title').value, subjectId: Number($('#subject').value) || null, questions: payload };
+        const body = { title: $('#title').value, subjectId: Number($('#subject').value) || null, mode: $('#mode').value, questions: payload };
         if (id) await api(`/api/quizzes/${id}`, { method: 'PUT', body });
         else await api('/api/quizzes', { method: 'POST', body });
         location.href = '/dashboard';
@@ -145,6 +158,7 @@
         const quiz = await api(`/api/quizzes/${id}`);
         $('#title').value = quiz.title;
         $('#subject').value = quiz.subject_id || '';
+        $('#mode').value = quiz.mode || 'single';
         questions = quiz.questions.map((q) => ({
           ...q,
           answers: [...q.answers, '', '', ''].slice(0, 4),
@@ -153,6 +167,7 @@
         questions = [blankQuestion()];
         openIndex = 0;
       }
+      updateModeHint();
       render();
     });
   </script>

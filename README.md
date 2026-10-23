@@ -87,7 +87,7 @@ Wer mehrere Fragen in Folge richtig beantwortet, bekommt Extrapunkte: ab der 2. 
 
 ## Team-Modus
 
-Der Host schaltet in der Lobby den „Team-Modus“ ein. Mit „Teams bilden“ werden die Teilnehmer zufällig in **zwei Teams** (🦊 Füchse, 🦉 Eulen) verteilt, jedes braucht mindestens 2 Spieler. Danach werden die Teams auf dem großen Bildschirm vorgestellt, jeder sieht auf dem Handy sein Team.
+Der Spielmodus wird beim Erstellen (und Bearbeiten) eines Quiz festgelegt: **Einzel** oder **Team**. Bei einem Team-Quiz werden die Teilnehmer nach dem Klick auf „Teams bilden“ zufällig in **zwei Teams** (🦊 Füchse, 🦉 Eulen) verteilt, mindestens 4 Teilnehmer. Danach werden die Teams auf dem großen Bildschirm vorgestellt, jeder sieht auf dem Handy sein Team. Im Dashboard sind Team-Quizze mit „👥 Team“ gekennzeichnet.
 
 - **Teampunkte** = Summe der Punkte aller Mitglieder; die Rangliste nach jeder Runde und die Siegerehrung zeigen die Teams (darunter die besten Einzelspieler).
 - **Ungerade Teilnehmerzahl:** Ein Team hat dann genau einen Spieler mehr. Das kleinere Team bekommt einen **Geist-Spieler 👻**, der immer so viele Punkte hat wie der Durchschnitt seiner echten Mitspieler (aufgerundet auf ganze Punkte). Bei gerader Zahl gibt es keinen Geist.

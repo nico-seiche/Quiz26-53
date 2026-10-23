@@ -3,7 +3,7 @@ const QRCode = require('qrcode');
 const db = require('./db');
 const { requireAuth } = require('./auth');
 const { loadQuiz } = require('./quizzes');
-const { MIN_PLAYERS_FOR_SCORING, TEAM_COUNTS, MIN_PLAYERS_PER_TEAM, streakBonus } = require('./config');
+const { MIN_PLAYERS_FOR_SCORING, TEAM_COUNT, MIN_PLAYERS_PER_TEAM, streakBonus } = require('./config');
 const { standings } = require('./teams');
 const { awardForGame, publicInfo } = require('./achievements');
 
@@ -324,9 +324,9 @@ router.post('/', requireAuth, async (req, res) => {
   const snapshot = { title: quiz.title, subjectId: quiz.subject_id, questions: quiz.questions };
   for (let attempt = 0; attempt < 10; attempt++) {
     const rows = await db.query(`
-      INSERT INTO quiz.games (pin, host_user_id, quiz_id, quiz) VALUES ($1, $2, $3, $4)
+      INSERT INTO quiz.games (pin, host_user_id, quiz_id, quiz, team_count) VALUES ($1, $2, $3, $4, $5)
       ON CONFLICT (pin) DO NOTHING RETURNING pin
-    `, [generatePin(), req.user.id, quiz.id, JSON.stringify(snapshot)]);
+    `, [generatePin(), req.user.id, quiz.id, JSON.stringify(snapshot), quiz.mode === 'team' ? TEAM_COUNT : 0]);
     if (rows.length) return res.json({ pin: rows[0].pin });
   }
   res.status(503).json({ error: 'Keine freie PIN gefunden, bitte erneut versuchen' });
@@ -351,19 +351,6 @@ router.get('/:pin/qr', requireAuth, requireHost, async (req, res) => {
 });
 
 router.get('/:pin/host', requireAuth, requireHost, async (req, res) => {
-  res.json(hostView(await loadGame(req.params.pin)));
-});
-
-// Team-Modus ein-/ausschalten (nur in der Lobby): count = 0 (aus) oder Anzahl der Teams
-router.post('/:pin/teams', requireAuth, requireHost, async (req, res) => {
-  const count = Number(req.body.count);
-  if (count !== 0 && !TEAM_COUNTS.includes(count)) return res.status(400).json({ error: 'Ungültige Teamanzahl' });
-  const result = await updateGame(req.params.pin, async (client, game) => {
-    if (game.state !== 'lobby') return { error: 'Die Teams lassen sich nur vor dem Start ändern', status: 409 };
-    await client.query('UPDATE quiz.games SET team_count = $2 WHERE pin = $1', [game.pin, count]);
-    return { changed: true };
-  });
-  if (result.error) return res.status(result.status).json({ error: result.error });
   res.json(hostView(await loadGame(req.params.pin)));
 });
 

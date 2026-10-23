@@ -72,6 +72,7 @@
             <strong>${escapeHtml(q.title)}</strong><br>
             <span class="muted">${q.question_count} Fragen</span>
             ${q.subject ? `<span class="tag">${escapeHtml(q.subject)}</span>` : '<span class="tag">Kein Fach</span>'}
+            <span class="tag">${q.mode === 'team' ? '👥 Team' : '👤 Einzel'}</span>
           </div>
           <div class="row">
             <button class="primary" type="button" data-start="${q.id}" ${q.question_count ? '' : 'disabled'}>Starten</button>

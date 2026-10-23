@@ -5,8 +5,8 @@ const MIN_PLAYERS_FOR_SCORING = 10;
 const STREAK_BONUS_PER_STEP = 50;
 const STREAK_BONUS_MAX = 250;
 
-// Team-Modus: immer genau 2 Teams (erlaubte Werte für team_count), Mindestgröße pro Team
-const TEAM_COUNTS = [2];
+// Team-Modus: immer genau 2 Teams, Mindestgröße pro Team
+const TEAM_COUNT = 2;
 const MIN_PLAYERS_PER_TEAM = 2;
 
 function streakBonus(streak) {
@@ -14,5 +14,5 @@ function streakBonus(streak) {
 }
 
 module.exports = {
-  MIN_PLAYERS_FOR_SCORING, STREAK_BONUS_PER_STEP, STREAK_BONUS_MAX, TEAM_COUNTS, MIN_PLAYERS_PER_TEAM, streakBonus,
+  MIN_PLAYERS_FOR_SCORING, STREAK_BONUS_PER_STEP, STREAK_BONUS_MAX, TEAM_COUNT, MIN_PLAYERS_PER_TEAM, streakBonus,
 };

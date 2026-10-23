@@ -57,6 +57,11 @@ async function readBody(req, res) {
     res.status(400).json({ error: 'Titel fehlt' });
     return null;
   }
+  const mode = req.body.mode === undefined ? 'single' : req.body.mode;
+  if (!['single', 'team'].includes(mode)) {
+    res.status(400).json({ error: 'Ungültiger Spielmodus' });
+    return null;
+  }
   const subjectId = Number(req.body.subjectId);
   const subject = Number.isInteger(subjectId)
     && await db.one('SELECT id FROM quiz.subjects WHERE id = $1', [subjectId]);
@@ -65,7 +70,7 @@ async function readBody(req, res) {
     return null;
   }
   try {
-    return { title, subjectId, questions: validateQuestions(req.body.questions || []) };
+    return { title, subjectId, mode, questions: validateQuestions(req.body.questions || []) };
   } catch (msg) {
     res.status(400).json({ error: msg });
     return null;
@@ -74,7 +79,7 @@ async function readBody(req, res) {
 
 router.get('/', async (req, res) => {
   const quizzes = await db.query(`
-    SELECT q.id, q.title, q.updated_at, s.name AS subject,
+    SELECT q.id, q.title, q.updated_at, q.mode, s.name AS subject,
            (SELECT COUNT(*)::int FROM quiz.questions WHERE quiz_id = q.id) AS question_count
     FROM quiz.quizzes q LEFT JOIN quiz.subjects s ON s.id = q.subject_id
     WHERE q.owner_id = $1 ORDER BY q.updated_at DESC
@@ -87,8 +92,8 @@ router.post('/', async (req, res) => {
   if (!body) return;
   const id = await db.tx(async (client) => {
     const { rows } = await client.query(
-      'INSERT INTO quiz.quizzes (owner_id, title, subject_id) VALUES ($1, $2, $3) RETURNING id',
-      [req.user.id, body.title, body.subjectId],
+      'INSERT INTO quiz.quizzes (owner_id, title, subject_id, mode) VALUES ($1, $2, $3, $4) RETURNING id',
+      [req.user.id, body.title, body.subjectId, body.mode],
     );
     await saveQuestions(client, rows[0].id, body.questions);
     return Number(rows[0].id);
@@ -108,8 +113,8 @@ router.put('/:id', async (req, res) => {
   const body = await readBody(req, res);
   if (!body) return;
   await db.tx(async (client) => {
-    await client.query('UPDATE quiz.quizzes SET title = $1, subject_id = $2, updated_at = now() WHERE id = $3', [
-      body.title, body.subjectId, quiz.id,
+    await client.query('UPDATE quiz.quizzes SET title = $1, subject_id = $2, mode = $3, updated_at = now() WHERE id = $4', [
+      body.title, body.subjectId, body.mode, quiz.id,
     ]);
     await saveQuestions(client, quiz.id, body.questions);
   });

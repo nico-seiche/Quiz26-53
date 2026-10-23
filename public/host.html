@@ -19,13 +19,8 @@
     <p class="error" id="error"></p>
     <div id="view"></div>
     <div class="card" id="team-options" hidden>
-      <div class="row spread">
-        <label class="row" for="team-count" style="margin:0;cursor:pointer;gap:.6rem">
-          <input type="checkbox" id="team-count" style="width:1.2rem;height:1.2rem">
-          <span>👥 Team-Modus (2 Teams)</span>
-        </label>
-      </div>
-      <p class="muted" id="team-hint" style="margin:.75rem 0 0"></p>
+      <h3 style="margin-bottom:.35rem">👥 Team-Modus</h3>
+      <p class="muted" id="team-hint" style="margin:0"></p>
     </div>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
@@ -256,24 +251,19 @@
 
     // --- Team-Modus in der Lobby ---
 
+    // Der Modus ist am Quiz eingestellt; in der Lobby steht nur, wie die Teams aussehen werden
     function teamHint(s) {
       const n = s.players.length;
-      const k = s.teamCount;
-      if (!k) return 'Alle spielen einzeln. Mit Teams werden die Teilnehmer beim Start zufällig in zwei gleich große Teams gelost.';
-      const need = k * 2;
-      if (n < need) return `Für zwei Teams braucht es mindestens ${need} Teilnehmer (aktuell ${n}).`;
+      const need = s.teamCount * 2;
+      if (n < need) return `Dieses Quiz wird im Team-Modus gespielt. Es braucht mindestens ${need} Teilnehmer (aktuell ${n}).`;
       return n % 2
         ? `${n} Teilnehmer → zwei Teams mit ${(n + 1) / 2} und ${(n - 1) / 2} Spielern. Das kleinere Team bekommt einen Geist-Spieler 👻, der immer den Punktedurchschnitt seiner Mitspieler hat.`
         : `${n} Teilnehmer → zwei gleich große Teams mit je ${n / 2} Spielern.`;
     }
 
     function updateTeamOptions(s) {
-      const box = $('#team-options');
-      box.hidden = s.state !== 'lobby';
-      if (s.state !== 'lobby') return;
-      const select = $('#team-count');
-      if (document.activeElement !== select) select.checked = s.teamCount > 0;  // nicht stören, solange man klickt
-      $('#team-hint').textContent = teamHint(s);
+      $('#team-options').hidden = s.state !== 'lobby' || !s.teamCount;
+      if (!$('#team-options').hidden) $('#team-hint').textContent = teamHint(s);
     }
 
     function updateControls(s) {
@@ -378,16 +368,6 @@
         } catch (err) {
           $('#error').textContent = err.message;
           $('#next').disabled = false;
-        }
-      };
-      $('#team-count').onchange = async (e) => {
-        $('#error').textContent = '';
-        try {
-          live.apply(await api(`/api/games/${encodeURIComponent(pin)}/teams`, { method: 'POST', body: { count: e.target.checked ? 2 : 0 } }));
-        } catch (err) {
-          $('#error').textContent = err.message;
-          e.target.checked = !e.target.checked;
-          live.refresh();
         }
       };
       $('#next').onclick = () => act('next');
