@@ -58,7 +58,9 @@
       $('#account-hint').innerHTML = me
         ? `Du spielst als <strong>${escapeHtml(me.username)}</strong> – deine Punkte werden gespeichert.`
         : `Du spielst als Gast. <a href="${loginLink}">Anmelden</a>, um deine Punkte zu speichern.`;
-      ($('#pin').value ? (me ? $('#pin') : $('#name')) : $('#pin')).focus();
+      // Nichts automatisch anklicken, wenn man die PIN selbst eingeben will. Nur nach dem Scannen
+      // des QR-Codes (PIN steht schon da) geht es für Gäste direkt beim Namen weiter.
+      if ($('#pin').value && !me) $('#name').focus();
     }
 
     function render() {
