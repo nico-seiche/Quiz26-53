@@ -51,14 +51,21 @@ async function saveQuestions(client, quizId, questions) {
   }
 }
 
-function readBody(req, res) {
+async function readBody(req, res) {
   const title = String(req.body.title || '').trim();
   if (!title) {
     res.status(400).json({ error: 'Titel fehlt' });
     return null;
   }
+  const subjectId = Number(req.body.subjectId);
+  const subject = Number.isInteger(subjectId)
+    && await db.one('SELECT id FROM quiz.subjects WHERE id = $1', [subjectId]);
+  if (!subject) {
+    res.status(400).json({ error: 'Bitte ein Fach auswählen' });
+    return null;
+  }
   try {
-    return { title, questions: validateQuestions(req.body.questions || []) };
+    return { title, subjectId, questions: validateQuestions(req.body.questions || []) };
   } catch (msg) {
     res.status(400).json({ error: msg });
     return null;
@@ -67,20 +74,21 @@ function readBody(req, res) {
 
 router.get('/', async (req, res) => {
   const quizzes = await db.query(`
-    SELECT q.id, q.title, q.updated_at,
+    SELECT q.id, q.title, q.updated_at, s.name AS subject,
            (SELECT COUNT(*)::int FROM quiz.questions WHERE quiz_id = q.id) AS question_count
-    FROM quiz.quizzes q WHERE q.owner_id = $1 ORDER BY q.updated_at DESC
+    FROM quiz.quizzes q LEFT JOIN quiz.subjects s ON s.id = q.subject_id
+    WHERE q.owner_id = $1 ORDER BY q.updated_at DESC
   `, [req.user.id]);
   res.json(quizzes);
 });
 
 router.post('/', async (req, res) => {
-  const body = readBody(req, res);
+  const body = await readBody(req, res);
   if (!body) return;
   const id = await db.tx(async (client) => {
     const { rows } = await client.query(
-      'INSERT INTO quiz.quizzes (owner_id, title) VALUES ($1, $2) RETURNING id',
-      [req.user.id, body.title],
+      'INSERT INTO quiz.quizzes (owner_id, title, subject_id) VALUES ($1, $2, $3) RETURNING id',
+      [req.user.id, body.title, body.subjectId],
     );
     await saveQuestions(client, rows[0].id, body.questions);
     return Number(rows[0].id);
@@ -97,11 +105,11 @@ router.get('/:id', async (req, res) => {
 router.put('/:id', async (req, res) => {
   const quiz = await loadQuiz(req.params.id);
   if (!quiz || quiz.owner_id !== req.user.id) return res.status(404).json({ error: 'Quiz nicht gefunden' });
-  const body = readBody(req, res);
+  const body = await readBody(req, res);
   if (!body) return;
   await db.tx(async (client) => {
-    await client.query('UPDATE quiz.quizzes SET title = $1, updated_at = now() WHERE id = $2', [
-      body.title, quiz.id,
+    await client.query('UPDATE quiz.quizzes SET title = $1, subject_id = $2, updated_at = now() WHERE id = $3', [
+      body.title, body.subjectId, quiz.id,
     ]);
     await saveQuestions(client, quiz.id, body.questions);
   });

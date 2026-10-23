@@ -47,10 +47,10 @@ Ohne `SUPABASE_URL`/`SUPABASE_PUBLISHABLE_KEY` läuft alles per Polling.
 
 1. **Konto** erstellen bzw. anmelden (`/`) – nur zum Erstellen/Hosten und Punktesammeln nötig
 2. **Dashboard** (`/dashboard`): eigene Quizze verwalten, gespeicherte Ergebnisse ansehen, per PIN beitreten
-3. **Editor** (`/edit`): Titel, Fragen mit 2–4 Antworten, richtige Antwort, Zeitlimit
+3. **Editor** (`/edit`): Titel, Fach, Fragen mit 2–4 Antworten, richtige Antwort, Zeitlimit
 4. **Starten** → **Host-Bildschirm** (`/host?pin=…`) mit QR-Code, PIN und Teilnehmerliste
 5. Teilnehmende scannen den QR-Code oder geben die PIN ein (`/play`) – als Gast mit Namen oder eingeloggt mit ihrem Nutzernamen
-6. Host steuert: Quiz starten → Auflösen (automatisch nach Ablauf der Zeit oder wenn alle geantwortet haben) → Nächste Frage → Endstand
+6. Host steuert: Quiz starten → Auflösen (automatisch nach Ablauf der Zeit oder wenn alle geantwortet haben) → **Zwischenstand** (Rangliste, Überholte tauschen per Animation die Plätze) → Nächste Frage … → **Siegerehrung** (Treppchen mit Platz 3, 2, 1 nacheinander)
 
 ## Aufbau
 
@@ -62,10 +62,20 @@ src/db.js          Postgres-Verbindung
 src/auth.js        Registrierung, Login, Sessions (httpOnly-Cookie, bcrypt)
 src/quizzes.js     Quizze erstellen/bearbeiten/löschen
 src/game.js        Live-Spiele: PIN, QR-Code, Spielablauf, Gäste, Punkte
-src/results.js     Gespeicherte Ergebnisse eingeloggter Spieler
+src/results.js     Statistik und gespeicherte Ergebnisse eingeloggter Spieler
 public/            Frontend (reines HTML/CSS/JS, kein Build-Schritt)
 supabase/          Datenbank-Migrationen
 ```
+
+## Fächer und Statistik
+
+Jedes Quiz gehört zu einem Fach. Die Fächer liegen in der Tabelle `quiz.subjects` (aktuell Politik, Soziologie, Psychologie). Ein neues Fach ergänzt man im Supabase-SQL-Editor:
+
+```sql
+INSERT INTO quiz.subjects (name, position) VALUES ('Statistik', 4);
+```
+
+`position` bestimmt die Reihenfolge. Das Dashboard zeigt eingeloggten Spielern ihre Gesamtpunkte und die Punkte je Fach. Quizze aus der Zeit vor den Fächern erscheinen unter „Ohne Fach“.
 
 ## Punkte
 

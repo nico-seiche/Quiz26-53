@@ -93,10 +93,21 @@
           <p class="big">+${s.lastPoints} Punkte</p>
           <p class="muted">Platz ${s.rank} von ${s.playerCount}</p>
         </div>`;
-      } else if (s.state === 'finished') {
+      } else if (s.state === 'scoreboard') {
+        const climbed = s.prevRank - s.rank;
         html = `<div class="card center">
-          <h1>Quiz beendet</h1>
-          <p class="big">${s.score} Punkte</p>
+          <h2>Zwischenstand</h2>
+          <p class="big" style="font-size:2.5rem;font-weight:800">Platz ${s.rank}</p>
+          <p class="muted">von ${s.playerCount}</p>
+          ${climbed > 0 ? `<p class="big" style="color:var(--ok)">▲ ${climbed} ${climbed === 1 ? 'Platz' : 'Plätze'} gutgemacht!</p>` : ''}
+          <p>${s.score} Punkte${s.lastPoints ? ` (+${s.lastPoints})` : ''}</p>
+          <p class="muted">Schau auf den großen Bildschirm …</p>
+        </div>`;
+      } else if (s.state === 'finished') {
+        const medal = ['🥇', '🥈', '🥉'][s.rank - 1];
+        html = `<div class="card center">
+          <h1>${s.rank === 1 ? 'Du hast gewonnen! 🏆' : 'Quiz beendet'}</h1>
+          <p class="big">${medal ? medal + ' ' : ''}${s.score} Punkte</p>
           <p>Platz ${s.rank} von ${s.playerCount}</p>
           ${s.guest
             ? '<p class="muted">Als Gast werden deine Punkte nicht gespeichert.</p><p><a class="btn" href="/">Konto erstellen</a></p>'

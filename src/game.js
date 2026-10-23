@@ -86,9 +86,9 @@ async function finish(client, game) {
   for (const [i, p] of players.entries()) {
     if (!p.user_id) continue;
     await client.query(`
-      INSERT INTO quiz.game_results (user_id, quiz_id, quiz_title, score, rank, player_count)
-      VALUES ($1, $2, $3, $4, $5, $6)
-    `, [p.user_id, game.quiz_id, game.quiz.title, p.score, i + 1, players.length]);
+      INSERT INTO quiz.game_results (user_id, quiz_id, quiz_title, subject_id, score, rank, player_count)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `, [p.user_id, game.quiz_id, game.quiz.title, game.quiz.subjectId || null, p.score, i + 1, players.length]);
   }
 }
 
@@ -118,7 +118,7 @@ async function loadGame(pin) {
   }
   if (!game) return null;
   const players = await db.query(
-    'SELECT key, user_id, name, score FROM quiz.game_players WHERE game_pin = $1 ORDER BY score DESC, joined_at',
+    'SELECT key, user_id, name, score, joined_at FROM quiz.game_players WHERE game_pin = $1 ORDER BY score DESC, joined_at',
     [pin],
   );
   const answers = await db.query(
@@ -126,6 +126,22 @@ async function loadGame(pin) {
     [pin, game.question_index],
   );
   return { game, players, answers };
+}
+
+// Ergänzt jeden Spieler um Platz, Punkte und Platz vor der aktuellen Frage ("Zwischenstand")
+function rankPlayers({ game, players, answers }) {
+  const showMoves = game.state === 'reveal' || game.state === 'scoreboard';
+  const gained = new Map(answers.map((a) => [a.player_key, showMoves ? a.points : 0]));
+  const list = players.map((p, i) => ({
+    ...p,
+    rank: i + 1,
+    gained: gained.get(p.key) || 0,
+    prevScore: p.score - (gained.get(p.key) || 0),
+  }));
+  [...list]
+    .sort((a, b) => b.prevScore - a.prevScore || a.joined_at - b.joined_at)
+    .forEach((p, i) => { p.prevRank = i + 1; });
+  return list;
 }
 
 function baseView({ game }) {
@@ -148,7 +164,15 @@ function baseView({ game }) {
 
 function hostView(data) {
   const view = baseView(data);
-  view.players = data.players.map((p) => ({ name: p.name, guest: !p.user_id, score: p.score }));
+  view.players = rankPlayers(data).map((p) => ({
+    name: p.name,
+    guest: !p.user_id,
+    score: p.score,
+    prevScore: p.prevScore,
+    gained: p.gained,
+    rank: p.rank,
+    prevRank: p.prevRank,
+  }));
   view.answeredCount = data.answers.length;
   if (data.game.state === 'reveal') {
     view.distribution = view.question.answers.map(() => 0);
@@ -158,22 +182,24 @@ function hostView(data) {
 }
 
 function playerView(data, key) {
-  const index = data.players.findIndex((p) => p.key === key);
-  if (index < 0) return null;
-  const player = data.players[index];
+  const players = rankPlayers(data);
+  const player = players.find((p) => p.key === key);
+  if (!player) return null;
   const mine = data.answers.find((a) => a.player_key === key);
   const view = baseView(data);
   Object.assign(view, {
     name: player.name,
     guest: !player.user_id,
     score: player.score,
-    rank: index + 1,
-    playerCount: data.players.length,
+    rank: player.rank,
+    prevRank: player.prevRank,
+    playerCount: players.length,
   });
   if (view.question) {
     view.myAnswer = mine ? mine.choice : null;
     if (data.game.state === 'reveal') view.lastPoints = mine ? mine.points : 0;
   }
+  if (data.game.state === 'scoreboard') view.lastPoints = player.gained;
   return view;
 }
 
@@ -192,7 +218,7 @@ router.post('/', requireAuth, async (req, res) => {
   // Alte Spiele aufräumen (Ergebnisse bleiben in game_results erhalten)
   await db.query("DELETE FROM quiz.games WHERE created_at < now() - interval '1 day'");
 
-  const snapshot = { title: quiz.title, questions: quiz.questions };
+  const snapshot = { title: quiz.title, subjectId: quiz.subject_id, questions: quiz.questions };
   for (let attempt = 0; attempt < 10; attempt++) {
     const rows = await db.query(`
       INSERT INTO quiz.games (pin, host_user_id, quiz_id, quiz) VALUES ($1, $2, $3, $4)
@@ -232,6 +258,8 @@ router.post('/:pin/next', requireAuth, requireHost, async (req, res) => {
     } else if (game.state === 'question') {
       await reveal(client, game);
     } else if (game.state === 'reveal') {
+      await client.query("UPDATE quiz.games SET state = 'scoreboard' WHERE pin = $1", [game.pin]);
+    } else if (game.state === 'scoreboard') {
       const next = game.question_index + 1;
       if (next < game.quiz.questions.length) await startQuestion(client, game, next);
       else await finish(client, game);

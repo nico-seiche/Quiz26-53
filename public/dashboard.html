@@ -26,10 +26,14 @@
     </div>
 
     <div class="card">
-      <div class="row spread">
-        <h2>Meine Ergebnisse</h2>
-        <span class="muted" id="total"></span>
-      </div>
+      <h2>Meine Statistik</h2>
+      <div class="stat-total" id="total">0</div>
+      <div class="muted" id="games">Punkte insgesamt</div>
+      <div id="subjects" style="margin-top:1rem"></div>
+    </div>
+
+    <div class="card">
+      <h2>Meine Ergebnisse</h2>
       <ul class="list" id="results"></ul>
     </div>
 
@@ -57,6 +61,7 @@
           <div>
             <strong>${escapeHtml(q.title)}</strong><br>
             <span class="muted">${q.question_count} Fragen</span>
+            ${q.subject ? `<span class="tag">${escapeHtml(q.subject)}</span>` : '<span class="tag">Kein Fach</span>'}
           </div>
           <div class="row">
             <button class="primary" type="button" data-start="${q.id}" ${q.question_count ? '' : 'disabled'}>Starten</button>
@@ -83,12 +88,20 @@
     };
 
     async function loadResults() {
-      const { total, results } = await api('/api/results');
-      $('#total').textContent = `${total} Punkte insgesamt`;
+      const { total, games, subjects, results } = await api('/api/results');
+      $('#total').textContent = total.toLocaleString('de-DE');
+      $('#games').textContent = `Punkte insgesamt · ${games} ${games === 1 ? 'Spiel' : 'Spiele'}`;
+      const max = Math.max(1, ...subjects.map((s) => s.points));
+      $('#subjects').innerHTML = subjects.map((s) => `
+        <div class="stat-row" title="${s.games} ${s.games === 1 ? 'Spiel' : 'Spiele'}">
+          <span>${escapeHtml(s.name)}</span>
+          <div class="stat-bar"><span style="width:${(s.points / max) * 100}%"></span></div>
+          <span class="stat-points">${s.points.toLocaleString('de-DE')}</span>
+        </div>`).join('');
       $('#results').innerHTML = results.length ? results.map((r) => `
         <li>
           <div>
-            <strong>${escapeHtml(r.quiz_title)}</strong><br>
+            <strong>${escapeHtml(r.quiz_title)}</strong>${r.subject ? ` <span class="tag">${escapeHtml(r.subject)}</span>` : ''}<br>
             <span class="muted">${new Date(r.played_at).toLocaleString('de-DE')}</span>
           </div>
           <div>${r.score} Punkte · Platz ${r.rank}/${r.player_count}</div>

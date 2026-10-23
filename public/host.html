@@ -23,10 +23,45 @@
   <script src="/js/common.js"></script>
   <script>
     const pin = new URLSearchParams(location.search).get('pin');
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const BOARD_ROWS = 10;
     let joinInfo = null;
     let state = null;
     let tick = null;
     let live;
+    let lastKey = null;  // verhindert, dass Animationen bei jedem Nachladen neu starten
+    let animToken = 0;
+    let timers = [];
+
+    // Geplante Schritte einer Animation; verfallen, sobald eine neue Ansicht gerendert wird
+    function later(fn, ms) {
+      const token = animToken;
+      timers.push(setTimeout(() => { if (token === animToken) fn(); }, ms));
+    }
+
+    function stopAnimations() {
+      animToken++;
+      timers.forEach(clearTimeout);
+      timers = [];
+      document.querySelectorAll('.confetti').forEach((el) => el.remove());
+    }
+
+    function countUp(el, from, to, ms) {
+      if (reducedMotion || from === to) { el.textContent = to; return; }
+      const token = animToken;
+      const t0 = performance.now();
+      const step = (now) => {
+        if (token !== animToken) return;
+        const t = Math.min(1, (now - t0) / ms);
+        el.textContent = Math.round(from + (to - from) * (1 - Math.pow(1 - t, 3)));
+        if (t < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }
+
+    function guestTag(p) {
+      return p.guest ? ' <span class="muted">(Gast)</span>' : '';
+    }
 
     function answersHtml(q, reveal, distribution) {
       return `<div class="answers">${q.answers.map((a, i) => `
@@ -35,19 +70,129 @@
         </div>`).join('')}</div>`;
     }
 
-    function render() {
-      const s = state;
+    // --- Zwischenstand nach jeder Runde ---
+
+    function scoreboardHtml(s) {
+      const players = s.players.filter((p) => p.rank <= BOARD_ROWS || p.prevRank <= BOARD_ROWS);
+      const rows = Math.min(BOARD_ROWS, s.players.length);
+      const start = !reducedMotion;  // erst an alter Position zeigen, dann umsortieren
+      return `
+        <div class="row spread">
+          <span class="muted">Frage ${s.questionIndex + 1} / ${s.total} · PIN ${escapeHtml(s.pin)}</span>
+        </div>
+        <h2 class="center" style="margin-top:1rem">Zwischenstand</h2>
+        <div class="board" id="board" style="height: calc(${rows} * var(--slot) - .5rem)">
+          ${players.map((p, i) => `
+            <div class="board-row" data-i="${i}" style="--pos:${(start ? p.prevRank : p.rank) - 1}">
+              <span class="place">${start ? p.prevRank : p.rank}</span>
+              <span class="who">${escapeHtml(p.name)}${guestTag(p)}</span>
+              <span class="gain">${p.gained ? '+' + p.gained : ''}</span>
+              <span class="pts">${start ? p.prevScore : p.score}</span>
+              <span class="move"></span>
+            </div>`).join('')}
+        </div>
+        ${s.players.length > BOARD_ROWS ? `<p class="center muted">… und ${s.players.length - BOARD_ROWS} weitere</p>` : ''}`;
+    }
+
+    function animateScoreboard(s) {
+      const players = s.players.filter((p) => p.rank <= BOARD_ROWS || p.prevRank <= BOARD_ROWS);
+      if (reducedMotion) {
+        document.querySelectorAll('.board-row').forEach((row) => {
+          if (players[row.dataset.i].rank < players[row.dataset.i].prevRank) row.classList.add('climbed');
+        });
+        return;
+      }
+      later(() => {
+        document.querySelectorAll('.board-row').forEach((row) => {
+          const p = players[row.dataset.i];
+          row.style.setProperty('--pos', p.rank - 1);
+          countUp(row.querySelector('.pts'), p.prevScore, p.score, 1100);
+          if (p.rank < p.prevRank) {
+            row.classList.add('climbed');
+            row.querySelector('.move').textContent = `▲ ${p.prevRank - p.rank}`;
+          }
+          later(() => { row.querySelector('.place').textContent = p.rank; }, 500);
+        });
+      }, 1500);
+    }
+
+    // --- Siegerehrung ---
+
+    function podiumHtml(s) {
+      if (!s.players.length) return '<div class="card center"><h2>Keine Teilnehmer</h2></div>';
+      const top = s.players.slice(0, 3);
+      const medals = ['🥇', '🥈', '🥉'];
+      // Reihenfolge des Aufpoppens: Platz 3, dann 2, dann 1
+      const delay = (i) => reducedMotion ? 0 : 0.6 + (top.length - 1 - i) * 1.8;
+      const winnerDelay = delay(0);
+      const slot = (i) => `
+        <div class="slot p${i + 1}" style="--delay:${delay(i)}s">
+          ${i === 0 ? `<div class="crown" aria-hidden="true">👑</div>` : `<div class="medal" aria-hidden="true">${medals[i]}</div>`}
+          <div class="who">${escapeHtml(top[i].name)}</div>
+          <div class="score">${top[i].score} Punkte</div>
+          <div class="step">${i + 1}</div>
+        </div>`;
+      // Sichtbare Reihenfolge: 2 – 1 – 3
+      const order = [1, 0, 2].filter((i) => top[i]);
+      const rest = s.players.slice(3);
+      return `
+        <h1 class="center">Siegerehrung</h1>
+        <div class="winner-title" style="--delay:${winnerDelay + 0.9}s">🏆 ${escapeHtml(top[0].name)} gewinnt!</div>
+        <div class="podium">${order.map(slot).join('')}</div>
+        ${rest.length ? `
+          <div class="card fade-in" style="--delay:${winnerDelay + 1.8}s; max-width:760px; margin:0 auto 1rem">
+            <h3>Weitere Plätze</h3>
+            <ol class="ranking" start="4" style="font-size:1.1rem">${rest.slice(0, 10).map((p) =>
+              `<li>${escapeHtml(p.name)} – ${p.score} Punkte</li>`).join('')}</ol>
+            ${rest.length > 10 ? `<p class="muted">… und ${rest.length - 10} weitere</p>` : ''}
+          </div>` : ''}
+        <p class="center fade-in" style="--delay:${winnerDelay + 1.8}s"><a class="btn" href="/dashboard">Zurück zum Dashboard</a></p>`;
+    }
+
+    function confetti() {
+      const box = document.createElement('div');
+      box.className = 'confetti';
+      const colors = ['#e11d48', '#2563eb', '#d97706', '#16a34a', '#4f46e5', '#e6b422'];
+      for (let i = 0; i < 90; i++) {
+        const piece = document.createElement('i');
+        piece.style.left = `${Math.random() * 100}%`;
+        piece.style.background = colors[i % colors.length];
+        piece.style.animationDuration = `${2.5 + Math.random() * 2.5}s`;
+        piece.style.animationDelay = `${Math.random() * 1.2}s`;
+        piece.style.transform = `rotate(${Math.random() * 360}deg)`;
+        box.appendChild(piece);
+      }
+      document.body.appendChild(box);
+      later(() => box.remove(), 8000);
+    }
+
+    // --- Hauptansicht ---
+
+    function updateControls(s) {
       $('#title').textContent = s.title;
-      clearInterval(tick);
       const nextBtn = $('#next');
       nextBtn.hidden = s.state === 'finished';
       $('#end').hidden = s.state === 'finished';
       nextBtn.textContent = {
         lobby: 'Quiz starten',
         question: 'Auflösen',
-        reveal: s.questionIndex + 1 < s.total ? 'Nächste Frage' : 'Ergebnis zeigen',
+        reveal: 'Rangliste zeigen',
+        scoreboard: s.questionIndex + 1 < s.total ? 'Nächste Frage' : 'Siegerehrung',
       }[s.state] || '';
       nextBtn.disabled = s.state === 'lobby' && !s.players.length;
+    }
+
+    function render() {
+      const s = state;
+      updateControls(s);
+
+      // Zwischenstand und Siegerehrung nur einmal aufbauen, sonst startet die Animation bei jedem Nachladen neu
+      const key = `${s.state}:${s.questionIndex}`;
+      if ((s.state === 'scoreboard' || s.state === 'finished') && key === lastKey) return;
+      lastKey = key;
+
+      stopAnimations();
+      clearInterval(tick);
 
       let html = '';
       if (s.state === 'lobby') {
@@ -63,7 +208,7 @@
           <div class="card">
             <h3>${s.players.length} Teilnehmer</h3>
             <div class="players">${s.players.map((p) =>
-              `<span class="chip">${escapeHtml(p.name)}${p.guest ? ' <span class="muted">(Gast)</span>' : ''}</span>`).join('') ||
+              `<span class="chip">${escapeHtml(p.name)}${guestTag(p)}</span>`).join('') ||
               '<span class="muted">Warte auf Teilnehmer …</span>'}</div>
           </div>`;
       } else if (s.state === 'question' || s.state === 'reveal') {
@@ -75,21 +220,11 @@
           </div>
           <div class="question-text">${escapeHtml(s.question.text)}</div>
           ${reveal ? '' : '<div class="timer" id="timer"></div>'}
-          ${answersHtml(s.question, reveal, reveal ? s.distribution : null)}
-          ${reveal ? `
-            <div class="card" style="margin-top:1.5rem">
-              <h3>Zwischenstand</h3>
-              <ol class="ranking">${s.players.slice(0, 5).map((p) =>
-                `<li>${escapeHtml(p.name)} – ${p.score}</li>`).join('')}</ol>
-            </div>` : ''}`;
+          ${answersHtml(s.question, reveal, reveal ? s.distribution : null)}`;
+      } else if (s.state === 'scoreboard') {
+        html = scoreboardHtml(s);
       } else if (s.state === 'finished') {
-        html = `
-          <div class="card center">
-            <h1>Endstand</h1>
-            <ol class="ranking" style="display:inline-block;text-align:left">${s.players.map((p) =>
-              `<li>${escapeHtml(p.name)} – ${p.score} Punkte</li>`).join('')}</ol>
-            <p><a class="btn" href="/dashboard">Zurück zum Dashboard</a></p>
-          </div>`;
+        html = podiumHtml(s);
       }
       $('#view').innerHTML = html;
 
@@ -101,6 +236,10 @@
         };
         update();
         tick = setInterval(update, 250);
+      } else if (s.state === 'scoreboard') {
+        animateScoreboard(s);
+      } else if (s.state === 'finished' && s.players.length && !reducedMotion) {
+        later(confetti, (0.6 + (Math.min(3, s.players.length) - 1) * 1.8) * 1000 + 300);
       }
     }
 

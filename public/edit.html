@@ -14,7 +14,9 @@
   <main>
     <div class="card">
       <label for="title">Titel</label>
-      <input type="text" id="title" placeholder="z. B. Statistik – Kapitel 3">
+      <input type="text" id="title" placeholder="z. B. Wahlsysteme im Vergleich">
+      <label for="subject">Fach</label>
+      <select id="subject"><option value="">Fach wählen …</option></select>
     </div>
     <div id="questions"></div>
     <button type="button" id="add">+ Frage hinzufügen</button>
@@ -88,7 +90,7 @@
         return { ...q, answers };
       });
       try {
-        const body = { title: $('#title').value, questions: payload };
+        const body = { title: $('#title').value, subjectId: Number($('#subject').value) || null, questions: payload };
         if (id) await api(`/api/quizzes/${id}`, { method: 'PUT', body });
         else await api('/api/quizzes', { method: 'POST', body });
         location.href = '/dashboard';
@@ -98,9 +100,12 @@
     };
 
     requireLogin().then(async () => {
+      const subjects = await api('/api/subjects');
+      $('#subject').innerHTML += subjects.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
       if (id) {
         const quiz = await api(`/api/quizzes/${id}`);
         $('#title').value = quiz.title;
+        $('#subject').value = quiz.subject_id || '';
         questions = quiz.questions.map((q) => ({
           ...q,
           answers: [...q.answers, '', '', ''].slice(0, 4),
