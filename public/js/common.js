@@ -132,6 +132,8 @@ function mountNav(active, me) {
     </a>`).join('');
   document.body.appendChild(nav);
 
+  if (typeof showChangelog === 'function') showChangelog();
+
   const box = document.getElementById('me');
   if (box && me) {
     box.innerHTML = `<span class="level-badge" title="${me.points.toLocaleString('de-DE')} Punkte">🏅 Level ${me.level}</span>
