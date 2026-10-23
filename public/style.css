@@ -64,7 +64,16 @@ ul.list li { display: flex; justify-content: space-between; align-items: center;
 ul.list li:last-child { border-bottom: 0; }
 
 /* Editor */
-.question-head { margin-bottom: 1rem; }
+.question-head { margin-bottom: 1rem; justify-content: space-between; flex-wrap: nowrap; }
+.card.collapsed .question-head { margin-bottom: 0; }
+.question-head > .row { flex: none; }
+.q-toggle {
+  flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: .6rem; padding: .35rem 0;
+  border: 0; background: none; text-align: left; font-size: 1.1rem; font-weight: 700; color: var(--text);
+}
+.q-toggle .chevron { color: var(--muted); }
+.q-toggle .q-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card.collapsed .q-toggle .q-title { font-weight: 600; }
 .answer-row { display: flex; gap: .5rem; align-items: center; margin-bottom: .4rem; }
 .answer-row input[type=text] { flex: 1; }
 
@@ -203,4 +212,14 @@ select {
   .slot.p1 .who { font-size: 1.2rem; }
   .winner-title { font-size: 1.5rem; }
   .stat-row { grid-template-columns: 6rem 1fr auto; }
+}
+
+/* Fragen-Akkordeon im Editor: auf dem Handy bekommt der Titel die volle Breite, die Buttons stehen darunter */
+@media (max-width: 640px) {
+  .question-head { flex-wrap: wrap; }
+  .q-toggle { flex-basis: 100%; align-items: flex-start; }
+  .q-toggle .q-title {
+    white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  }
+  .question-head > .row { margin-left: auto; }
 }
