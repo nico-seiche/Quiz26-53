@@ -87,11 +87,11 @@ Wer mehrere Fragen in Folge richtig beantwortet, bekommt Extrapunkte: ab der 2. 
 
 ## Team-Modus
 
-Der Host wählt in der Lobby unter „Team-Modus“ 2, 3 oder 4 Teams (🦊 Füchse, 🦉 Eulen, 🐸 Frösche, 🐝 Bienen). Mit „Teams bilden“ werden die Teilnehmer zufällig in Teams verteilt; die Teamgrößen unterscheiden sich höchstens um 1, jedes Team braucht mindestens 2 Spieler. Danach werden die Teams auf dem großen Bildschirm vorgestellt, jeder sieht auf dem Handy sein Team.
+Der Host schaltet in der Lobby den „Team-Modus“ ein. Mit „Teams bilden“ werden die Teilnehmer zufällig in **zwei Teams** (🦊 Füchse, 🦉 Eulen) verteilt, jedes braucht mindestens 2 Spieler. Danach werden die Teams auf dem großen Bildschirm vorgestellt, jeder sieht auf dem Handy sein Team.
 
 - **Teampunkte** = Summe der Punkte aller Mitglieder; die Rangliste nach jeder Runde und die Siegerehrung zeigen die Teams (darunter die besten Einzelspieler).
-- **Ausgleich bei ungleichen Teams:** Hat ein Team weniger Mitglieder als die größten, bekommt es zusätzlich die Punkte des schwächsten Spielers aller größeren Teams. Der Ausgleich steht auf dem Bildschirm unter der Rangliste.
-- Jeder sammelt weiter seine Einzelpunkte (Gesamtwertung, Erfolge). Wertung und Mindestteilnehmerzahl gelten wie im normalen Spiel.
+- **Ungerade Teilnehmerzahl:** Ein Team hat dann genau einen Spieler mehr. Das kleinere Team bekommt einen **Geist-Spieler 👻**, der immer so viele Punkte hat wie der Durchschnitt seiner echten Mitspieler (aufgerundet auf ganze Punkte). Bei gerader Zahl gibt es keinen Geist.
+- Jeder sammelt weiter seine Einzelpunkte (Gesamtwertung, Erfolge). Der Geist-Spieler hat keinen Einfluss darauf; Wertung und Mindestteilnehmerzahl gelten wie im normalen Spiel.
 
 ## Erfolge
 

@@ -244,8 +244,8 @@ function hostView(data) {
       gained: t.gained,
       rank: t.rank,
       prevRank: t.prevRank,
+      ghost: t.ghost,
       bonus: t.bonus,
-      bonusFrom: t.bonusFrom,
     }));
   }
   if (data.game.state === 'finished') {
@@ -294,7 +294,7 @@ function playerView(data, key) {
   if (data.game.team_count > 0 && player.team !== null) {
     const teams = standings(players, data.game.team_count);
     const mineTeam = teams.find((t) => t.index === player.team);
-    view.team = { index: mineTeam.index, name: mineTeam.name, emoji: mineTeam.emoji, color: mineTeam.color };
+    view.team = { index: mineTeam.index, name: mineTeam.name, emoji: mineTeam.emoji, color: mineTeam.color, ghost: mineTeam.ghost };
     view.teammates = mineTeam.members.filter((m) => m.key !== key).map((m) => m.name);
     view.teamStanding = { rank: mineTeam.rank, prevRank: mineTeam.prevRank, score: mineTeam.score, teams: teams.length };
   }

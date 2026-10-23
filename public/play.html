@@ -82,6 +82,7 @@
           <h2>Du bist bei ${s.team.emoji} ${escapeHtml(s.team.name)}!</h2>
           <p class="muted">Deine Mitspieler:</p>
           <p class="big">${s.teammates.map(escapeHtml).join(', ')}</p>
+          ${s.team.ghost ? '<p class="muted">👻 Euer Team ist einen Spieler kleiner und bekommt einen Geist-Spieler mit dem Punktedurchschnitt eures Teams.</p>' : ''}
           <p class="muted">Gleich geht’s los …</p>
         </div>`;
       } else if (s.state === 'question') {

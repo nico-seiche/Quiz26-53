@@ -20,13 +20,10 @@
     <div id="view"></div>
     <div class="card" id="team-options" hidden>
       <div class="row spread">
-        <label for="team-count" style="margin:0">👥 Team-Modus</label>
-        <select id="team-count" style="width:auto">
-          <option value="0">Aus (jeder für sich)</option>
-          <option value="2">2 Teams</option>
-          <option value="3">3 Teams</option>
-          <option value="4">4 Teams</option>
-        </select>
+        <label class="row" for="team-count" style="margin:0;cursor:pointer;gap:.6rem">
+          <input type="checkbox" id="team-count" style="width:1.2rem;height:1.2rem">
+          <span>👥 Team-Modus (2 Teams)</span>
+        </label>
       </div>
       <p class="muted" id="team-hint" style="margin:.75rem 0 0"></p>
     </div>
@@ -88,7 +85,7 @@
     function boardEntries(s) {
       if (s.teams) {
         return s.teams.map((t) => ({
-          name: `${t.emoji} ${t.name}`, tag: `${t.size} Spieler`, color: t.color,
+          name: `${t.emoji} ${t.name}`, tag: `${t.size} Spieler${t.ghost ? ' + 👻' : ''}`, color: t.color,
           rank: t.rank, prevRank: t.prevRank, score: t.score, prevScore: t.prevScore, gained: t.gained,
         }));
       }
@@ -130,10 +127,9 @@
 
     // Team-Modus unter der Rangliste: Ausgleich und die besten Einzelspieler
     function teamExtras(s) {
-      const compensated = s.teams.filter((t) => t.bonus > 0);
+      const ghost = s.teams.find((t) => t.ghost);
       return `
-        ${compensated.length ? `<p class="center muted" style="margin-top:1rem">⚖️ Ausgleich für die kleineren Teams: ${compensated.map((t) =>
-          `${t.emoji} ${escapeHtml(t.name)} +${t.bonus} (Punkte von ${escapeHtml(t.bonusFrom)}, dem schwächsten Spieler der größeren Teams)`).join(' · ')}</p>` : ''}
+        ${ghost ? `<p class="center muted" style="margin-top:1rem">👻 Geist-Spieler für ${ghost.emoji} ${escapeHtml(ghost.name)}: ${ghost.bonus} Punkte (Durchschnitt der Mitspieler)</p>` : ''}
         <div class="card" style="max-width:760px;margin:1.5rem auto 0">
           <h3>Beste Einzelspieler</h3>
           <ol class="ranking" style="font-size:1.1rem">${s.players.slice(0, 3).map((p) =>
@@ -171,16 +167,15 @@
     // --- Die Teams vorstellen ---
 
     function teamsHtml(s) {
-      const sizes = new Set(s.teams.map((t) => t.size));
       return `
         <h1 class="center">Die Teams</h1>
         <div class="teams-grid">${s.teams.map((t, i) => `
           <div class="team-card pop-in" style="--delay:${reducedMotion ? 0 : 0.3 + i * 0.5}s;--team:${t.color}">
             <h2>${t.emoji} ${escapeHtml(t.name)}</h2>
             <p class="muted">${t.size} Spieler</p>
-            <ul>${t.members.map((m) => `<li>${escapeHtml(m.name)}${guestTag(m)}</li>`).join('')}</ul>
+            <ul>${t.members.map((m) => `<li>${escapeHtml(m.name)}${guestTag(m)}</li>`).join('')}${t.ghost ? '<li class="muted">👻 Geist (Durchschnitt des Teams)</li>' : ''}</ul>
           </div>`).join('')}</div>
-        ${sizes.size > 1 ? `<p class="center muted" style="margin-top:1.5rem">⚖️ Ungleich große Teams: Das kleinere Team bekommt als Ausgleich die Punkte des schwächsten Spielers aus den größeren Teams.</p>` : ''}`;
+        ${s.teams.some((t) => t.ghost) ? `<p class="center muted" style="margin-top:1.5rem">👻 Ein Team hat einen Spieler weniger und bekommt deshalb einen Geist-Spieler, der immer den Punktedurchschnitt seiner Mitspieler hat.</p>` : ''}`;
     }
 
     // --- Siegerehrung ---
@@ -188,7 +183,7 @@
     // Podiumsplätze: im Team-Modus die Teams, sonst die Spieler
     function podiumEntries(s) {
       if (s.teams) {
-        return s.teams.map((t) => ({ name: `${t.emoji} ${t.name}`, score: t.score, sub: t.members.map((m) => m.name).join(', ') }));
+        return s.teams.map((t) => ({ name: `${t.emoji} ${t.name}`, score: t.score, sub: t.members.map((m) => m.name).join(', ') + (t.ghost ? ' + 👻' : '') }));
       }
       return s.players.map((p) => ({ name: p.name, score: p.score }));
     }
@@ -264,14 +259,12 @@
     function teamHint(s) {
       const n = s.players.length;
       const k = s.teamCount;
-      if (!k) return 'Alle spielen einzeln. Mit Teams werden die Teilnehmer beim Start zufällig in gleich große Teams gelost.';
+      if (!k) return 'Alle spielen einzeln. Mit Teams werden die Teilnehmer beim Start zufällig in zwei gleich große Teams gelost.';
       const need = k * 2;
-      if (n < need) return `Für ${k} Teams braucht es mindestens ${need} Teilnehmer (aktuell ${n}).`;
-      const base = Math.floor(n / k);
-      const extra = n % k;
-      const sizes = Array.from({ length: k }, (_, i) => base + (i < extra ? 1 : 0)).join(' + ');
-      return `${n} Teilnehmer → Teams mit ${sizes} Spielern.${extra
-        ? ' Ausgleich: Das kleinere Team bekommt die Punkte des schwächsten Spielers aus den größeren Teams.' : ''}`;
+      if (n < need) return `Für zwei Teams braucht es mindestens ${need} Teilnehmer (aktuell ${n}).`;
+      return n % 2
+        ? `${n} Teilnehmer → zwei Teams mit ${(n + 1) / 2} und ${(n - 1) / 2} Spielern. Das kleinere Team bekommt einen Geist-Spieler 👻, der immer den Punktedurchschnitt seiner Mitspieler hat.`
+        : `${n} Teilnehmer → zwei gleich große Teams mit je ${n / 2} Spielern.`;
     }
 
     function updateTeamOptions(s) {
@@ -279,7 +272,7 @@
       box.hidden = s.state !== 'lobby';
       if (s.state !== 'lobby') return;
       const select = $('#team-count');
-      if (document.activeElement !== select) select.value = String(s.teamCount);  // nicht stören, solange man auswählt
+      if (document.activeElement !== select) select.checked = s.teamCount > 0;  // nicht stören, solange man klickt
       $('#team-hint').textContent = teamHint(s);
     }
 
@@ -390,9 +383,10 @@
       $('#team-count').onchange = async (e) => {
         $('#error').textContent = '';
         try {
-          live.apply(await api(`/api/games/${encodeURIComponent(pin)}/teams`, { method: 'POST', body: { count: Number(e.target.value) } }));
+          live.apply(await api(`/api/games/${encodeURIComponent(pin)}/teams`, { method: 'POST', body: { count: e.target.checked ? 2 : 0 } }));
         } catch (err) {
           $('#error').textContent = err.message;
+          e.target.checked = !e.target.checked;
           live.refresh();
         }
       };

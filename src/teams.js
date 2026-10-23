@@ -2,13 +2,11 @@
 const TEAMS = [
   { name: 'Füchse', emoji: '🦊', color: '#e11d48' },
   { name: 'Eulen', emoji: '🦉', color: '#2563eb' },
-  { name: 'Frösche', emoji: '🐸', color: '#16a34a' },
-  { name: 'Bienen', emoji: '🐝', color: '#d97706' },
 ];
 
 // Teamwertung aus den Einzelpunkten. field wählt die Punkte (score = aktuell, prevScore = vor der Frage).
-// Ausgleich: Hat ein Team weniger Mitglieder als die größten, bekommt es zusätzlich die Punkte
-// des schwächsten Spielers aller größeren Teams.
+// Ausgleich: Hat ein Team einen Spieler weniger, bekommt es einen Geist-Spieler 👻 mit dem
+// Punktedurchschnitt der echten Mitglieder des Teams.
 function buildTeams(players, teamCount, field = 'score') {
   const teams = Array.from({ length: teamCount }, (_, i) => ({
     index: i,
@@ -16,15 +14,12 @@ function buildTeams(players, teamCount, field = 'score') {
     members: players.filter((p) => p.team === i),
   }));
   const maxSize = Math.max(...teams.map((t) => t.members.length));
-  const uneven = teams.some((t) => t.members.length < maxSize);
-  const larger = teams.filter((t) => t.members.length === maxSize).flatMap((t) => t.members);
-  const worst = uneven && larger.length ? larger.reduce((a, b) => (b[field] < a[field] ? b : a)) : null;
 
   for (const t of teams) {
     t.size = t.members.length;
     t.base = t.members.reduce((sum, p) => sum + p[field], 0);
-    t.bonus = worst && t.size < maxSize ? worst[field] : 0;
-    t.bonusFrom = t.bonus && worst ? worst.name : null;
+    t.ghost = t.size > 0 && t.size < maxSize;
+    t.bonus = t.ghost ? Math.round(t.base / t.size) : 0;
     t.score = t.base + t.bonus;
   }
   return teams;

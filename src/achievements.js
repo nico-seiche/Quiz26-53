@@ -104,7 +104,7 @@ async function awardForGame(client, game, players) {
   }
   const history = rankHistory(players, answersByPlayer, game.quiz.questions.length);
 
-  // Team-Modus: das Team mit den meisten Punkten (eindeutig, nicht gleichauf) gewinnt
+  // Team-Modus: das Team mit den meisten Punkten (inkl. Geist-Spieler, eindeutig, nicht gleichauf) gewinnt
   let winningTeam = null;
   if (game.team_count > 0) {
     const ranked = rankTeams(buildTeams(players, game.team_count));
