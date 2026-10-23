@@ -79,7 +79,7 @@ async function readBody(req, res) {
 
 router.get('/', async (req, res) => {
   const quizzes = await db.query(`
-    SELECT q.id, q.title, q.updated_at, q.mode, s.name AS subject,
+    SELECT q.id, q.title, q.updated_at, q.mode, s.name AS subject, s.icon AS subject_icon,
            (SELECT COUNT(*)::int FROM quiz.questions WHERE quiz_id = q.id) AS question_count
     FROM quiz.quizzes q LEFT JOIN quiz.subjects s ON s.id = q.subject_id
     WHERE q.owner_id = $1 ORDER BY q.updated_at DESC

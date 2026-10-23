@@ -13,9 +13,13 @@
     <button type="button" onclick="logout()">Abmelden</button>
   </header>
   <main>
-    <div class="card">
-      <div class="muted">Angemeldet als</div>
-      <h1 id="name" style="margin:0">…</h1>
+    <div class="card profile-card">
+      <span id="profile-avatar"></span>
+      <div>
+        <div class="muted">Angemeldet als</div>
+        <h1 id="name" style="margin:0">…</h1>
+        <span class="level-badge" id="profile-level"></span>
+      </div>
     </div>
 
     <div class="card">
@@ -87,7 +91,9 @@
 
     requireLogin().then((me) => {
       $('#name').textContent = me.username;
-      mountNav('profile');
+      $('#profile-avatar').innerHTML = avatarHtml(me.username, '4.5rem');
+      $('#profile-level').textContent = `🏅 Level ${me.level} · noch ${me.toNext.toLocaleString('de-DE')} Punkte bis Level ${me.level + 1}`;
+      mountNav('profile', me);
       loadResults();
       loadAchievements().then(() => {
         if (location.hash === '#erfolge') document.getElementById('erfolge').scrollIntoView();

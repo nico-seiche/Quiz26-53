@@ -101,27 +101,40 @@ function liveGame(pin, load, render) {
   return { refresh, apply, remaining };
 }
 
-// Schwebende Navigation am unteren Rand (Home, Quiz, Bestenliste, Profil)
-const NAV_ITEMS = [
-  { id: 'home', href: '/dashboard', label: 'Home',
-    icon: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>' },
-  { id: 'quizzes', href: '/quizzes', label: 'Quiz',
-    icon: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>' },
-  { id: 'leaderboard', href: '/leaderboard', label: 'Bestenliste',
-    icon: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/>' },
-  { id: 'profile', href: '/profile', label: 'Profil',
-    icon: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>' },
+// Runder Avatar mit dem Anfangsbuchstaben; die Farbe ergibt sich aus dem Namen
+const AVATAR_GRADIENTS = [
+  'linear-gradient(135deg,#f59e0b,#ef4444)', 'linear-gradient(135deg,#10b981,#06b6d4)', 'linear-gradient(135deg,#6366f1,#ec4899)',
+  'linear-gradient(135deg,#3b82f6,#8b5cf6)', 'linear-gradient(135deg,#f43f5e,#fb923c)', 'linear-gradient(135deg,#14b8a6,#84cc16)',
 ];
+function avatarHtml(name, size = '2rem') {
+  let hash = 0;
+  for (const ch of String(name)) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return `<span class="avatar" style="--size:${size};--avatar:${AVATAR_GRADIENTS[hash % AVATAR_GRADIENTS.length]}" aria-hidden="true">${escapeHtml(String(name).charAt(0).toUpperCase())}</span>`;
+}
 
-function mountNav(active) {
+// Schwebende Navigation am unteren Rand (Home, Quiz, Bestenliste, Profil) und Level-Anzeige in der Kopfzeile.
+// me: Antwort von /api/auth/me (Name, Level)
+function mountNav(active, me) {
   document.body.classList.add('has-nav');
+  const items = [
+    { id: 'home', href: '/dashboard', label: 'Home', icon: '🏠' },
+    { id: 'quizzes', href: '/quizzes', label: 'Quiz', icon: '❓' },
+    { id: 'leaderboard', href: '/leaderboard', label: 'Bestenliste', icon: '🏅' },
+    { id: 'profile', href: '/profile', label: 'Profil', icon: me ? avatarHtml(me.username, '1.7rem') : '👤' },
+  ];
   const nav = document.createElement('nav');
   nav.className = 'bottom-nav';
   nav.setAttribute('aria-label', 'Hauptnavigation');
-  nav.innerHTML = NAV_ITEMS.map((item) => `
+  nav.innerHTML = items.map((item) => `
     <a href="${item.href}" ${item.id === active ? 'aria-current="page"' : ''}>
-      <svg viewBox="0 0 24 24" aria-hidden="true">${item.icon}</svg>
+      <span class="nav-icon" aria-hidden="true">${item.icon}</span>
       <span>${item.label}</span>
     </a>`).join('');
   document.body.appendChild(nav);
+
+  const box = document.getElementById('me');
+  if (box && me) {
+    box.innerHTML = `<span class="level-badge" title="${me.points.toLocaleString('de-DE')} Punkte">🏅 Level ${me.level}</span>
+      <span class="hide-small">${escapeHtml(me.username)}</span>`;
+  }
 }

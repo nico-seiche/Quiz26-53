@@ -23,7 +23,7 @@ app.get('/api/config', (req, res) => {
 
 // Fächer, denen Quiz zugeordnet werden
 app.get('/api/subjects', async (req, res) => {
-  res.json(await db.query('SELECT id, name FROM quiz.subjects ORDER BY position, id'));
+  res.json(await db.query('SELECT id, name, icon FROM quiz.subjects ORDER BY position, id'));
 });
 
 // Prüft die Datenbankverbindung

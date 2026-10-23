@@ -37,6 +37,25 @@ router.get('/', requireAuth, async (req, res) => {
   const [{ count }] = await db.query('SELECT COUNT(*)::int AS count FROM quiz.users');
   const me = await db.one(`${ranked} SELECT points, games, rank FROM ranked WHERE id = $3`, [...params, req.user.id]);
 
+  // Platz vor meinem letzten gewerteten Spiel: so erkennt man Aufsteiger
+  const last = await db.one(`
+    SELECT MAX(played_at) AS at FROM quiz.game_results
+    WHERE user_id = $1 AND player_count >= $2 AND ($3::int IS NULL OR subject_id = $3)
+  `, [req.user.id, MIN_PLAYERS_FOR_SCORING, subjectId]);
+  me.prevRank = null;
+  if (last.at) {
+    const before = await db.one(`
+      WITH ranked AS (
+        SELECT u.id, RANK() OVER (ORDER BY COALESCE(SUM(r.score), 0) DESC)::int AS rank
+        FROM quiz.users u
+        LEFT JOIN quiz.game_results r
+          ON r.user_id = u.id AND r.player_count >= $1 AND ($2::int IS NULL OR r.subject_id = $2) AND r.played_at < $4
+        GROUP BY u.id
+      ) SELECT rank FROM ranked WHERE id = $3
+    `, [MIN_PLAYERS_FOR_SCORING, subjectId, req.user.id, last.at]);
+    me.prevRank = before.rank;
+  }
+
   res.json({
     minPlayers: MIN_PLAYERS_FOR_SCORING,
     subjects,

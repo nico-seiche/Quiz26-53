@@ -9,47 +9,65 @@
 <body>
   <header class="top">
     <a class="brand" href="/dashboard">Quiz</a>
-    <span class="muted hide-small" id="me"></span>
+    <span id="me"></span>
   </header>
   <main>
-    <h1 id="hello">Hallo 👋</h1>
+    <h1 class="hello">Hallo, <span class="hello-name" id="hello-name">…</span> 👋</h1>
 
-    <div class="card">
+    <div class="card join-card">
+      <div class="join-art" aria-hidden="true">
+        <span class="spark s1">✨</span><span id="art-avatar"></span><span class="spark s2">✨</span><span class="spark s3">❓</span>
+      </div>
       <h2>Einem Quiz beitreten</h2>
-      <form class="row" id="join-form">
-        <input type="text" id="join-pin" inputmode="numeric" placeholder="PIN eingeben" style="max-width:200px">
-        <button class="primary" type="submit">Beitreten</button>
+      <form class="join-form" id="join-form">
+        <input type="text" id="join-pin" inputmode="numeric" placeholder="PIN eingeben" aria-label="Game-PIN">
+        <button class="go-btn" type="submit">GO!</button>
       </form>
+      <div class="level-line" id="level-line" hidden>
+        <div class="level-bar" role="progressbar" aria-label="Fortschritt zum nächsten Level" id="level-bar">
+          <span id="level-fill"></span>
+        </div>
+        <div class="level-labels">
+          <span><strong id="level-now"></strong> <span class="streak-chip" id="streak"></span></span>
+          <span class="muted" id="level-next"></span>
+        </div>
+      </div>
     </div>
 
     <div class="tile-grid">
-      <a class="tile" href="/profile">
-        <span class="tile-value" id="t-points">–</span><span class="muted">Punkte</span>
+      <a class="tile tile-gold" href="/profile">
+        <span class="tile-icon" aria-hidden="true">🏆</span>
+        <span class="tile-value" id="t-points">–</span>
+        <span class="tile-label">Punkte</span>
+        <span class="tile-chip dark" id="t-today" hidden></span>
       </a>
-      <a class="tile" href="/leaderboard">
-        <span class="tile-value" id="t-rank">–</span><span class="muted" id="t-rank-label">Platz</span>
+      <a class="tile tile-silver" href="/leaderboard">
+        <span class="tile-icon" aria-hidden="true">🥇</span>
+        <span class="tile-value" id="t-rank">–</span>
+        <span class="tile-label" id="t-rank-label">Platz</span>
+        <span class="tile-chip" id="t-rank-chip" hidden></span>
       </a>
-      <a class="tile" href="/profile#erfolge">
-        <span class="tile-value" id="t-ach">–</span><span class="muted">Erfolge</span>
+      <a class="tile tile-rainbow" href="/profile#erfolge">
+        <span class="tile-icon" aria-hidden="true">⭐</span>
+        <span class="tile-value" id="t-ach">–</span>
+        <span class="tile-label">Erfolge</span>
+        <span class="tile-chip" id="t-ach-chip" hidden></span>
       </a>
     </div>
 
-    <div class="card">
-      <div class="row spread">
-        <h2>Zuletzt gespielt</h2>
-        <a href="/profile">Alle Ergebnisse</a>
-      </div>
-      <ul class="list" id="recent"></ul>
+    <div class="row spread section-head">
+      <h2>Zuletzt gespielt</h2>
+      <a class="pill-btn" href="/profile">Alle Ergebnisse</a>
     </div>
+    <div class="recent-list" id="recent"></div>
 
-    <div class="card">
-      <div class="row spread">
-        <div>
-          <h2>Eigenes Quiz erstellen</h2>
-          <span class="muted">Wähle Fach und Spielmodus und lade deinen Kurs ein.</span>
-        </div>
-        <a class="btn primary" href="/edit">+ Neues Quiz</a>
+    <div class="create-card">
+      <span class="q-bubble" aria-hidden="true">?</span>
+      <div>
+        <h2>Eigenes Quiz erstellen</h2>
+        <span class="muted">Wähle Fach und Spielmodus und lade deinen Kurs ein.</span>
       </div>
+      <a class="btn primary" href="/edit">+ Neues Quiz</a>
     </div>
   </main>
   <script src="/js/common.js"></script>
@@ -62,7 +80,23 @@
 
     const nf = (n) => n.toLocaleString('de-DE');
 
-    async function loadOverview() {
+    // Level-Fortschritt, aus /api/auth/me
+    function showLevel(me, dayStreak) {
+      $('#level-line').hidden = false;
+      $('#level-fill').style.width = `${(me.intoLevel / me.perLevel) * 100}%`;
+      $('#level-bar').setAttribute('aria-valuenow', Math.round((me.intoLevel / me.perLevel) * 100));
+      $('#level-now').textContent = `Level ${me.level}`;
+      $('#level-next').textContent = `Nächstes Ziel: Level ${me.level + 1} in ${nf(me.toNext)} Punkten`;
+      if (dayStreak > 0) $('#streak').textContent = `🔥 ${dayStreak} ${dayStreak === 1 ? 'Tag' : 'Tage'} Serie`;
+    }
+
+    // Farbe des Punkte-Etiketts nach Platzierung im Spiel
+    function pillClass(r) {
+      const share = r.rank / r.player_count;
+      return share <= 0.34 ? 'good' : share <= 0.67 ? 'mid' : 'low';
+    }
+
+    async function loadOverview(me) {
       // Jede Kennzahl lädt für sich; ein Fehler bei einer soll die übrigen nicht verhindern
       const [results, achievements, board] = await Promise.all([
         api('/api/results').catch(() => null),
@@ -71,28 +105,43 @@
       ]);
       if (results) {
         $('#t-points').textContent = nf(results.total);
+        if (results.today > 0) { $('#t-today').hidden = false; $('#t-today').textContent = `+${nf(results.today)} heute`; }
+        showLevel(me, results.dayStreak);
         $('#recent').innerHTML = results.results.slice(0, 3).map((r) => `
-          <li>
+          <div class="recent-row">
+            <span class="subject-icon" aria-hidden="true">${r.subject_icon || '📘'}</span>
             <div>
-              <strong>${escapeHtml(r.quiz_title)}</strong>${r.subject ? ` <span class="tag">${escapeHtml(r.subject)}</span>` : ''}<br>
+              <div class="recent-title">${escapeHtml(r.quiz_title)}</div>
+              ${r.subject ? `<span class="tag">${escapeHtml(r.subject)}</span>` : ''}
               <span class="muted">${new Date(r.played_at).toLocaleDateString('de-DE')}</span>
             </div>
-            <div>${r.score} Punkte · Platz ${r.rank}/${r.player_count}</div>
-          </li>`).join('') || '<li class="muted">Noch nichts gespielt – tritt einem Quiz bei und deine Ergebnisse erscheinen hier.</li>';
+            <div class="recent-meta">
+              <span class="pts-pill ${pillClass(r)}">${nf(r.score)} Punkte</span>
+              <span class="muted">Platz ${r.rank}/${r.player_count}</span>
+            </div>
+          </div>`).join('') || '<div class="card muted">Noch nichts gespielt – tritt einem Quiz bei und deine Ergebnisse erscheinen hier.</div>';
       }
-      if (achievements) $('#t-ach').textContent = `${achievements.earned}/${achievements.total}`;
+      if (achievements) {
+        $('#t-ach').textContent = `${achievements.earned}/${achievements.total}`;
+        if (achievements.title) { $('#t-ach-chip').hidden = false; $('#t-ach-chip').textContent = achievements.title; }
+      }
       if (board) {
         const ranked = board.me.points > 0;
         $('#t-rank').textContent = ranked ? board.me.rank : '–';
         $('#t-rank-label').textContent = ranked ? `Platz von ${board.userCount}` : 'noch ohne Platz';
+        // Chip: Aufsteiger (Platz seit dem letzten Spiel verbessert), sonst Spitzenplätze
+        const up = board.me.prevRank ? board.me.prevRank - board.me.rank : 0;
+        const chip = !ranked ? null : up > 0 ? `Aufsteiger! ▲${up}` : board.me.rank === 1 ? 'Spitze! 👑' : board.me.rank <= 3 ? 'Top 3' : null;
+        if (chip) { $('#t-rank-chip').hidden = false; $('#t-rank-chip').textContent = chip; }
       }
     }
 
     requireLogin().then((me) => {
-      $('#me').textContent = me.username;
-      $('#hello').textContent = `Hallo, ${me.username} 👋`;
-      mountNav('home');
-      loadOverview();
+      $('#hello-name').textContent = me.username;
+      $('#art-avatar').innerHTML = avatarHtml(me.username, '4.5rem');
+      mountNav('home', me);
+      showLevel(me, 0);
+      loadOverview(me);
     });
   </script>
 </body>

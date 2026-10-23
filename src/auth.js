@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('./db');
+const { MIN_PLAYERS_FOR_SCORING, levelInfo } = require('./config');
 
 const COOKIE_NAME = 'sid';
 const SESSION_DAYS = 30;
@@ -93,9 +94,14 @@ router.post('/logout', async (req, res) => {
   res.json({ ok: true });
 });
 
-router.get('/me', (req, res) => {
+router.get('/me', async (req, res) => {
   if (!req.user) return res.status(401).json({ error: 'Nicht angemeldet' });
-  res.json(req.user);
+  // Gewertete Gesamtpunkte und Level (für die Anzeige in der Kopfzeile)
+  const { points } = await db.one(
+    'SELECT COALESCE(SUM(score), 0)::int AS points FROM quiz.game_results WHERE user_id = $1 AND player_count >= $2',
+    [req.user.id, MIN_PLAYERS_FOR_SCORING],
+  );
+  res.json({ ...req.user, points, ...levelInfo(points) });
 });
 
 module.exports = { router, loadUser, requireAuth };

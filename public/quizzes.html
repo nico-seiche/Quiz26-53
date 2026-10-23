@@ -10,36 +10,35 @@
   <header class="top">
     <a class="brand" href="/dashboard">Quiz</a>
     <strong>Meine Quiz</strong>
-    <span class="muted hide-small" id="me"></span>
+    <span id="me"></span>
   </header>
   <main>
-    <div class="card">
-      <div class="row spread">
-        <h2>Meine Quiz</h2>
-        <a class="btn primary" href="/edit">+ Neues Quiz</a>
-      </div>
-      <p class="error" id="error"></p>
-      <ul class="list" id="quizzes"></ul>
+    <div class="row spread section-head">
+      <h2>Meine Quiz</h2>
+      <a class="btn primary" href="/edit">+ Neues Quiz</a>
     </div>
+    <p class="error" id="error"></p>
+    <div class="recent-list" id="quizzes"></div>
   </main>
   <script src="/js/common.js"></script>
   <script>
     async function load() {
       const quizzes = await api('/api/quizzes');
       $('#quizzes').innerHTML = quizzes.length ? quizzes.map((q) => `
-        <li>
+        <div class="recent-row">
+          <span class="subject-icon" aria-hidden="true">${q.subject_icon || '📘'}</span>
           <div>
-            <strong>${escapeHtml(q.title)}</strong><br>
+            <div class="recent-title">${escapeHtml(q.title)}</div>
             <span class="muted">${q.question_count} Fragen</span>
             ${q.subject ? `<span class="tag">${escapeHtml(q.subject)}</span>` : '<span class="tag">Kein Fach</span>'}
             <span class="tag">${q.mode === 'team' ? '👥 Team' : '👤 Einzel'}</span>
           </div>
-          <div class="row">
+          <div class="recent-meta">
             <button class="primary" type="button" data-start="${q.id}" ${q.question_count ? '' : 'disabled'}>Starten</button>
             <a class="btn" href="/edit?id=${q.id}">Bearbeiten</a>
             <button class="danger" type="button" data-delete="${q.id}">Löschen</button>
           </div>
-        </li>`).join('') : '<li class="muted">Noch kein Quiz – leg dein erstes an.</li>';
+        </div>`).join('') : '<div class="card muted">Noch kein Quiz – leg dein erstes an.</div>';
     }
 
     $('#quizzes').onclick = async (e) => {
@@ -59,8 +58,7 @@
     };
 
     requireLogin().then((me) => {
-      $('#me').textContent = me.username;
-      mountNav('quizzes');
+      mountNav('quizzes', me);
       load();
     });
   </script>

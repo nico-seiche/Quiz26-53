@@ -10,7 +10,7 @@
   <header class="top">
     <a class="brand" href="/dashboard">Quiz</a>
     <strong>🏆 Bestenliste</strong>
-    <span class="muted hide-small" id="me"></span>
+    <span id="me"></span>
   </header>
   <main>
     <div class="tabs" id="tabs" role="tablist" aria-label="Wertung wählen"></div>
@@ -37,7 +37,7 @@
       return `
         <li class="lb-row ${e.isMe ? 'me' : ''} ${e.points === 0 ? 'zero' : ''}" ${e.isMe ? 'aria-current="true"' : ''}>
           <span class="lb-rank">${rankLabel(e)}</span>
-          <span class="lb-name">${escapeHtml(e.username)}${e.isMe ? ' <span class="tag">Du</span>' : ''}</span>
+          <span class="lb-name">${avatarHtml(e.username, '1.9rem')}<span class="lb-text">${escapeHtml(e.username)}</span>${e.isMe ? ' <span class="tag">Du</span>' : ''}</span>
           <span class="lb-games muted">${e.games} ${e.games === 1 ? 'Spiel' : 'Spiele'}</span>
           <span class="lb-points">${nf(e.points)}</span>
         </li>`;
@@ -85,8 +85,7 @@
 
     requireLogin().then((me) => {
       myName = me.username;
-      $('#me').textContent = me.username;
-      mountNav('leaderboard');
+      mountNav('leaderboard', me);
       load();
     });
   </script>

@@ -137,6 +137,15 @@ async function awardForGame(client, game, players) {
 
 const router = express.Router();
 
+// Titel nach Anzahl erreichter Erfolge (für die Kachel auf der Startseite)
+function collectorTitle(earned) {
+  if (earned >= 12) return 'Legende';
+  if (earned >= 8) return 'Sammler';
+  if (earned >= 4) return 'Entdecker';
+  if (earned >= 1) return 'Einsteiger';
+  return null;
+}
+
 // Alle Erfolge mit Stand des eingeloggten Nutzers
 router.get('/', requireAuth, async (req, res) => {
   const earned = new Map((await db.query(
@@ -155,7 +164,7 @@ router.get('/', requireAuth, async (req, res) => {
     }
     return item;
   });
-  res.json({ minPlayers: MIN_PLAYERS_FOR_SCORING, earned: earned.size, total: ACHIEVEMENTS.length, achievements });
+  res.json({ minPlayers: MIN_PLAYERS_FOR_SCORING, earned: earned.size, total: ACHIEVEMENTS.length, title: collectorTitle(earned.size), achievements });
 });
 
 module.exports = { router, awardForGame, publicInfo, ACHIEVEMENTS };

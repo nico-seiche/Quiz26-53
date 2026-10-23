@@ -70,15 +70,26 @@ public/            Frontend (reines HTML/CSS/JS, kein Build-Schritt); js/common.
 supabase/          Datenbank-Migrationen
 ```
 
+## Design, Level und Serie
+
+Die Oberfläche folgt einem weichen Verlaufs-Design mit runden Karten, Level-Anzeige und bunter Navigation. Hinter den Home-Kacheln stehen echte Daten:
+
+- **Level:** alle 2.000 gewerteten Punkte ein Level (`POINTS_PER_LEVEL` in `src/config.js`).
+- **Tage-Serie:** aufeinanderfolgende Tage (Europa/Berlin) mit mindestens einem gewerteten Spiel; sie bleibt bestehen, wenn man gestern gespielt hat.
+- **„+X heute“:** gewertete Punkte des heutigen Tages.
+- **„Aufsteiger!“:** der Platz in der Gesamtwertung ist seit dem letzten gewerteten Spiel besser geworden.
+- **Sammler-Titel:** Einsteiger, Entdecker, Sammler, Legende je nach Anzahl der Erfolge.
+- Avatare sind der Anfangsbuchstabe auf einem Farbverlauf, Fach-Symbole Emojis.
+
 ## Fächer und Statistik
 
 Jedes Quiz gehört zu einem Fach. Die Fächer liegen in der Tabelle `quiz.subjects` (aktuell Politik, Soziologie, Psychologie). Ein neues Fach ergänzt man im Supabase-SQL-Editor:
 
 ```sql
-INSERT INTO quiz.subjects (name, position) VALUES ('Statistik', 4);
+INSERT INTO quiz.subjects (name, position, icon) VALUES ('Statistik', 4, '📊');
 ```
 
-`position` bestimmt die Reihenfolge. Das Dashboard zeigt eingeloggten Spielern ihre Gesamtpunkte und die Punkte je Fach. Quiz aus der Zeit vor den Fächern erscheinen unter „Ohne Fach“.
+`position` bestimmt die Reihenfolge, `icon` ist das Emoji in Quizliste und „Zuletzt gespielt“ (Standard 📘). Das Dashboard zeigt eingeloggten Spielern ihre Gesamtpunkte und die Punkte je Fach. Quiz aus der Zeit vor den Fächern erscheinen unter „Ohne Fach“.
 
 **Mindestteilnehmer:** In Gesamtpunkte und Fächer-Statistik fließen nur Spiele mit mindestens 10 Teilnehmern ein (Gäste mitgezählt). Kleinere Spiele bleiben in „Meine Ergebnisse“ sichtbar, sind dort aber als „zählt nicht“ markiert. Der Wert steht in `src/config.js` (`MIN_PLAYERS_FOR_SCORING`) und wird beim Abruf der Statistik angewendet, eine Änderung gilt also auch rückwirkend.
 
