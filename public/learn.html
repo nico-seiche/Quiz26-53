@@ -26,7 +26,7 @@
       <div class="tabs" id="levels" style="margin:0" hidden>
         <button type="button" data-level="0.3">Leicht</button>
         <button type="button" data-level="0.6">Mittel</button>
-        <button type="button" data-level="1">Schwer</button>
+        <button type="button" data-level="1">Alle Begriffe</button>
       </div>
     </div>
     <p class="error" id="error"></p>
@@ -137,7 +137,7 @@
     function showCloze() {
       const c = card();
       const tokens = Cloze.tokenize(c.definition);
-      blanks = level >= 1 ? new Set(tokens.map((t, i) => (t.word ? i : -1)).filter((i) => i >= 0)) : Cloze.pickBlanks(tokens, level);
+      blanks = Cloze.pickBlanks(tokens, level);
       stage.innerHTML = progressHtml() + `
         <div class="card">
           <div class="muted">Ergänze die Lücken</div>

@@ -1,10 +1,25 @@
 // Hilfen zum Auswendiglernen langer Definitionen: Lücken erzeugen und Antworten tolerant vergleichen.
 // Reine Funktionen ohne Seitenzugriff, damit sie sich auch in Node testen lassen.
 const Cloze = (() => {
-  // Füllwörter, die nicht als Lücke taugen (die Lücken sollen die Begriffe sein, auf die es ankommt)
-  const STOP = new Set(('der die das den dem des ein eine einer einem einen eines und oder aber wenn dann als wie ' +
-    'bei mit von vom zum zur zu im in am an auf aus für nach über unter ist sind wird werden war hat haben kann ' +
-    'können sich es er sie nicht auch nur so sein ihre ihrer ihren dass').split(' '));
+  // Füllwörter, die nie als Lücke dienen sollen: Artikel, Präpositionen, Konjunktionen, Pronomen,
+  // Hilfs-/Modalverben und häufige Adverbien. Übrig bleiben die Begriffe, auf die es ankommt.
+  const STOP = new Set(`
+    der die das den dem des ein eine einer einem einen eines kein keine keiner keinem keinen keines
+    und oder aber sondern denn sowie sowohl auch noch nur schon bereits bzw usw etc ggf evtl
+    wenn dann als wie weil da dass ob obwohl während bevor nachdem indem damit falls sofern soweit solange sobald
+    von vom zu zum zur zum bei beim mit ohne nach aus auf an am im in ins um für gegen durch über unter vor hinter neben
+    zwischen bis seit ab außer entlang trotz wegen statt innerhalb außerhalb gemäß laut per pro
+    ich du er sie es wir ihr man sich mich dich uns euch ihn ihm ihnen ihre ihrer ihren ihrem ihres sein seine seiner seinen
+    seinem seines mein dein unser euer dieser diese dieses diesem diesen jener jene jenes welche welcher welches welchen
+    wer was wo wann wie wohin woher wobei wodurch wofür dabei dafür dagegen davon dazu daher deshalb deswegen darum
+    ist sind war waren wird werden wurde wurden worden wäre wären sei seien bin bist seid hat haben hatte hatten hätte
+    kann können konnte konnten könnte könnten muss müssen musste müsste soll sollen sollte sollten darf dürfen durfte
+    will wollen wollte mag mögen möchte möchten lässt lassen gibt geben gilt gelten liegt liegen vor
+    nicht kein nichts nie niemals immer oft meist meistens manchmal selten stets jeweils jeder jede jedes jedem jeden
+    alle allen aller alles aller viele vielen mehr mehrere einige einigen etwa etwas sehr ganz gar fast eher zudem zwar
+    also somit dennoch jedoch doch hier dort dann nun jetzt heute bereits ebenso ebenfalls sonst ansonsten insbesondere
+    sog sogenannte sogenannten sogenannter bestimmte bestimmten bestimmter bestimmtes bzw
+  `.split(/\s+/).filter(Boolean).map((w) => fold(w)));
 
   // Zerlegt in Wörter und Trennstücke (Leerzeichen, Satzzeichen), damit der Text unverändert angezeigt werden kann
   function tokenize(text) {
@@ -41,11 +56,17 @@ const Cloze = (() => {
     return tolerance > 0 && distance(a, b) <= tolerance;
   }
 
-  // Wählt anteilig Wörter als Lücken aus (Indizes in tokens); Füllwörter nur, wenn sonst zu wenig übrig bleibt
+  // Inhaltswort = kein Füllwort und mindestens 4 Buchstaben (oder eine Zahl)
+  function isContent(word) {
+    return !STOP.has(fold(word)) && (word.length >= 4 || /\d/.test(word));
+  }
+
+  // Wählt anteilig Inhaltswörter als Lücken aus (Indizes in tokens). Füllwörter werden nie gewählt;
+  // nur wenn ein Text gar keine Inhaltswörter hat, bleibt keine Lücke übrig und es wird das längste Wort genommen.
   function pickBlanks(tokens, ratio, random = Math.random) {
     const words = tokens.map((t, i) => (t.word ? i : -1)).filter((i) => i >= 0);
-    const strong = words.filter((i) => tokens[i].text.length >= 4 && !STOP.has(tokens[i].text.toLowerCase()));
-    const pool = strong.length >= 3 ? strong : words;
+    let pool = words.filter((i) => isContent(tokens[i].text));
+    if (!pool.length && words.length) pool = [words.reduce((a, b) => (tokens[b].text.length > tokens[a].text.length ? b : a))];
     const count = Math.min(pool.length, Math.max(1, Math.round(pool.length * ratio)));
     const shuffled = pool.map((i) => [random(), i]).sort((x, y) => x[0] - y[0]);
     return new Set(shuffled.slice(0, count).map(([, i]) => i));
@@ -93,7 +114,7 @@ const Cloze = (() => {
     return cards.map((c) => ({ ...c, definition: c.definition.replace(/\s+/g, ' ').trim() }));
   }
 
-  return { tokenize, matches, pickBlanks, compare, parseCards, fold };
+  return { tokenize, matches, isContent, pickBlanks, compare, parseCards, fold };
 })();
 
 if (typeof module !== 'undefined') module.exports = Cloze;
