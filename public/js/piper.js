@@ -6,8 +6,6 @@ const Piper = (() => {
   const PHONEMIZE = 'https://cdn.jsdelivr.net/npm/@diffusionstudio/piper-wasm@1.0.0/build/piper_phonemize';
   const PATHS = {
     'de_DE-thorsten-medium': 'de/de_DE/thorsten/medium/de_DE-thorsten-medium.onnx',
-    'de_DE-ramona-low': 'de/de_DE/ramona/low/de_DE-ramona-low.onnx',
-    'de_DE-kerstin-low': 'de/de_DE/kerstin/low/de_DE-kerstin-low.onnx',
   };
   const CACHE = 'piper-models-v1';
 

@@ -52,9 +52,7 @@ const Speech = (() => {
   // --- Natürliche Stimme: Piper (Open Source) läuft per WebAssembly im Browser, ohne Server ---
   // Die Stimme (ca. 60 MB) wird einmal geladen und im Gerät gespeichert. Der Code liegt in piper.js, Laufzeit und Phonemizer kommen von CDNs.
   const PIPER_VOICES = [
-    { id: 'de_DE-thorsten-medium', label: 'Thorsten (männlich, beste Qualität)' },
-    { id: 'de_DE-ramona-low', label: 'Ramona (weiblich)' },
-    { id: 'de_DE-kerstin-low', label: 'Kerstin (weiblich)' },
+    { id: 'de_DE-thorsten-medium', label: 'Thorsten (natürliche Stimme)' },
   ];
   let piperChain = Promise.resolve();   // Berechnungen nacheinander, das Handy würde parallel nur langsamer
   const audioMem = new Map();
