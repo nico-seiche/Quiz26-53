@@ -448,7 +448,7 @@ input.cloze-input.bad { border-color: var(--danger); background: color-mix(in sr
 .freetext { width: 100%; min-height: 12rem; font-size: 1.05rem; line-height: 1.6; }
 .set-meter { display: flex; align-items: center; gap: .6rem; margin-top: .35rem; max-width: 22rem; }
 .set-meter .stat-bar { flex: 1; }
-.card-edit .row { align-items: flex-start; flex-wrap: nowrap; }
+.card-edit .row { align-items: stretch; flex-wrap: nowrap; }
 .card-edit textarea { margin-top: .4rem; }
 .card-edit { padding: 1rem 1.25rem; }
 .inline-check { display: flex; align-items: center; gap: .6rem; margin: 1rem 0 0; font-weight: 600; }
@@ -468,7 +468,7 @@ input.cloze-input.bad { border-color: var(--danger); background: color-mix(in sr
 .more-btn { width: 100%; margin-top: .5rem; }
 @media (display-mode: standalone) { body { user-select: none; -webkit-user-select: none; } input, textarea { user-select: text; -webkit-user-select: text; } }
 
-.icon-btn { flex: none; padding: .5rem .6rem; line-height: 0; }
+.icon-btn { flex: none; display: grid; place-items: center; width: 2.9rem; padding: 0; line-height: 0; }
 .icon-btn svg { display: block; }
 
 .profile-card .level-next { font-size: .85rem; margin-top: .3rem; }
