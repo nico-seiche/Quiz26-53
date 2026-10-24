@@ -57,7 +57,7 @@ const Speech = (() => {
   let piperChain = Promise.resolve();   // Berechnungen nacheinander, das Handy würde parallel nur langsamer
   const audioMem = new Map();
 
-  const engine = () => store.get('speech-engine', 'device');            // 'device' oder Piper-Stimmen-ID
+  const engine = () => store.get('speech-engine', piperSupported() ? PIPER_VOICES[0].id : 'device');   // 'device' oder Piper-Stimmen-ID
   const setEngine = (e) => store.set('speech-engine', e);
   const usingPiper = () => engine() !== 'device' && piperSupported();
   function piperSupported() {
@@ -150,11 +150,17 @@ const Speech = (() => {
 
   // Liest text vor und wartet, bis er fertig ist. Ergebnis: 'ok', 'cancelled', 'blocked' oder 'error' (löst nie mit Fehler auf).
   const utterances = [];   // Referenzen halten: Chrome verwirft sonst laufende Äußerungen und "onend" kommt nie an
-  function say(text, { rate, onWait } = {}) {
-    if (!supported && !usingPiper()) return Promise.resolve('error');
+  function say(text, opts = {}) {
+    if (!usingPiper()) return sayDevice(text, opts);
+    // Ist die Stimme noch nicht geladen, spricht vorübergehend die Gerätestimme (z. B. bei 🔊 vor dem ersten Download)
+    const started = run;
+    return Piper.ready(engine()).then((ok) => (started !== run ? 'cancelled' : ok ? sayPiper(text, opts) : sayDevice(text, opts)));
+  }
+
+  function sayPiper(text, { rate, onWait } = {}) {
     const mine = run;
     const r = rate || Number(store.get('speech-rate', 1));
-    if (usingPiper()) {
+    {
       const id = engine();
       const parts = chunks(text, PIPER_CHUNK);
       const audios = parts.map((c) => piperAudio(c, id));   // alle Teile werden der Reihe nach berechnet
@@ -174,6 +180,12 @@ const Speech = (() => {
         return mine === run ? playBlob(blob, r) : 'cancelled';
       }), Promise.resolve('ok'));
     }
+  }
+
+  function sayDevice(text, { rate } = {}) {
+    if (!supported) return Promise.resolve('error');
+    const mine = run;
+    const r = rate || Number(store.get('speech-rate', 1));
     return chunks(text, 140).reduce((chain, part) => chain.then((state) => new Promise((resolve) => {
       if (state !== 'ok' || mine !== run) return resolve(mine !== run ? 'cancelled' : state);
       const u = new SpeechSynthesisUtterance(part);

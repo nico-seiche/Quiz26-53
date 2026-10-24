@@ -268,8 +268,8 @@
           <select id="hear-rate">${[0.8, 0.9, 1, 1.1, 1.25].map((r) => `<option value="${r}">${r === 1 ? 'Normal' : r + '×'}</option>`).join('')}</select>
           <label for="hear-voice">Stimme</label>
           <select id="hear-voice">
-            ${Speech.piperSupported() ? `<optgroup label="Natürlich (einmal ca. 60 MB laden)">${Speech.PIPER_VOICES.map((v) => `<option value="${v.id}">${escapeHtml(v.label)}</option>`).join('')}</optgroup>` : ''}
-            ${voices.length ? `<optgroup label="Stimmen deines Geräts">${voices.map((v) => `<option value="device:${escapeHtml(v.voiceURI)}">${escapeHtml(v.name)}</option>`).join('')}</optgroup>` : (Speech.supported ? '<option value="device:">Standardstimme</option>' : '')}
+            ${Speech.piperSupported() ? `<optgroup label="Einmal ca. 60 MB laden">${Speech.PIPER_VOICES.map((v) => `<option value="${v.id}">${escapeHtml(v.label)}</option>`).join('')}</optgroup>` : ''}
+            ${!Speech.piperSupported() && voices.length ? `<optgroup label="Stimmen deines Geräts">${voices.map((v) => `<option value="device:${escapeHtml(v.voiceURI)}">${escapeHtml(v.name)}</option>`).join('')}</optgroup>` : (!Speech.piperSupported() && Speech.supported ? '<option value="device:">Standardstimme</option>' : '')}
           </select>
           <p class="muted" id="hear-status" style="margin:.4rem 0 0"></p>
           <label class="inline-check"><input type="checkbox" id="hear-hide"> Text verbergen (nur zuhören und mitdenken)</label>
@@ -320,21 +320,22 @@
       }
       const wasPlaying = hearPlaying;
       hearPlaying = false;
+      let loaded = false;
       try {
         if (!(await Speech.piperReady(value))) {
           if (!confirm('Die natürliche Stimme ist ca. 60 MB groß und wird einmalig auf dein Gerät geladen (am besten im WLAN). Jetzt laden?')) throw new Error('abgebrochen');
           await Speech.piperLoad(value, (done, total) => hearStatus(`Stimme wird geladen … ${Math.round(done / 1e6)} von ${Math.round(total / 1e6)} MB`));
         }
         Speech.setEngine(value);
+        loaded = true;
         hearStatus('Stimme bereit. Die erste Karte braucht beim Start einen Moment, danach geht es flüssig.');
       } catch (err) {
         console.warn(err);
-        hearStatus(err.message === 'abgebrochen' ? '' : 'Die Stimme konnte nicht geladen werden – Internet prüfen oder Gerätestimme nutzen.');
-        const dev = `device:${(Speech.pickVoice() || {}).voiceURI || ''}`;
-        Speech.setEngine('device');
-        $('#hear-voice').value = dev; if (!$('#hear-voice').value) $('#hear-voice').selectedIndex = $('#hear-voice').options.length - 1;
+        hearStatus(err.message === 'abgebrochen' ? '' : 'Die Stimme konnte nicht geladen werden – bitte Internetverbindung prüfen und es noch einmal versuchen.');
+        hearShow();
       }
-      if (wasPlaying) hearStart();
+      hearShow();
+      if (wasPlaying && loaded) hearStart();
     }
 
     // Bildschirm anlassen, solange vorgelesen wird (sonst unterbricht das Handy die Wiedergabe)
@@ -354,12 +355,9 @@
       if (result === 'cancelled' || me !== Speech.current() || !hearPlaying) return false;
       if (result === 'blocked') { hearFail('Dein Browser hat die Wiedergabe blockiert – tippe noch einmal auf „Abspielen“.'); return false; }
       if (result === 'error') {
-        if (Speech.engine() !== 'device') {
-          Speech.setEngine('device');
-          const dev = `device:${(Speech.pickVoice() || {}).voiceURI || ''}`;
-          $('#hear-voice').value = dev; if (!$('#hear-voice').value) $('#hear-voice').selectedIndex = $('#hear-voice').options.length - 1;
-          hearFail('Die natürliche Stimme hat auf diesem Gerät nicht funktioniert (zu wenig Speicher?). Ich habe auf die Gerätestimme gewechselt – tippe auf „Abspielen“.');
-        } else hearFail('Die Sprachausgabe hat abgebrochen – tippe noch einmal auf „Abspielen“.');
+        hearFail(Speech.engine() !== 'device'
+          ? 'Die Stimme konnte nicht abgespielt werden (zu wenig Speicher oder keine Verbindung?) – tippe noch einmal auf „Abspielen“.'
+          : 'Die Sprachausgabe hat abgebrochen – tippe noch einmal auf „Abspielen“.');
         return false;
       }
       return true;
@@ -367,6 +365,10 @@
     function hearFail(msg) { hearPlaying = false; keepAwake(false); hearShow(); hearStatus(msg); }
 
     async function hearStart() {
+      if (Speech.piperSupported() && !(await Speech.piperReady(Speech.engine()))) {
+        hearPlaying = true;
+        return chooseVoice(Speech.engine());   // lädt die Stimme (nach Rückfrage) und startet danach
+      }
       hearPlaying = true;
       keepAwake(true);
       Speech.cancel();
