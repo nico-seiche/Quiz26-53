@@ -91,6 +91,12 @@ Unter **Lernen** (`/study`) legt man Lernsets aus Begriff-Definition-Karten an (
 
 Als gewusst gilt eine Karte ab 80 % richtiger Wörter. Der Fortschritt folgt dem Karteikasten-System (Leitner): gewusst → eine Box höher (fällig nach 1, 3, 7, 21 Tagen), nicht gewusst → zurück in Box 0 und sofort wieder fällig; ab Box 3 gilt eine Karte als gelernt. Der Fortschritt gehört jedem Nutzer einzeln (Tabelle `quiz.card_progress`). Lernsets können für alle sichtbar gemacht und kopiert werden; bearbeiten darf nur der Besitzer. Die Intervalle stehen in `src/study.js` (`BOX_DAYS`).
 
+### Karten per Foto scannen (Handschrift)
+
+Im Lernset-Editor öffnet „📷 Karteikarten scannen“ die Kamera: erst die Vorderseite, dann die Rückseite fotografieren, den erkannten Text prüfen und die Karte hinzufügen. Das Foto wird im Browser auf höchstens 1600 px verkleinert und an `POST /api/study/scan` (`src/scan.js`) geschickt, das es zur Texterkennung an ein Claude-Modell mit Bildverständnis weitergibt – das liest Handschrift deutlich besser als klassische OCR. Der Lückentext-Generator bleibt davon unberührt und arbeitet weiter ohne KI.
+
+Einrichten: in Vercel (Project → Settings → Environment Variables) `ANTHROPIC_API_KEY` setzen und neu deployen. Optional: `SCAN_MODEL` (Standard `claude-sonnet-5-5`, ein kleineres Modell ist günstiger) und `SCAN_DAILY_LIMIT` (Standard 60 Scans pro Nutzer und Tag, Zähler in `quiz.scan_usage`). Ohne Key zeigt die App beim Scannen nur den Hinweis „noch nicht eingerichtet“.
+
 ## Fächer und Statistik
 
 Jedes Quiz gehört zu einem Fach. Die Fächer liegen in der Tabelle `quiz.subjects` (aktuell Politik, Soziologie, Psychologie). Ein neues Fach ergänzt man im Supabase-SQL-Editor:

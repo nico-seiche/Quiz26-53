@@ -3,5 +3,6 @@
   "outputDirectory": "public",
   "cleanUrls": true,
   "regions": ["fra1"],
+  "functions": { "api/index.js": { "maxDuration": 30 } },
   "rewrites": [{ "source": "/api/(.*)", "destination": "/api" }]
 }

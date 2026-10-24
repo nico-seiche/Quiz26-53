@@ -38,10 +38,35 @@
       <p class="muted" id="import-info" style="margin-bottom:0"></p>
     </details>
 
+    <div class="card scan-card">
+      <button type="button" class="primary" id="scan-open">📷 Karteikarten scannen (Handschrift)</button>
+      <span class="muted">Vorder- und Rückseite fotografieren, der Text wird automatisch erkannt.</span>
+    </div>
+
     <div id="cards"></div>
     <button type="button" id="add">+ Karte hinzufügen</button>
     <p class="error" id="error"></p>
   </main>
+  <div class="changelog-backdrop" id="scan" hidden>
+    <div class="changelog card" role="dialog" aria-modal="true" aria-labelledby="scan-title">
+      <button type="button" class="changelog-x" id="scan-close" aria-label="Schließen">✕</button>
+      <h2 id="scan-title">Karte scannen</h2>
+      <p class="muted" id="scan-step"></p>
+      <input type="file" id="scan-file" accept="image/*" capture="environment" hidden>
+      <div class="row">
+        <button type="button" class="primary" id="scan-shoot">📷 Foto aufnehmen</button>
+        <label class="btn" for="scan-pick" style="margin:0;cursor:pointer">🖼️ Aus Galerie</label>
+        <input type="file" id="scan-pick" accept="image/*" hidden>
+      </div>
+      <p class="muted" id="scan-busy" hidden>Text wird erkannt …</p>
+      <p class="error" id="scan-error"></p>
+      <label for="scan-term">Vorderseite (Begriff)</label>
+      <input type="text" id="scan-term" maxlength="200" placeholder="wird nach dem Foto ausgefüllt">
+      <label for="scan-def">Rückseite (Definition)</label>
+      <textarea id="scan-def" rows="4" placeholder="wird nach dem Foto ausgefüllt"></textarea>
+      <button type="button" class="primary" id="scan-add" style="width:100%;margin-top:1rem" disabled>Karte hinzufügen und nächste scannen</button>
+    </div>
+  </div>
   <script src="/js/cloze.js"></script>
   <script src="/js/common.js"></script>
   <script>
@@ -90,6 +115,68 @@
       render();
       $('#import').value = '';
       $('#import-info').textContent = `${parsed.length} ${parsed.length === 1 ? 'Karte' : 'Karten'} hinzugefügt – bitte unten kurz prüfen.${incomplete ? ` ${incomplete} ohne Definition.` : ''}`;
+    };
+
+
+    // --- Karten per Foto erfassen (Handschrift) ---
+    // Ablauf: Vorderseite fotografieren → Rückseite fotografieren → prüfen → hinzufügen → nächste Karte.
+    let scanSide = 'term';
+    const scanSteps = { term: '1/2 – Fotografiere die Vorderseite (Begriff).', definition: '2/2 – Fotografiere die Rückseite (Definition).' };
+
+    function scanReset() {
+      scanSide = 'term';
+      $('#scan-term').value = ''; $('#scan-def').value = ''; $('#scan-error').textContent = '';
+      scanUpdate();
+    }
+    function scanUpdate() {
+      const both = $('#scan-term').value.trim() && $('#scan-def').value.trim();
+      $('#scan-add').disabled = !both;
+      $('#scan-step').textContent = both ? 'Fertig – Text bei Bedarf korrigieren und hinzufügen.' : scanSteps[scanSide];
+    }
+
+    // Verkleinert das Foto (max. 1600 px, JPEG), damit der Upload schnell geht und unter dem Limit bleibt
+    function shrink(file) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * scale); canvas.height = Math.round(img.height * scale);
+          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+          URL.revokeObjectURL(img.src);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = () => reject(new Error('Das Bild konnte nicht gelesen werden'));
+        img.src = URL.createObjectURL(file);
+      });
+    }
+
+    async function scanFile(file) {
+      if (!file) return;
+      $('#scan-error').textContent = '';
+      $('#scan-busy').hidden = false;
+      try {
+        const { text } = await api('/api/study/scan', { method: 'POST', body: { image: await shrink(file), kind: scanSide } });
+        $(scanSide === 'term' ? '#scan-term' : '#scan-def').value = text;
+        if (scanSide === 'term') scanSide = 'definition';
+      } catch (err) {
+        $('#scan-error').textContent = err.message;
+      } finally {
+        $('#scan-busy').hidden = true;
+        scanUpdate();
+      }
+    }
+
+    $('#scan-open').onclick = () => { scanReset(); $('#scan').hidden = false; };
+    $('#scan-close').onclick = () => { $('#scan').hidden = true; };
+    $('#scan-shoot').onclick = () => { $('#scan-file').value = ''; $('#scan-file').click(); };
+    $('#scan-file').onchange = (e) => scanFile(e.target.files[0]);
+    $('#scan-pick').onchange = (e) => { scanFile(e.target.files[0]); e.target.value = ''; };
+    $('#scan-term').oninput = $('#scan-def').oninput = scanUpdate;
+    $('#scan-add').onclick = () => {
+      cards = cards.filter((c) => c.term || c.definition).concat({ term: $('#scan-term').value.trim(), definition: $('#scan-def').value.trim() });
+      render();
+      scanReset();
     };
 
     $('#save').onclick = async () => {

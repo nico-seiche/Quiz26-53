@@ -6,11 +6,14 @@ const results = require('./results');
 const achievements = require('./achievements');
 const leaderboard = require('./leaderboard');
 const study = require('./study');
+const scan = require('./scan');
 const db = require('./db');
 
 // Die API; lokal von server.js gestartet, auf Vercel als Serverless-Funktion (api/index.js)
 const app = express();
 app.set('trust proxy', true);
+// Fotos für den Scan sind größer als der Standard (100 kB); die Route muss vor dem allgemeinen Parser kommen
+app.use('/api/study/scan', express.json({ limit: '7mb' }));
 app.use(express.json());
 app.use(auth.loadUser);
 
@@ -44,6 +47,7 @@ app.use('/api/games', game.router);
 app.use('/api/results', results.router);
 app.use('/api/achievements', achievements.router);
 app.use('/api/leaderboard', leaderboard.router);
+app.use('/api/study/scan', scan.router);
 app.use('/api/study', study.router);
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Nicht gefunden' }));

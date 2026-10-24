@@ -477,3 +477,6 @@ input.cloze-input.bad { border-color: var(--danger); background: color-mix(in sr
 .icon-btn svg { display: block; }
 
 .profile-card .level-next { font-size: .85rem; margin-top: .3rem; }
+
+.scan-card { display: grid; gap: .5rem; }
+#scan[hidden] { display: none; }
