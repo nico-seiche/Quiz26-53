@@ -451,8 +451,13 @@ input.cloze-input.bad { border-color: var(--danger); background: color-mix(in sr
 .card-edit .row { align-items: stretch; flex-wrap: nowrap; }
 .card-edit textarea { margin-top: .4rem; }
 .card-edit { padding: 1rem 1.25rem; }
-.inline-check { display: flex; align-items: center; gap: .6rem; margin: 1rem 0 0; font-weight: 600; }
-.inline-check input { width: auto; margin: 0; }
+.inline-check {
+  display: flex; align-items: center; gap: .75rem; margin: 1rem 0 0; padding: .6rem .7rem; cursor: pointer;
+  font-weight: 600; background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+}
+.inline-check input { flex: none; width: 1.4rem; height: 1.4rem; margin: 0; accent-color: var(--primary); cursor: pointer; }
+.inline-check:has(input:checked) { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, var(--bg)); }
+.inline-check:has(input:focus-visible) { outline: 3px solid color-mix(in srgb, var(--primary) 45%, transparent); outline-offset: 1px; }
 
 /* Handy / installierte App: kompakter, nichts ragt über den Rand */
 .profile-card > div { min-width: 0; }
