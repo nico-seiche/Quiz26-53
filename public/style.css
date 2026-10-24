@@ -481,3 +481,14 @@ input.cloze-input.bad { border-color: var(--danger); background: color-mix(in sr
 .hear-controls { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: .75rem; margin: 1rem 0; }
 .hear-controls button { padding: .9rem; font-size: 1.1rem; }
 .hear-options select { width: 100%; padding: .6rem .7rem; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 12px; }
+
+/* Lernart Tippen */
+.type-area { display: block; padding: .8rem; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; line-height: 2.2; font-size: 1.1rem; min-height: 6rem; }
+.type-input { display: inline-block; width: 9rem; max-width: 100%; padding: .1rem .3rem; font: inherit; color: var(--text); background: transparent; border: 0; border-bottom: 2px solid var(--primary); outline: none; }
+.tw { display: inline; padding: .05rem .3rem; margin: 0; border: 0; border-radius: 6px; font: inherit; font-weight: 400; background: transparent; color: var(--text); box-shadow: none; }
+.tw.ok { background: color-mix(in srgb, var(--ok) 18%, transparent); }
+.tw.hint { background: color-mix(in srgb, var(--primary) 20%, transparent); }
+.tw.fixed { background: color-mix(in srgb, #f59e0b 28%, transparent); }
+.tw.pending { color: var(--muted); }
+button.tw.bad { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); font-weight: 700; text-decoration: underline wavy var(--danger); cursor: pointer; }
+button.tw.bad:hover:not(:disabled) { transform: none; }

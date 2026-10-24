@@ -2,6 +2,14 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-10-24e',
+    title: 'Neu: Tippen',
+    items: [
+      ['⌨️', 'Definition abtippen', 'Neue Lernart: Tippe die Definition Wort für Wort ab. Weißt du nicht weiter, deckt „Nächstes Wort“ (oder Enter) das nächste Wort auf – danach tippst du einfach weiter.'],
+      ['🔴', 'Fehler direkt korrigieren', 'Falsche Wörter werden rot markiert. Ein Klick darauf ersetzt sie durch das richtige Wort.'],
+    ],
+  },
+  {
     id: '2026-10-24d',
     title: 'Neu: Lernen mit den Ohren',
     items: [

@@ -114,7 +114,30 @@ const Cloze = (() => {
     return cards.map((c) => ({ ...c, definition: c.definition.replace(/\s+/g, ' ').trim() }));
   }
 
-  return { tokenize, matches, isContent, pickBlanks, compare, parseCards, fold };
+  // --- Lernart "Tippen": Definition Wort für Wort abtippen, mit Aufdecken und Korrektur per Klick ---
+
+  // Die Wörter, die getippt werden müssen (ohne Satzzeichen)
+  const typingWords = (definition) => tokenize(definition).filter((t) => t.word).map((t) => t.text);
+
+  // Eingabe säubern: Satzzeichen an den Rändern weg
+  const cleanWord = (w) => String(w).replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+
+  // Gleichheit beim Tippen: Groß-/Kleinschreibung egal, ß = ss, Umlaute und Buchstaben müssen stimmen
+  const sameWord = (a, b) => cleanWord(a).toLowerCase().replace(/ß/g, 'ss') === cleanWord(b).toLowerCase().replace(/ß/g, 'ss');
+
+  // Bewertet die bisher eingegebenen Wörter (entries: {text, hint}) gegen die erwarteten.
+  // 'ok' = richtig, 'bad' = der erste Fehler, 'pending' = nach dem ersten Fehler, wird erst danach bewertet.
+  function typingStatus(entries, expected) {
+    let broken = false;
+    return entries.map((e, i) => {
+      if (broken) return 'pending';
+      if (i < expected.length && (e.hint || sameWord(e.text, expected[i]))) return 'ok';
+      broken = true;
+      return 'bad';
+    });
+  }
+
+  return { tokenize, matches, isContent, pickBlanks, compare, parseCards, fold, typingWords, cleanWord, sameWord, typingStatus };
 })();
 
 if (typeof module !== 'undefined') module.exports = Cloze;
