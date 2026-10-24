@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quiz – Lernen</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/dashboard">Quiz</a>
+    <strong>Lernen</strong>
+    <span id="me"></span>
+  </header>
+  <main>
+    <div class="row spread section-head">
+      <h2>Meine Lernsets</h2>
+      <a class="btn primary" href="/study-edit">+ Neues Lernset</a>
+    </div>
+    <p class="error" id="error"></p>
+    <div class="recent-list" id="mine"></div>
+
+    <div class="section-head" style="margin-top:2rem"><h2>Von anderen geteilt</h2></div>
+    <div class="recent-list" id="shared"></div>
+  </main>
+  <script src="/js/changelog.js"></script>
+  <script src="/js/common.js"></script>
+  <script>
+    const nf = (n) => n.toLocaleString('de-DE');
+
+    function rowHtml(s) {
+      const learned = s.card_count ? (s.mastered_count / s.card_count) * 100 : 0;
+      return `
+        <div class="recent-row">
+          <span class="subject-icon" aria-hidden="true">${s.subject_icon || '📘'}</span>
+          <div>
+            <div class="recent-title">${escapeHtml(s.title)}</div>
+            <span class="muted">${nf(s.card_count)} ${s.card_count === 1 ? 'Karte' : 'Karten'}</span>
+            ${s.subject ? `<span class="tag">${escapeHtml(s.subject)}</span>` : ''}
+            ${s.mine ? (s.is_public ? '<span class="tag">🌍 Geteilt</span>' : '<span class="tag">🔒 Privat</span>') : `<span class="tag">von ${escapeHtml(s.owner)}</span>`}
+            <div class="set-meter" title="Gelernt = in mindestens Box 3 des Karteikasten-Systems">
+              <div class="stat-bar"><span style="width:${learned}%"></span></div>
+              <span class="muted">${nf(s.mastered_count)}/${nf(s.card_count)} gelernt${s.due_count ? ` · ${nf(s.due_count)} fällig` : ''}</span>
+            </div>
+          </div>
+          <div class="recent-meta">
+            <a class="btn primary" href="/learn?id=${s.id}">Lernen</a>
+            ${s.mine
+              ? `<a class="btn" href="/study-edit?id=${s.id}">Bearbeiten</a>
+                 <button class="danger" type="button" data-delete="${s.id}">Löschen</button>`
+              : `<button type="button" data-copy="${s.id}">Kopieren</button>`}
+          </div>
+        </div>`;
+    }
+
+    async function load() {
+      const { mine, shared } = await api('/api/study');
+      $('#mine').innerHTML = mine.length ? mine.map(rowHtml).join('')
+        : `<div class="card muted"><strong>Noch kein Lernset.</strong><br>Lege Begriffe mit ihren Definitionen an
+           und lerne sie als Karteikarten, Lückentext oder aus dem Kopf. Du kannst Definitionen aus deinem Skript einfach einfügen.</div>`;
+      $('#shared').innerHTML = shared.length ? shared.map(rowHtml).join('')
+        : '<div class="card muted">Noch hat niemand ein Lernset geteilt.</div>';
+    }
+
+    document.querySelector('main').onclick = async (e) => {
+      const del = e.target.dataset.delete;
+      const copy = e.target.dataset.copy;
+      try {
+        if (del && confirm('Lernset wirklich löschen? Dein Lernfortschritt dazu geht verloren.')) {
+          await api(`/api/study/${del}`, { method: 'DELETE' });
+          load();
+        } else if (copy) {
+          const { id } = await api(`/api/study/${copy}/copy`, { method: 'POST' });
+          location.href = `/study-edit?id=${id}`;
+        }
+      } catch (err) {
+        $('#error').textContent = err.message;
+      }
+    };
+
+    requireLogin().then((me) => {
+      mountNav('study', me);
+      load();
+    });
+  </script>
+</body>
+</html>

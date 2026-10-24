@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quiz – Lernen</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/study">← Lernsets</a>
+    <strong id="set-title">…</strong>
+    <span></span>
+  </header>
+  <main>
+    <div class="tabs" id="modes" role="tablist" aria-label="Lernart">
+      <button type="button" role="tab" data-mode="cards">🃏 Karteikarten</button>
+      <button type="button" role="tab" data-mode="cloze">✏️ Lückentext</button>
+      <button type="button" role="tab" data-mode="free">🧠 Aus dem Kopf</button>
+    </div>
+    <div class="row spread" style="margin-bottom:1rem">
+      <div class="tabs" id="scope" style="margin:0">
+        <button type="button" data-scope="due">Fällige</button>
+        <button type="button" data-scope="all">Alle Karten</button>
+      </div>
+      <div class="tabs" id="levels" style="margin:0" hidden>
+        <button type="button" data-level="0.3">Leicht</button>
+        <button type="button" data-level="0.6">Mittel</button>
+        <button type="button" data-level="1">Schwer</button>
+      </div>
+    </div>
+    <p class="error" id="error"></p>
+    <div id="stage"></div>
+  </main>
+  <script src="/js/cloze.js"></script>
+  <script src="/js/common.js"></script>
+  <script>
+    const setId = new URLSearchParams(location.search).get('id');
+    const PASS = 0.8;  // ab diesem Anteil richtiger Wörter gilt eine Karte als gewusst
+    let set = null;
+    let mode = localStorage.getItem('learn-mode') || 'cards';
+    let scope = 'due';
+    let level = Number(localStorage.getItem('learn-level')) || 0.3;
+    let queue = [];
+    let total = 0;
+    let known = 0;
+    let retried = new Set();
+    let blanks = null;     // Lücken der aktuellen Karte
+    let checked = false;
+
+    const stage = $('#stage');
+    const card = () => queue[0];
+
+    function markTabs() {
+      document.querySelectorAll('#modes button').forEach((b) => { const on = b.dataset.mode === mode; b.classList.toggle('active', on); b.setAttribute('aria-selected', on); });
+      document.querySelectorAll('#scope button').forEach((b) => b.classList.toggle('active', b.dataset.scope === scope));
+      document.querySelectorAll('#levels button').forEach((b) => b.classList.toggle('active', Number(b.dataset.level) === level));
+      $('#levels').hidden = mode !== 'cloze';
+    }
+
+    function startSession() {
+      let cards = set.cards.slice();
+      if (scope === 'due') cards = cards.filter((c) => c.due);
+      // Unsichere Karten zuerst, innerhalb einer Box zufällig
+      cards = cards.map((c) => [c, c.box + Math.random() * 0.9]).sort((a, b) => a[1] - b[1]).map(([c]) => c);
+      queue = cards;
+      total = cards.length;
+      known = 0;
+      retried = new Set();
+      markTabs();
+      next();
+    }
+
+    function progressHtml() {
+      const done = total - queue.length;
+      return `<div class="study-progress"><div class="level-bar"><span style="width:${total ? (done / total) * 100 : 0}%"></span></div>
+        <span class="muted">${Math.min(done + 1, total)} / ${total}</span></div>`;
+    }
+
+    function next() {
+      checked = false;
+      if (!queue.length) return finish();
+      if (mode === 'cards') showCard(false);
+      else if (mode === 'cloze') showCloze();
+      else showFree();
+    }
+
+    function finish() {
+      const dueLeft = set.cards.filter((c) => c.due).length;
+      stage.innerHTML = total === 0 ? `
+        <div class="card" style="text-align:center">
+          <div class="score-big">🎉 Alles erledigt!</div>
+          <p class="muted">Gerade ist keine Karte fällig. Komm später wieder – oder übe alle Karten.</p>
+          <button type="button" class="primary" id="all">Alle Karten üben</button>
+        </div>` : `
+        <div class="card" style="text-align:center">
+          <div class="score-big">🎉 Geschafft!</div>
+          <p>${known} von ${total} ${total === 1 ? 'Karte' : 'Karten'} gewusst.</p>
+          <div class="row" style="justify-content:center">
+            <button type="button" class="primary" id="again">Nochmal</button>
+            <a class="btn" href="/study">Zu den Lernsets</a>
+          </div>
+        </div>`;
+      const all = $('#all'); if (all) all.onclick = () => { scope = 'all'; startSession(); };
+      const again = $('#again'); if (again) again.onclick = () => { scope = dueLeft ? 'due' : 'all'; startSession(); };
+    }
+
+    // Ergebnis speichern und weiter. Nicht Gewusstes kommt einmal ans Ende der Runde zurück.
+    async function answer(isKnown) {
+      const c = queue.shift();
+      if (isKnown) known++;
+      else if (!retried.has(c.id)) { retried.add(c.id); queue.push(c); total++; }
+      c.due = false;
+      api(`/api/study/cards/${c.id}/review`, { method: 'POST', body: { known: isKnown } }).catch((e) => { $('#error').textContent = e.message; });
+      next();
+    }
+
+    // --- Karteikarten ---
+    function showCard(flipped) {
+      const c = card();
+      stage.innerHTML = progressHtml() + `
+        <div class="card study-card" id="flip" tabindex="0" role="button" aria-label="Karte umdrehen">
+          <div>
+            <div class="term">${escapeHtml(c.term)}</div>
+            ${flipped ? `<div class="definition">${escapeHtml(c.definition)}</div>` : '<div class="hint">Sag die Definition laut oder im Kopf – dann umdrehen (Leertaste)</div>'}
+          </div>
+        </div>
+        ${flipped ? `<div class="study-actions">
+          <button type="button" class="no" id="no">❌ Noch nicht</button>
+          <button type="button" class="ok" id="yes">✅ Gewusst</button></div>` :
+          '<div class="study-actions" style="grid-template-columns:1fr"><button type="button" class="primary" id="show">Antwort zeigen</button></div>'}`;
+      if (flipped) { $('#yes').onclick = () => answer(true); $('#no').onclick = () => answer(false); $('#yes').focus(); }
+      else { $('#show').onclick = $('#flip').onclick = () => showCard(true); $('#show').focus(); }
+    }
+
+    // --- Lückentext ---
+    function showCloze() {
+      const c = card();
+      const tokens = Cloze.tokenize(c.definition);
+      blanks = level >= 1 ? new Set(tokens.map((t, i) => (t.word ? i : -1)).filter((i) => i >= 0)) : Cloze.pickBlanks(tokens, level);
+      stage.innerHTML = progressHtml() + `
+        <div class="card">
+          <div class="muted">Ergänze die Lücken</div>
+          <h2 style="margin:.2rem 0 1rem">${escapeHtml(c.term)}</h2>
+          <div class="cloze-text" id="cloze">${tokens.map((t, i) => blanks.has(i)
+            ? `<input class="cloze-input" type="text" data-i="${i}" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Lücke" style="--w:${Math.max(4, t.text.length + 1)}ch">`
+            : escapeHtml(t.text)).join('')}</div>
+          <div class="row" style="margin-top:1rem"><button type="button" class="primary" id="check">Prüfen</button>
+            <button type="button" id="skip">Weiß ich nicht</button></div>
+          <div id="result"></div>
+        </div>`;
+      const inputs = [...document.querySelectorAll('.cloze-input')];
+      inputs[0].focus();
+      inputs.forEach((inp, k) => inp.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        if (checked) answer(Number($('#result').dataset.pass) === 1);
+        else if (k < inputs.length - 1) inputs[k + 1].focus();
+        else checkCloze(tokens, inputs);
+      }));
+      $('#check').onclick = () => checkCloze(tokens, inputs);
+      $('#skip').onclick = () => checkCloze(tokens, inputs, true);
+    }
+
+    function checkCloze(tokens, inputs, giveUp = false) {
+      if (checked) return;
+      checked = true;
+      let right = 0;
+      inputs.forEach((inp) => {
+        const expected = tokens[Number(inp.dataset.i)].text;
+        const good = !giveUp && Cloze.matches(inp.value, expected);
+        if (good) right++;
+        inp.classList.add(good ? 'ok' : 'bad');
+        inp.readOnly = true;
+        if (!good) inp.insertAdjacentHTML('afterend', `<span class="cloze-answer"> ${escapeHtml(expected)} </span>`);
+      });
+      const share = right / inputs.length;
+      resultBox(share, `${right} von ${inputs.length} Lücken richtig`);
+    }
+
+    // --- Aus dem Kopf ---
+    function showFree() {
+      const c = card();
+      stage.innerHTML = progressHtml() + `
+        <div class="card">
+          <div class="muted">Schreibe die Definition aus dem Gedächtnis auf – sinngemäß reicht nicht, es zählen die Wörter.</div>
+          <h2 style="margin:.2rem 0 .8rem">${escapeHtml(c.term)}</h2>
+          <textarea class="freetext" id="free" placeholder="Definition …" autocomplete="off" spellcheck="false"></textarea>
+          <div class="row" style="margin-top:1rem"><button type="button" class="primary" id="check">Prüfen</button>
+            <button type="button" id="skip">Weiß ich nicht</button></div>
+          <div id="result"></div>
+        </div>`;
+      $('#free').focus();
+      const run = (giveUp) => {
+        if (checked) return;
+        checked = true;
+        const r = Cloze.compare(c.definition, giveUp ? '' : $('#free').value);
+        $('#free').readOnly = true;
+        const text = r.tokens.map((t) => !t.word ? escapeHtml(t.text)
+          : `<span class="${t.ok ? 'w-ok' : 'w-missing'}">${escapeHtml(t.text)}</span>`).join('');
+        resultBox(r.total ? r.correct / r.total : 0, `${r.correct} von ${r.total} Wörtern richtig`,
+          `<p class="cloze-text" style="line-height:1.9">${text}</p>
+           ${r.extra.length ? `<p class="muted">Nicht in der Definition: ${escapeHtml(r.extra.join(', '))}</p>` : ''}`);
+      };
+      $('#check').onclick = () => run(false);
+      $('#skip').onclick = () => run(true);
+    }
+
+    // Auswertung unter der Aufgabe: ab PASS gewusst, sonst nochmal
+    function resultBox(share, summary, extra = '') {
+      const pass = share >= PASS;
+      $('#check').hidden = true; $('#skip').hidden = true;
+      $('#result').dataset.pass = pass ? 1 : 0;
+      $('#result').innerHTML = `
+        <div style="margin-top:1rem">
+          <div class="score-big">${pass ? '✅' : '🔁'} ${Math.round(share * 100)} %</div>
+          <div class="muted">${summary}${pass ? '' : ' – das kommt gleich nochmal'}</div>
+          ${extra}
+          <button type="button" class="primary" id="go" style="margin-top:.8rem">Weiter</button>
+        </div>`;
+      $('#go').onclick = () => answer(pass);
+      $('#go').focus();
+    }
+
+    // Tastatur: Leertaste dreht die Karteikarte um, 1/2 bewertet sie
+    document.addEventListener('keydown', (e) => {
+      if (mode !== 'cards' || !queue.length || /INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+      if (e.key === ' ' && $('#show')) { e.preventDefault(); showCard(true); }
+      else if ($('#yes') && (e.key === '1' || e.key === 'ArrowRight')) answer(true);
+      else if ($('#no') && (e.key === '2' || e.key === 'ArrowLeft')) answer(false);
+    });
+
+    $('#modes').onclick = (e) => { if (e.target.dataset.mode) { mode = e.target.dataset.mode; localStorage.setItem('learn-mode', mode); startSession(); } };
+    $('#scope').onclick = (e) => { if (e.target.dataset.scope) { scope = e.target.dataset.scope; startSession(); } };
+    $('#levels').onclick = (e) => { if (e.target.dataset.level) { level = Number(e.target.dataset.level); localStorage.setItem('learn-level', level); startSession(); } };
+
+    (async () => {
+      await requireLogin();
+      try {
+        set = await api(`/api/study/${setId}`);
+      } catch (err) {
+        $('#error').textContent = err.message;
+        return;
+      }
+      $('#set-title').textContent = set.title;
+      if (!set.cards.length) { stage.innerHTML = '<div class="card muted">Dieses Lernset hat noch keine Karten.</div>'; return; }
+      if (!set.cards.some((c) => c.due)) scope = 'all';
+      startSession();
+    })();
+  </script>
+</body>
+</html>

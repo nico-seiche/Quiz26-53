@@ -81,6 +81,16 @@ Die Oberfläche folgt einem weichen Verlaufs-Design mit runden Karten, Level-Anz
 - **Sammler-Titel:** Einsteiger, Entdecker, Sammler, Legende je nach Anzahl der Erfolge.
 - Avatare sind der Anfangsbuchstabe auf einem Farbverlauf, Fach-Symbole Emojis.
 
+## Lernen (Lernsets)
+
+Unter **Lernen** (`/study`) legt man Lernsets aus Begriff-Definition-Karten an (`/study-edit`). Längere Texte aus dem Skript lassen sich einfügen: pro Karte eine Zeile `Begriff - Definition`, Folgezeilen gehören zur vorigen Definition. Gelernt wird unter `/learn?id=…` auf drei Arten:
+
+- **Karteikarten:** Begriff ansehen, Definition aufdecken, „Gewusst“ oder „Noch nicht“ (Tasten Leertaste, 1, 2).
+- **Lückentext:** aus der Definition werden anteilig Wörter zu Lücken (Leicht 30 %, Mittel 60 %, Schwer alle Wörter). Füllwörter bleiben möglichst stehen; Groß-/Kleinschreibung, Umlaute und kleine Tippfehler bei längeren Wörtern werden verziehen (`public/js/cloze.js`).
+- **Aus dem Kopf:** die ganze Definition aufschreiben; verglichen wird wortweise in der richtigen Reihenfolge, fehlende Wörter werden rot markiert.
+
+Als gewusst gilt eine Karte ab 80 % richtiger Wörter. Der Fortschritt folgt dem Karteikasten-System (Leitner): gewusst → eine Box höher (fällig nach 1, 3, 7, 21 Tagen), nicht gewusst → zurück in Box 0 und sofort wieder fällig; ab Box 3 gilt eine Karte als gelernt. Der Fortschritt gehört jedem Nutzer einzeln (Tabelle `quiz.card_progress`). Lernsets können für alle sichtbar gemacht und kopiert werden; bearbeiten darf nur der Besitzer. Die Intervalle stehen in `src/study.js` (`BOX_DAYS`).
+
 ## Fächer und Statistik
 
 Jedes Quiz gehört zu einem Fach. Die Fächer liegen in der Tabelle `quiz.subjects` (aktuell Politik, Soziologie, Psychologie). Ein neues Fach ergänzt man im Supabase-SQL-Editor:

@@ -2,6 +2,17 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-10-24',
+    title: 'Neu: Lernen',
+    items: [
+      ['📚', 'Lernsets', 'Lege Begriffe mit ihren Definitionen an – oder füge ganze Passagen aus deinem Skript auf einmal ein.'],
+      ['🃏', 'Karteikarten', 'Begriff ansehen, Definition aufdecken, bewerten. Sicheres kommt seltener, Unsicheres öfter.'],
+      ['✏️', 'Lückentext', 'Lange Definitionen Schritt für Schritt auswendig lernen: erst wenige, dann alle Wörter als Lücke.'],
+      ['🧠', 'Aus dem Kopf', 'Schreib die Definition komplett auf – fehlende Wörter werden markiert.'],
+      ['🌍', 'Teilen', 'Lernsets lassen sich für den Kurs freigeben und kopieren.'],
+    ],
+  },
+  {
     id: '2026-10-23',
     title: 'Neues Design & Level',
     items: [

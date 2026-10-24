@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quiz – Lernset bearbeiten</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/study">← Lernen</a>
+    <button class="primary" type="button" id="save">Speichern</button>
+  </header>
+  <main>
+    <div class="card">
+      <label for="title">Titel</label>
+      <input type="text" id="title" maxlength="100" placeholder="z. B. Polizeirecht – Begriffe">
+      <label for="subject">Fach</label>
+      <select id="subject"><option value="">Fach wählen …</option></select>
+      <label class="inline-check"><input type="checkbox" id="public"> Für andere sichtbar machen (sie können es lernen und kopieren)</label>
+    </div>
+
+    <details class="card" id="import-box">
+      <summary><strong>Texte einfügen</strong> <span class="muted">– mehrere Definitionen auf einmal aus deinem Skript</span></summary>
+      <p class="muted">Pro Karte eine Zeile im Format <code>Begriff - Definition</code> (auch <code>–</code> oder <code>:</code>).
+        Zeilen ohne Trenner werden an die vorige Definition angehängt, Zeilenumbrüche aus PDFs stören also nicht.
+        Danach kannst du jede Karte prüfen und anpassen.</p>
+      <textarea id="import" rows="8" placeholder="Abstrakte Gefahr - Eine abstrakte Gefahr liegt vor, wenn bei ungehindertem Geschehensablauf …"></textarea>
+      <button type="button" id="do-import" style="margin-top:.6rem">Karten erzeugen</button>
+      <p class="muted" id="import-info" style="margin-bottom:0"></p>
+    </details>
+
+    <div id="cards"></div>
+    <button type="button" id="add">+ Karte hinzufügen</button>
+    <p class="error" id="error"></p>
+  </main>
+  <script src="/js/cloze.js"></script>
+  <script src="/js/common.js"></script>
+  <script>
+    const id = new URLSearchParams(location.search).get('id');
+    let cards = [];
+
+    function render() {
+      $('#cards').innerHTML = cards.map((c, i) => `
+        <div class="card card-edit" data-i="${i}">
+          <div class="row">
+            <input type="text" data-field="term" maxlength="200" value="${escapeHtml(c.term)}" placeholder="Begriff, z. B. Abstrakte Gefahr" aria-label="Begriff ${i + 1}">
+            <button type="button" data-action="up" aria-label="Nach oben" ${i === 0 ? 'disabled' : ''}>↑</button>
+            <button type="button" data-action="down" aria-label="Nach unten" ${i === cards.length - 1 ? 'disabled' : ''}>↓</button>
+            <button type="button" class="danger" data-action="remove">Entfernen</button>
+          </div>
+          <textarea rows="3" data-field="definition" placeholder="Definition" aria-label="Definition ${i + 1}">${escapeHtml(c.definition)}</textarea>
+        </div>`).join('') || '<div class="card muted">Noch keine Karten – füge unten eine hinzu oder nutze „Texte einfügen“.</div>';
+    }
+
+    $('#cards').addEventListener('input', (e) => {
+      const field = e.target.dataset.field;
+      if (field) cards[Number(e.target.closest('[data-i]').dataset.i)][field] = e.target.value;
+    });
+    $('#cards').addEventListener('click', (e) => {
+      const action = e.target.dataset.action;
+      if (!action) return;
+      const i = Number(e.target.closest('[data-i]').dataset.i);
+      if (action === 'remove') cards.splice(i, 1);
+      else { const j = action === 'up' ? i - 1 : i + 1; [cards[i], cards[j]] = [cards[j], cards[i]]; }
+      render();
+    });
+    $('#add').onclick = () => {
+      cards.push({ term: '', definition: '' });
+      render();
+      const inputs = document.querySelectorAll('[data-field=term]');
+      inputs[inputs.length - 1].focus();
+    };
+
+    $('#do-import').onclick = () => {
+      const parsed = Cloze.parseCards($('#import').value).filter((c) => c.term);
+      if (!parsed.length) { $('#import-info').textContent = 'Nichts erkannt – pro Karte eine Zeile „Begriff - Definition“.'; return; }
+      const incomplete = parsed.filter((c) => !c.definition).length;
+      cards = cards.filter((c) => c.term || c.definition).concat(parsed);
+      render();
+      $('#import').value = '';
+      $('#import-info').textContent = `${parsed.length} ${parsed.length === 1 ? 'Karte' : 'Karten'} hinzugefügt – bitte unten kurz prüfen.${incomplete ? ` ${incomplete} ohne Definition.` : ''}`;
+    };
+
+    $('#save').onclick = async () => {
+      $('#error').textContent = '';
+      const body = {
+        title: $('#title').value, subjectId: Number($('#subject').value), isPublic: $('#public').checked,
+        cards: cards.filter((c) => c.term.trim() || c.definition.trim()),
+      };
+      try {
+        if (id) await api(`/api/study/${id}`, { method: 'PUT', body });
+        else await api('/api/study', { method: 'POST', body });
+        location.href = '/study';
+      } catch (err) {
+        $('#error').textContent = err.message;
+      }
+    };
+
+    (async () => {
+      await requireLogin();
+      const subjects = await api('/api/subjects');
+      $('#subject').innerHTML += subjects.map((s) => `<option value="${s.id}">${s.icon} ${escapeHtml(s.name)}</option>`).join('');
+      if (id) {
+        try {
+          const set = await api(`/api/study/${id}`);
+          if (!set.canEdit) { location.href = '/study'; return; }
+          $('#title').value = set.title;
+          $('#subject').value = set.subjectId || '';
+          $('#public').checked = set.isPublic;
+          cards = set.cards.map((c) => ({ id: c.id, term: c.term, definition: c.definition }));
+        } catch (err) {
+          $('#error').textContent = err.message;
+        }
+      } else {
+        cards = [{ term: '', definition: '' }];
+      }
+      render();
+    })();
+  </script>
+</body>
+</html>

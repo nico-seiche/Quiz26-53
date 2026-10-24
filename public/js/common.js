@@ -119,6 +119,7 @@ function mountNav(active, me) {
   const items = [
     { id: 'home', href: '/dashboard', label: 'Home', icon: '🏠' },
     { id: 'quizzes', href: '/quizzes', label: 'Quiz', icon: '❓' },
+    { id: 'study', href: '/study', label: 'Lernen', icon: '📚' },
     { id: 'leaderboard', href: '/leaderboard', label: 'Bestenliste', icon: '🏅' },
     { id: 'profile', href: '/profile', label: 'Profil', icon: me ? avatarHtml(me.username, '1.7rem') : '👤' },
   ];
