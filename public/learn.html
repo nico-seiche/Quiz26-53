@@ -42,6 +42,7 @@
     <div id="stage"></div>
   </main>
   <script src="/js/cloze.js"></script>
+  <script src="/js/piper.js"></script>
   <script src="/js/speech.js"></script>
   <script src="/js/common.js"></script>
   <script>
@@ -146,7 +147,7 @@
           <button type="button" class="ok" id="yes">✅ Gewusst</button></div>
           ${Speech.available() ? '<div style="text-align:center;margin-top:.75rem"><button type="button" id="say">🔊 Vorlesen</button></div>' : ''}` :
           '<div class="study-actions" style="grid-template-columns:1fr"><button type="button" class="primary" id="show">Antwort zeigen</button></div>'}`;
-      if (flipped) { if ($('#say')) $('#say').onclick = () => { Speech.cancel(); Speech.say(c.definition); }; $('#yes').onclick = () => answer(true); $('#no').onclick = () => answer(false); $('#yes').focus(); }
+      if (flipped) { if ($('#say')) $('#say').onclick = () => { Speech.unlock(); Speech.cancel(); Speech.say(c.definition); }; $('#yes').onclick = () => answer(true); $('#no').onclick = () => answer(false); $('#yes').focus(); }
       else { $('#show').onclick = $('#flip').onclick = () => showCard(true); $('#show').focus(); }
     }
 
@@ -236,7 +237,7 @@
           ${Speech.available() ? '<button type="button" id="say" style="margin-top:.8rem">🔊 Vorlesen</button>' : ''}
           <button type="button" class="primary" id="go" style="margin-top:.8rem">Weiter</button>
         </div>`;
-      if ($('#say')) $('#say').onclick = () => { Speech.cancel(); Speech.say(card().definition); };
+      if ($('#say')) $('#say').onclick = () => { Speech.unlock(); Speech.cancel(); Speech.say(card().definition); };
       $('#go').onclick = () => answer(pass);
       $('#go').focus();
     }
@@ -282,9 +283,9 @@
       $('#hear-hide').checked = Speech.store.get('hear-hide', '0') === '1';
       $('#hear-loop').checked = Speech.store.get('hear-loop', '0') === '1';
       hearShow();
-      $('#hear-play').onclick = () => (hearPlaying ? hearStop() : hearStart());
-      $('#hear-next').onclick = () => hearJump(1);
-      $('#hear-prev').onclick = () => hearJump(-1);
+      $('#hear-play').onclick = () => { Speech.unlock(); (hearPlaying ? hearStop() : hearStart()); };
+      $('#hear-next').onclick = () => { Speech.unlock(); hearJump(1); };
+      $('#hear-prev').onclick = () => { Speech.unlock(); hearJump(-1); };
       $('#hear-rate').onchange = (e) => { Speech.store.set('speech-rate', e.target.value); hearRestart(); };
       $('#hear-voice').onchange = (e) => chooseVoice(e.target.value);
       $('#hear-hide').onchange = (e) => { Speech.store.set('hear-hide', e.target.checked ? '1' : '0'); hearShow(); };
@@ -309,6 +310,7 @@
 
     // Stimme wählen; eine natürliche Stimme wird beim ersten Mal heruntergeladen
     async function chooseVoice(value) {
+      Speech.unlock();
       Speech.cancel();
       if (value.startsWith('device:')) {
         Speech.setEngine('device');
@@ -335,31 +337,61 @@
       if (wasPlaying) hearStart();
     }
 
+    // Bildschirm anlassen, solange vorgelesen wird (sonst unterbricht das Handy die Wiedergabe)
+    let wakeLock = null;
+    async function keepAwake(on) {
+      try {
+        if (on && 'wakeLock' in navigator && !wakeLock) {
+          wakeLock = await navigator.wakeLock.request('screen');
+          wakeLock.addEventListener('release', () => { wakeLock = null; });
+        } else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+      } catch {}
+    }
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && hearPlaying) keepAwake(true); });
+
+    // Ergebnis einer Wiedergabe auswerten; false = Schleife beenden
+    function hearCheck(result, me) {
+      if (result === 'cancelled' || me !== Speech.current() || !hearPlaying) return false;
+      if (result === 'blocked') { hearFail('Dein Browser hat die Wiedergabe blockiert – tippe noch einmal auf „Abspielen“.'); return false; }
+      if (result === 'error') {
+        if (Speech.engine() !== 'device') {
+          Speech.setEngine('device');
+          const dev = `device:${(Speech.pickVoice() || {}).voiceURI || ''}`;
+          $('#hear-voice').value = dev; if (!$('#hear-voice').value) $('#hear-voice').selectedIndex = $('#hear-voice').options.length - 1;
+          hearFail('Die natürliche Stimme hat auf diesem Gerät nicht funktioniert (zu wenig Speicher?). Ich habe auf die Gerätestimme gewechselt – tippe auf „Abspielen“.');
+        } else hearFail('Die Sprachausgabe hat abgebrochen – tippe noch einmal auf „Abspielen“.');
+        return false;
+      }
+      return true;
+    }
+    function hearFail(msg) { hearPlaying = false; keepAwake(false); hearShow(); hearStatus(msg); }
+
     async function hearStart() {
       hearPlaying = true;
+      keepAwake(true);
       Speech.cancel();
+      hearStatus('');
       const me = Speech.current();
+      const wait4 = (w) => hearStatus(w ? 'Wird vorbereitet …' : '');
       while (hearPlaying && me === Speech.current() && mode === 'hear') {
         const c = queue[hearIdx];
         hearStep = 'term'; hearShow();
         Speech.prefetch(c.definition);
         const nextCard = queue[(hearIdx + 1) % queue.length];
         Speech.prefetch(nextCard.term); Speech.prefetch(nextCard.definition);
-        await Speech.say(c.term, { onWait: (w) => hearStatus(w ? 'Wird vorbereitet …' : '') });
-        if (!hearPlaying || me !== Speech.current()) break;
+        if (!hearCheck(await Speech.say(c.term, { onWait: wait4 }), me)) return;
         await wait(1200);
-        if (!hearPlaying || me !== Speech.current()) break;
+        if (!hearPlaying || me !== Speech.current()) return;
         hearStep = 'definition'; hearShow();
-        await Speech.say(c.definition, { onWait: (w) => hearStatus(w ? 'Wird vorbereitet …' : '') });
-        if (!hearPlaying || me !== Speech.current()) break;
+        if (!hearCheck(await Speech.say(c.definition, { onWait: wait4 }), me)) return;
         await wait(2000);
-        if (!hearPlaying || me !== Speech.current()) break;
+        if (!hearPlaying || me !== Speech.current()) return;
         if (hearIdx + 1 < queue.length) hearIdx++;
         else if ($('#hear-loop').checked) hearIdx = 0;
-        else { hearPlaying = false; hearIdx = 0; hearStep = 'term'; hearShow(); return; }
+        else { hearPlaying = false; keepAwake(false); hearIdx = 0; hearStep = 'term'; hearShow(); return; }
       }
     }
-    function hearStop() { hearPlaying = false; Speech.cancel(); hearShow(); }
+    function hearStop() { hearPlaying = false; keepAwake(false); Speech.cancel(); hearShow(); }
     function hearRestart() { if (hearPlaying) hearStart(); }
     function hearJump(step) {
       hearIdx = (hearIdx + step + queue.length) % queue.length;

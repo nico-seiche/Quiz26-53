@@ -50,14 +50,12 @@ const Speech = (() => {
   }
 
   // --- Natürliche Stimme: Piper (Open Source) läuft per WebAssembly im Browser, ohne Server ---
-  // Die Stimme (ca. 60 MB) wird einmal geladen und im Gerät gespeichert. Bibliothek und Laufzeit kommen von CDNs.
-  const PIPER_LIB = 'https://cdn.jsdelivr.net/npm/@diffusionstudio/vits-web@1.0.3/+esm';
+  // Die Stimme (ca. 60 MB) wird einmal geladen und im Gerät gespeichert. Der Code liegt in piper.js, Laufzeit und Phonemizer kommen von CDNs.
   const PIPER_VOICES = [
     { id: 'de_DE-thorsten-medium', label: 'Thorsten (männlich, beste Qualität)' },
     { id: 'de_DE-ramona-low', label: 'Ramona (weiblich)' },
     { id: 'de_DE-kerstin-low', label: 'Kerstin (weiblich)' },
   ];
-  let piperLib = null;
   let piperChain = Promise.resolve();   // Berechnungen nacheinander, das Handy würde parallel nur langsamer
   const audioMem = new Map();
 
@@ -65,22 +63,10 @@ const Speech = (() => {
   const setEngine = (e) => store.set('speech-engine', e);
   const usingPiper = () => engine() !== 'device' && piperSupported();
   function piperSupported() {
-    return typeof window !== 'undefined' && 'WebAssembly' in window && !!navigator.storage?.getDirectory && 'Audio' in window;
+    return typeof window !== 'undefined' && typeof Piper !== 'undefined' && 'WebAssembly' in window && 'caches' in window && 'Audio' in window;
   }
-
-  async function lib() {
-    piperLib = piperLib || import(PIPER_LIB);
-    return piperLib;
-  }
-  async function piperReady(id) {
-    return (await (await lib()).stored()).includes(id);
-  }
-  // Stimme herunterladen; progress(geladen, gesamt) in Bytes
-  async function piperLoad(id, progress) {
-    const l = await lib();
-    try { await navigator.storage.persist?.(); } catch {}
-    await l.download(id, (p) => progress && progress(p.loaded, p.total));
-  }
+  const piperReady = (id) => Piper.ready(id);
+  const piperLoad = (id, progress) => Piper.load(id, progress);
 
   async function hash(text) {
     const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(text));
@@ -100,7 +86,7 @@ const Speech = (() => {
         if (hit) return await hit.blob();
       } catch {}
       await prev;
-      const blob = await (await lib()).predict({ text, voiceId: id });
+      const blob = await Piper.synth(text, id);
       try { (await caches.open('piper-audio-v1')).put(url, new Response(blob)); } catch {}
       return blob;
     })();
@@ -110,15 +96,48 @@ const Speech = (() => {
     return job;
   }
 
+  // Ein einziges <audio>-Element für alles: Handys erlauben Wiedergabe nur, wenn es per Fingertipp "freigeschaltet" wurde.
+  // Würde man pro Stück ein neues Element anlegen, wird es nach dem Rechnen (ohne Tipp) blockiert und die Wiedergabe bricht ab.
+  const SILENCE = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=';
   let audioEl = null;
+  let endPlayback = null;   // beendet die laufende Wiedergabe (für cancel)
+  function audio() {
+    if (!audioEl) { audioEl = new Audio(); audioEl.preload = 'auto'; }
+    return audioEl;
+  }
+  // Aus einem Klick-/Tipp-Handler aufrufen, bevor etwas Asynchrones passiert
+  function unlock() {
+    if (!piperSupported()) return;
+    const a = audio();
+    if (a.dataset.unlocked) return;
+    a.src = SILENCE;
+    a.play().then(() => { a.dataset.unlocked = '1'; a.pause(); }).catch(() => {});
+  }
+
+  // Spielt eine Audiodatei ab. Ergebnis: 'ok', 'cancelled' oder 'blocked' (Browser verweigert die Wiedergabe)
   function playBlob(blob, rate) {
     return new Promise((resolve) => {
+      const a = audio();
       const url = URL.createObjectURL(blob);
-      audioEl = new Audio(url);
-      audioEl.playbackRate = rate;
-      const done = () => { URL.revokeObjectURL(url); resolve(); };
-      audioEl.onended = audioEl.onerror = audioEl.onpause = done;
-      audioEl.play().catch(done);
+      let timer = null;
+      let finished = false;
+      const finish = (result) => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        a.onended = a.onerror = a.onloadedmetadata = null;
+        endPlayback = null;
+        URL.revokeObjectURL(url);
+        resolve(result);
+      };
+      endPlayback = () => { a.pause(); finish('cancelled'); };
+      a.onended = () => finish('ok');
+      a.onerror = () => finish('error');
+      // Sicherheitsnetz: bleibt das Ende-Ereignis aus, geht es nach der erwarteten Dauer trotzdem weiter
+      a.onloadedmetadata = () => { if (a.duration) timer = setTimeout(() => finish('ok'), (a.duration / rate) * 1000 + 4000); };
+      a.src = url;
+      a.playbackRate = rate;
+      a.play().catch((err) => finish(err && err.name === 'NotAllowedError' ? 'blocked' : 'error'));
     });
   }
 
@@ -131,45 +150,50 @@ const Speech = (() => {
     for (const c of chunks(text, PIPER_CHUNK)) piperAudio(c, id).catch(() => {});
   }
 
-  // Liest text vor und wartet, bis er fertig (oder abgebrochen) ist. Löst nie mit Fehler auf.
+  // Liest text vor und wartet, bis er fertig ist. Ergebnis: 'ok', 'cancelled', 'blocked' oder 'error' (löst nie mit Fehler auf).
+  const utterances = [];   // Referenzen halten: Chrome verwirft sonst laufende Äußerungen und "onend" kommt nie an
   function say(text, { rate, onWait } = {}) {
-    if (!supported && !usingPiper()) return Promise.resolve();
+    if (!supported && !usingPiper()) return Promise.resolve('error');
     const mine = run;
+    const r = rate || Number(store.get('speech-rate', 1));
     if (usingPiper()) {
       const id = engine();
-      const r = rate || Number(store.get('speech-rate', 1));
       const parts = chunks(text, PIPER_CHUNK);
       const audios = parts.map((c) => piperAudio(c, id));   // alle Teile werden der Reihe nach berechnet
-      return parts.reduce((chain, _, i) => chain.then(async () => {
-        if (mine !== run) return;
+      audios.forEach((p) => p.catch(() => {}));
+      return parts.reduce((chain, _, i) => chain.then(async (state) => {
+        if (state !== 'ok' || mine !== run) return mine !== run ? 'cancelled' : state;
         let blob;
         try {
           if (onWait) onWait(true);
           blob = await audios[i];
         } catch (err) {
           console.warn('piper', err);
-          return;
+          return 'error';
         } finally {
           if (onWait) onWait(false);
         }
-        if (mine === run) await playBlob(blob, r);
-      }), Promise.resolve());
+        return mine === run ? playBlob(blob, r) : 'cancelled';
+      }), Promise.resolve('ok'));
     }
-    return chunks(text).reduce((chain, part) => chain.then(() => new Promise((resolve) => {
-      if (mine !== run) return resolve();
+    return chunks(text, 140).reduce((chain, part) => chain.then((state) => new Promise((resolve) => {
+      if (state !== 'ok' || mine !== run) return resolve(mine !== run ? 'cancelled' : state);
       const u = new SpeechSynthesisUtterance(part);
+      utterances.push(u);
+      if (utterances.length > 20) utterances.shift();
       const voice = pickVoice();
       if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = 'de-DE';
-      u.rate = rate || Number(store.get('speech-rate', 1));
-      u.onend = u.onerror = () => resolve();
+      u.rate = r;
+      u.onend = () => resolve('ok');
+      u.onerror = (e) => resolve(mine !== run || (e && (e.error === 'interrupted' || e.error === 'canceled')) ? 'cancelled' : 'error');
       speechSynthesis.speak(u);
-    })), Promise.resolve());
+    })), Promise.resolve('ok'));
   }
 
   function cancel() {
     run++;
     if (supported) speechSynthesis.cancel();
-    if (audioEl) { audioEl.pause(); audioEl = null; }
+    if (endPlayback) endPlayback();
   }
 
   // Stimmen werden in manchen Browsern erst verzögert geladen
@@ -181,7 +205,7 @@ const Speech = (() => {
 
   return {
     supported, say, cancel, voices, pickVoice, onVoices, spoken, chunks, store, current: () => run, prefetch,
-    engine, setEngine, piperSupported, piperReady, piperLoad, PIPER_VOICES,
+    engine, setEngine, piperSupported, piperReady, piperLoad, PIPER_VOICES, unlock,
     available: () => supported || piperSupported(),
   };
 })();
