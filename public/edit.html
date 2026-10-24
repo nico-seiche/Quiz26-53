@@ -32,6 +32,16 @@
       </select>
       <p class="muted" id="mode-hint" style="margin:.5rem 0 0"></p>
     </div>
+    <div class="card" id="team-card" hidden>
+      <h2 style="margin-bottom:.25rem">👥 Zusammen bearbeiten</h2>
+      <p class="muted" id="team-info" style="margin-top:0"></p>
+      <div id="team-list" class="row"></div>
+      <div class="row" id="team-add" style="margin-top:.75rem;flex-wrap:nowrap">
+        <input type="text" id="team-name" placeholder="Nutzername deines Freundes" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <button type="button" id="team-invite">Einladen</button>
+      </div>
+      <p class="error" id="team-error" style="margin-bottom:0"></p>
+    </div>
     <div id="questions"></div>
     <button type="button" id="add">+ Frage hinzufügen</button>
     <p class="error" id="error"></p>
@@ -40,6 +50,8 @@
   <script>
     const id = new URLSearchParams(location.search).get('id');
     let questions = [];
+    let version = null;   // Stand beim Laden, damit gleichzeitiges Speichern auffällt
+    let me = null;
     let openIndex = -1;  // Akkordeon: immer höchstens eine Frage ist aufgeklappt
 
     function updateModeHint() {
@@ -138,6 +150,50 @@
       openQuestion(questions.length - 1, { focus: true });
     };
 
+
+    // --- Zusammenarbeit ---
+    let team = null;
+    function showTeam(quiz) {
+      team = quiz;
+      $('#team-card').hidden = false;
+      $('#team-add').hidden = !quiz.isOwner;
+      $('#team-info').textContent = quiz.isOwner
+        ? 'Lade Freunde ein: Sie können Fragen bearbeiten und das Quiz starten, löschen können nur du. Wer angemeldet ist, sieht das Quiz unter „Quiz“.'
+        : `Dieses Quiz gehört ${quiz.owner}. Du kannst Fragen bearbeiten und es starten.`;
+      const chips = [`<span class="tag">👑 ${escapeHtml(quiz.owner)}${quiz.isOwner ? ' (du)' : ''}</span>`]
+        .concat(quiz.collaborators.map((name) => {
+          const removable = quiz.isOwner || name.toLowerCase() === me.username.toLowerCase();
+          return `<span class="tag">${escapeHtml(name)}${name.toLowerCase() === me.username.toLowerCase() ? ' (du)' : ''}${removable
+            ? ` <button type="button" class="chip-x" data-remove="${escapeHtml(name)}" aria-label="${quiz.isOwner ? 'Entfernen' : 'Verlassen'}" title="${quiz.isOwner ? 'Entfernen' : 'Quiz verlassen'}">✕</button>` : ''}</span>`;
+        }));
+      $('#team-list').innerHTML = chips.join('');
+    }
+    async function teamAction(fn) {
+      $('#team-error').textContent = '';
+      try { await fn(); } catch (err) { $('#team-error').textContent = err.message; }
+    }
+    $('#team-invite').onclick = () => teamAction(async () => {
+      const username = $('#team-name').value.trim();
+      if (!username) return;
+      const { username: name } = await api(`/api/quizzes/${id}/collaborators`, { method: 'POST', body: { username } });
+      if (!team.collaborators.some((n) => n.toLowerCase() === name.toLowerCase())) team.collaborators.push(name);
+      $('#team-name').value = '';
+      showTeam(team);
+    });
+    $('#team-name').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); $('#team-invite').click(); } };
+    $('#team-list').onclick = (e) => {
+      const name = e.target.dataset.remove;
+      if (!name) return;
+      const self = name.toLowerCase() === me.username.toLowerCase();
+      if (!confirm(self ? 'Dieses Quiz verlassen? Du kannst es dann nicht mehr bearbeiten.' : `${name} entfernen?`)) return;
+      teamAction(async () => {
+        await api(`/api/quizzes/${id}/collaborators/${encodeURIComponent(name)}`, { method: 'DELETE' });
+        if (self) { location.href = '/quizzes'; return; }
+        team.collaborators = team.collaborators.filter((n) => n !== name);
+        showTeam(team);
+      });
+    };
+
     $('#save').onclick = async () => {
       $('#error').textContent = '';
       // Leere Antwortfelder am Ende ignorieren (Fragen mit 2–3 Antworten erlauben)
@@ -148,8 +204,19 @@
       });
       try {
         const body = { title: $('#title').value, subjectId: Number($('#subject').value) || null, mode: $('#mode').value, questions: payload };
-        if (id) await api(`/api/quizzes/${id}`, { method: 'PUT', body });
-        else await api('/api/quizzes', { method: 'POST', body });
+        if (id) {
+          try {
+            await api(`/api/quizzes/${id}`, { method: 'PUT', body: { ...body, version } });
+          } catch (err) {
+            if (!err.data || !err.data.conflict) throw err;
+            // Jemand anderes hat zwischenzeitlich gespeichert: bewusst entscheiden, nichts stillschweigend überschreiben
+            if (!confirm(`${err.message}\n\nOK: Deine Version trotzdem speichern (seine Änderungen gehen verloren).\nAbbrechen: nicht speichern – lade die Seite neu, um seine Änderungen zu sehen.`)) {
+              $('#error').textContent = `${err.message} Lade die Seite neu, um die Änderungen zu sehen (deine ungespeicherten Änderungen gehen dabei verloren).`;
+              return;
+            }
+            await api(`/api/quizzes/${id}`, { method: 'PUT', body: { ...body, version, force: true } });
+          }
+        } else await api('/api/quizzes', { method: 'POST', body });
         location.href = '/quizzes';
       } catch (err) {
         $('#error').textContent = err.message;
@@ -159,7 +226,8 @@
       }
     };
 
-    requireLogin().then(async () => {
+    requireLogin().then(async (user) => {
+      me = user;
       const subjects = await api('/api/subjects');
       $('#subject').innerHTML += subjects.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
       if (id) {
@@ -167,6 +235,8 @@
         $('#title').value = quiz.title;
         $('#subject').value = quiz.subject_id || '';
         $('#mode').value = quiz.mode || 'single';
+        version = quiz.version;
+        showTeam(quiz);
         questions = quiz.questions.map((q) => ({
           ...q,
           answers: [...q.answers, '', '', ''].slice(0, 4),
@@ -174,6 +244,9 @@
       } else {
         questions = [blankQuestion()];
         openIndex = 0;
+        $('#team-card').hidden = false;
+        $('#team-add').hidden = true;
+        $('#team-info').textContent = 'Speichere das Quiz zuerst – danach kannst du Freunde zum gemeinsamen Bearbeiten einladen.';
       }
       updateModeHint();
       render();

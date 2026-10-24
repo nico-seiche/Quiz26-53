@@ -2,7 +2,7 @@ const express = require('express');
 const QRCode = require('qrcode');
 const db = require('./db');
 const { requireAuth } = require('./auth');
-const { loadQuiz } = require('./quizzes');
+const { loadQuiz, canEdit } = require('./quizzes');
 const { MIN_PLAYERS_FOR_SCORING, TEAM_COUNT, MIN_PLAYERS_PER_TEAM, streakBonus } = require('./config');
 const { standings } = require('./teams');
 const { awardForGame, publicInfo } = require('./achievements');
@@ -312,10 +312,10 @@ function generatePin() {
 
 const router = express.Router();
 
-// Neues Spiel aus einem eigenen Quiz starten
+// Neues Spiel aus einem eigenen oder geteilten Quiz starten
 router.post('/', requireAuth, async (req, res) => {
   const quiz = await loadQuiz(req.body.quizId);
-  if (!quiz || quiz.owner_id !== req.user.id) return res.status(404).json({ error: 'Quiz nicht gefunden' });
+  if (!quiz || !(await canEdit(quiz, req.user.id))) return res.status(404).json({ error: 'Quiz nicht gefunden' });
   if (!quiz.questions.length) return res.status(400).json({ error: 'Das Quiz hat noch keine Fragen' });
 
   // Alte Spiele aufräumen (Ergebnisse bleiben in game_results erhalten)

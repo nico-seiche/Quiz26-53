@@ -2,6 +2,15 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-10-25',
+    title: 'Neu: Gemeinsam an Quiz arbeiten',
+    items: [
+      ['👥', 'Freunde einladen', 'Im Quiz-Editor unter „Zusammen bearbeiten“ lädst du Freunde per Nutzername ein. Sie sehen das Quiz dann unter „Quiz“.'],
+      ['✏️', 'Gemeinsam bearbeiten und starten', 'Eingeladene können Fragen ändern und das Quiz starten. Löschen und Einladen bleibt beim Besitzer.'],
+      ['🛡️', 'Nichts geht verloren', 'Haben zwei gleichzeitig gespeichert, fragt die App nach, bevor sie etwas überschreibt.'],
+    ],
+  },
+  {
     id: '2026-10-24e',
     title: 'Neu: Tippen',
     items: [

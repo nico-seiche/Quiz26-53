@@ -492,3 +492,8 @@ input.cloze-input.bad { border-color: var(--danger); background: color-mix(in sr
 .tw.pending { color: var(--muted); }
 button.tw.bad { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); font-weight: 700; text-decoration: underline wavy var(--danger); cursor: pointer; }
 button.tw.bad:hover:not(:disabled) { transform: none; }
+
+/* Zusammenarbeit */
+.chip-x { padding: 0 .3rem; margin-left: .2rem; border: 0; background: transparent; color: var(--muted); font-size: .9rem; line-height: 1; box-shadow: none; }
+.chip-x:hover:not(:disabled) { color: var(--danger); transform: none; }
+#team-list .tag { display: inline-flex; align-items: center; padding: .2rem .6rem; font-size: .95rem; }
