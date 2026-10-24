@@ -36,8 +36,10 @@
 * { box-sizing: border-box; }
 a { color: var(--link); }
 [hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; overscroll-behavior-y: none; }
 body {
-  margin: 0; min-height: 100vh;
+  margin: 0; min-height: 100vh; min-height: 100dvh; overflow-x: clip; overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   background: var(--bg); background-image: var(--page); background-attachment: fixed;
   color: var(--text);
@@ -45,7 +47,7 @@ body {
 }
 header.top {
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-  padding: .75rem 1rem; background: var(--card); border-bottom: 1px solid var(--border);
+  padding: .75rem 1rem; padding-top: calc(.75rem + env(safe-area-inset-top, 0px)); background: var(--card); border-bottom: 1px solid var(--border);
   background: color-mix(in srgb, var(--card) 82%, transparent);
   -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
   position: sticky; top: 0; z-index: 30;
@@ -244,7 +246,7 @@ ol.ranking li { padding: .25rem 0; }
 @media (max-width: 640px) { .lb-games { display: none; } .lb-row { grid-template-columns: 2.5rem 1fr 6ch; } }
 
 /* Schwebende Navigation unten */
-body.has-nav main { padding-bottom: 8rem; }
+body.has-nav main { padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px)); }
 .bottom-nav {
   position: fixed; left: 50%; transform: translateX(-50%); z-index: 40;
   bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
@@ -451,3 +453,17 @@ input.cloze-input.bad { border-color: var(--danger); background: color-mix(in sr
 .card-edit { padding: 1rem 1.25rem; }
 .inline-check { display: flex; align-items: center; gap: .6rem; margin: 1rem 0 0; font-weight: 600; }
 .inline-check input { width: auto; margin: 0; }
+
+/* Handy / installierte App: kompakter, nichts ragt über den Rand */
+.profile-card > div { min-width: 0; }
+.profile-card .level-badge { white-space: normal; }
+@media (max-width: 640px) {
+  main { padding-top: 1rem; }
+  .ach-grid { grid-template-columns: repeat(2, 1fr); gap: .5rem; }
+  .ach-tile { padding: .6rem .5rem; }
+  .ach-tile .icon { font-size: 1.75rem; }
+  .ach-tile .muted { font-size: .8rem; }
+  .card { padding: 1rem; }
+}
+.more-btn { width: 100%; margin-top: .5rem; }
+@media (display-mode: standalone) { body { user-select: none; -webkit-user-select: none; } input, textarea { user-select: text; -webkit-user-select: text; } }

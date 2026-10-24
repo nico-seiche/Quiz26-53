@@ -2,7 +2,15 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#5b4de8">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Quiz">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <title>Quiz – Profil</title>
   <link rel="stylesheet" href="/style.css">
 </head>
@@ -42,11 +50,13 @@
     <div class="card">
       <h2>Meine Ergebnisse</h2>
       <ul class="list" id="results"></ul>
+      <button type="button" class="more-btn" id="more" hidden>Alle anzeigen</button>
     </div>
   </main>
   <script src="/js/changelog.js"></script>
   <script src="/js/common.js"></script>
   <script>
+    let showAll = false;
     async function loadResults() {
       const { total, games, minPlayers, subjects, results } = await api('/api/results');
       $('#rule').textContent = `Gewertet werden nur Spiele mit mindestens ${minPlayers} Teilnehmern.`;
@@ -59,7 +69,9 @@
           <div class="stat-bar"><span style="width:${(s.points / max) * 100}%"></span></div>
           <span class="stat-points">${s.points.toLocaleString('de-DE')}</span>
         </div>`).join('');
-      $('#results').innerHTML = results.length ? results.map((r) => `
+      const shown = showAll ? results : results.slice(0, 5);
+      $('#more').hidden = showAll || results.length <= 5;
+      $('#results').innerHTML = shown.length ? shown.map((r) => `
         <li>
           <div>
             <strong>${escapeHtml(r.quiz_title)}</strong>${r.subject ? ` <span class="tag">${escapeHtml(r.subject)}</span>` : ''}<br>
@@ -89,6 +101,8 @@
               : '<span class="tag">🔒 Noch offen</span>'}
         </div>`).join('');
     }
+
+    $('#more').onclick = () => { showAll = true; loadResults(); };
 
     requireLogin().then((me) => {
       $('#name').textContent = me.username;
