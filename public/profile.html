@@ -27,6 +27,7 @@
         <div class="muted">Angemeldet als</div>
         <h1 id="name" style="margin:0">…</h1>
         <span class="level-badge" id="profile-level"></span>
+        <div class="muted level-next" id="profile-next"></div>
       </div>
     </div>
 
@@ -107,7 +108,8 @@
     requireLogin().then((me) => {
       $('#name').textContent = me.username;
       $('#profile-avatar').innerHTML = avatarHtml(me.username, '4.5rem');
-      $('#profile-level').textContent = `🏅 Level ${me.level} · noch ${me.toNext.toLocaleString('de-DE')} Punkte bis Level ${me.level + 1}`;
+      $('#profile-level').textContent = `🏅 Level ${me.level}`;
+      $('#profile-next').textContent = `Noch ${me.toNext.toLocaleString('de-DE')} Punkte bis Level ${me.level + 1}`;
       mountNav('profile', me);
       loadResults();
       loadAchievements().then(() => {

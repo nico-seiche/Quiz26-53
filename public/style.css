@@ -470,3 +470,5 @@ input.cloze-input.bad { border-color: var(--danger); background: color-mix(in sr
 
 .icon-btn { flex: none; padding: .5rem .6rem; line-height: 0; }
 .icon-btn svg { display: block; }
+
+.profile-card .level-next { font-size: .85rem; margin-top: .3rem; }
