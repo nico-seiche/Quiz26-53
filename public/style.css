@@ -467,3 +467,6 @@ input.cloze-input.bad { border-color: var(--danger); background: color-mix(in sr
 }
 .more-btn { width: 100%; margin-top: .5rem; }
 @media (display-mode: standalone) { body { user-select: none; -webkit-user-select: none; } input, textarea { user-select: text; -webkit-user-select: text; } }
+
+.icon-btn { flex: none; padding: .5rem .6rem; line-height: 0; }
+.icon-btn svg { display: block; }

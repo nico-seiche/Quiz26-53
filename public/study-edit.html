@@ -53,24 +53,26 @@
         <div class="card card-edit" data-i="${i}">
           <div class="row">
             <input type="text" data-field="term" maxlength="200" value="${escapeHtml(c.term)}" placeholder="Begriff, z. B. Abstrakte Gefahr" aria-label="Begriff ${i + 1}">
-            <button type="button" data-action="up" aria-label="Nach oben" ${i === 0 ? 'disabled' : ''}>↑</button>
-            <button type="button" data-action="down" aria-label="Nach unten" ${i === cards.length - 1 ? 'disabled' : ''}>↓</button>
-            <button type="button" class="danger" data-action="remove">Entfernen</button>
+            <button type="button" class="danger icon-btn" data-action="remove" aria-label="Karte entfernen" title="Karte entfernen"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 10v7M14 10v7"/></svg></button>
           </div>
           <textarea rows="3" data-field="definition" placeholder="Definition" aria-label="Definition ${i + 1}">${escapeHtml(c.definition)}</textarea>
         </div>`).join('') || '<div class="card muted">Noch keine Karten – füge unten eine hinzu oder nutze „Texte einfügen“.</div>';
+      autosizeAll();
     }
 
+    // Definitionsfelder wachsen mit dem Text, damit man alles sieht
+    function autosize(el) { el.style.height = 'auto'; el.style.height = `${el.scrollHeight + 2}px`; }
+    const autosizeAll = () => document.querySelectorAll('textarea[data-field=definition]').forEach(autosize);
+
     $('#cards').addEventListener('input', (e) => {
+      if (e.target.tagName === 'TEXTAREA') autosize(e.target);
       const field = e.target.dataset.field;
       if (field) cards[Number(e.target.closest('[data-i]').dataset.i)][field] = e.target.value;
     });
     $('#cards').addEventListener('click', (e) => {
-      const action = e.target.dataset.action;
-      if (!action) return;
+      if (!e.target.closest('[data-action=remove]')) return;
       const i = Number(e.target.closest('[data-i]').dataset.i);
-      if (action === 'remove') cards.splice(i, 1);
-      else { const j = action === 'up' ? i - 1 : i + 1; [cards[i], cards[j]] = [cards[j], cards[i]]; }
+      cards.splice(i, 1);
       render();
     });
     $('#add').onclick = () => {
