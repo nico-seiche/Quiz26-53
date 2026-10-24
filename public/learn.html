@@ -144,7 +144,7 @@
         ${flipped ? `<div class="study-actions">
           <button type="button" class="no" id="no">❌ Noch nicht</button>
           <button type="button" class="ok" id="yes">✅ Gewusst</button></div>
-          ${Speech.supported ? '<div style="text-align:center;margin-top:.75rem"><button type="button" id="say">🔊 Vorlesen</button></div>' : ''}` :
+          ${Speech.available() ? '<div style="text-align:center;margin-top:.75rem"><button type="button" id="say">🔊 Vorlesen</button></div>' : ''}` :
           '<div class="study-actions" style="grid-template-columns:1fr"><button type="button" class="primary" id="show">Antwort zeigen</button></div>'}`;
       if (flipped) { if ($('#say')) $('#say').onclick = () => { Speech.cancel(); Speech.say(c.definition); }; $('#yes').onclick = () => answer(true); $('#no').onclick = () => answer(false); $('#yes').focus(); }
       else { $('#show').onclick = $('#flip').onclick = () => showCard(true); $('#show').focus(); }
@@ -233,7 +233,7 @@
           <div class="score-big">${pass ? '✅' : '🔁'} ${Math.round(share * 100)} %</div>
           <div class="muted">${summary}${pass ? '' : ' – das kommt gleich nochmal'}</div>
           ${extra}
-          ${Speech.supported ? '<button type="button" id="say" style="margin-top:.8rem">🔊 Vorlesen</button>' : ''}
+          ${Speech.available() ? '<button type="button" id="say" style="margin-top:.8rem">🔊 Vorlesen</button>' : ''}
           <button type="button" class="primary" id="go" style="margin-top:.8rem">Weiter</button>
         </div>`;
       if ($('#say')) $('#say').onclick = () => { Speech.cancel(); Speech.say(card().definition); };
@@ -266,13 +266,19 @@
           <label for="hear-rate">Tempo</label>
           <select id="hear-rate">${[0.8, 0.9, 1, 1.1, 1.25].map((r) => `<option value="${r}">${r === 1 ? 'Normal' : r + '×'}</option>`).join('')}</select>
           <label for="hear-voice">Stimme</label>
-          <select id="hear-voice">${voices.map((v) => `<option value="${escapeHtml(v.voiceURI)}">${escapeHtml(v.name)}</option>`).join('') || '<option value="">Standard</option>'}</select>
+          <select id="hear-voice">
+            ${Speech.piperSupported() ? `<optgroup label="Natürlich (einmal ca. 60 MB laden)">${Speech.PIPER_VOICES.map((v) => `<option value="${v.id}">${escapeHtml(v.label)}</option>`).join('')}</optgroup>` : ''}
+            ${voices.length ? `<optgroup label="Stimmen deines Geräts">${voices.map((v) => `<option value="device:${escapeHtml(v.voiceURI)}">${escapeHtml(v.name)}</option>`).join('')}</optgroup>` : (Speech.supported ? '<option value="device:">Standardstimme</option>' : '')}
+          </select>
+          <p class="muted" id="hear-status" style="margin:.4rem 0 0"></p>
           <label class="inline-check"><input type="checkbox" id="hear-hide"> Text verbergen (nur zuhören und mitdenken)</label>
           <label class="inline-check"><input type="checkbox" id="hear-loop"> Wiederholen, bis ich anhalte</label>
-          <p class="muted" style="margin-bottom:0">Die Stimme kommt von deinem Gerät. Bei gesperrtem Display stoppt das Vorlesen auf vielen Handys.</p>
+          <p class="muted" style="margin-bottom:0">Natürliche Stimmen laufen im Browser (kein Server). Bei gesperrtem Display stoppt das Vorlesen auf vielen Handys.</p>
         </div>`;
       $('#hear-rate').value = Speech.store.get('speech-rate', '1');
-      if (voices.length) $('#hear-voice').value = (Speech.pickVoice() || voices[0]).voiceURI;
+      const engine = Speech.engine();
+      $('#hear-voice').value = engine !== 'device' && Speech.piperSupported() ? engine : `device:${(Speech.pickVoice() || voices[0] || {}).voiceURI || ''}`;
+      if (!$('#hear-voice').value) $('#hear-voice').selectedIndex = 0;
       $('#hear-hide').checked = Speech.store.get('hear-hide', '0') === '1';
       $('#hear-loop').checked = Speech.store.get('hear-loop', '0') === '1';
       hearShow();
@@ -280,7 +286,7 @@
       $('#hear-next').onclick = () => hearJump(1);
       $('#hear-prev').onclick = () => hearJump(-1);
       $('#hear-rate').onchange = (e) => { Speech.store.set('speech-rate', e.target.value); hearRestart(); };
-      $('#hear-voice').onchange = (e) => { Speech.store.set('speech-voice', e.target.value); hearRestart(); };
+      $('#hear-voice').onchange = (e) => chooseVoice(e.target.value);
       $('#hear-hide').onchange = (e) => { Speech.store.set('hear-hide', e.target.checked ? '1' : '0'); hearShow(); };
       $('#hear-loop').onchange = (e) => Speech.store.set('hear-loop', e.target.checked ? '1' : '0');
     }
@@ -299,6 +305,36 @@
       if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: c.term, artist: set.title });
     }
 
+    function hearStatus(text) { const el = $('#hear-status'); if (el) el.textContent = text; }
+
+    // Stimme wählen; eine natürliche Stimme wird beim ersten Mal heruntergeladen
+    async function chooseVoice(value) {
+      Speech.cancel();
+      if (value.startsWith('device:')) {
+        Speech.setEngine('device');
+        Speech.store.set('speech-voice', value.slice(7));
+        hearStatus('');
+        return hearRestart();
+      }
+      const wasPlaying = hearPlaying;
+      hearPlaying = false;
+      try {
+        if (!(await Speech.piperReady(value))) {
+          if (!confirm('Die natürliche Stimme ist ca. 60 MB groß und wird einmalig auf dein Gerät geladen (am besten im WLAN). Jetzt laden?')) throw new Error('abgebrochen');
+          await Speech.piperLoad(value, (done, total) => hearStatus(`Stimme wird geladen … ${Math.round(done / 1e6)} von ${Math.round(total / 1e6)} MB`));
+        }
+        Speech.setEngine(value);
+        hearStatus('Stimme bereit. Die erste Karte braucht beim Start einen Moment, danach geht es flüssig.');
+      } catch (err) {
+        console.warn(err);
+        hearStatus(err.message === 'abgebrochen' ? '' : 'Die Stimme konnte nicht geladen werden – Internet prüfen oder Gerätestimme nutzen.');
+        const dev = `device:${(Speech.pickVoice() || {}).voiceURI || ''}`;
+        Speech.setEngine('device');
+        $('#hear-voice').value = dev; if (!$('#hear-voice').value) $('#hear-voice').selectedIndex = $('#hear-voice').options.length - 1;
+      }
+      if (wasPlaying) hearStart();
+    }
+
     async function hearStart() {
       hearPlaying = true;
       Speech.cancel();
@@ -306,12 +342,15 @@
       while (hearPlaying && me === Speech.current() && mode === 'hear') {
         const c = queue[hearIdx];
         hearStep = 'term'; hearShow();
-        await Speech.say(c.term);
+        Speech.prefetch(c.definition);
+        const nextCard = queue[(hearIdx + 1) % queue.length];
+        Speech.prefetch(nextCard.term); Speech.prefetch(nextCard.definition);
+        await Speech.say(c.term, { onWait: (w) => hearStatus(w ? 'Wird vorbereitet …' : '') });
         if (!hearPlaying || me !== Speech.current()) break;
         await wait(1200);
         if (!hearPlaying || me !== Speech.current()) break;
         hearStep = 'definition'; hearShow();
-        await Speech.say(c.definition);
+        await Speech.say(c.definition, { onWait: (w) => hearStatus(w ? 'Wird vorbereitet …' : '') });
         if (!hearPlaying || me !== Speech.current()) break;
         await wait(2000);
         if (!hearPlaying || me !== Speech.current()) break;
@@ -358,8 +397,8 @@
         return;
       }
       $('#set-title').textContent = set.title;
-      Speech.onVoices(() => { $('#hear-tab').hidden = !Speech.supported; });
-      if (!Speech.supported && mode === 'hear') mode = 'cards';
+      Speech.onVoices(() => { $('#hear-tab').hidden = !Speech.available(); });
+      if (!Speech.available() && mode === 'hear') mode = 'cards';
       if (!set.cards.length) { stage.innerHTML = '<div class="card muted">Dieses Lernset hat noch keine Karten.</div>'; return; }
       if (!set.cards.some((c) => c.due)) scope = 'all';
       startSession();
