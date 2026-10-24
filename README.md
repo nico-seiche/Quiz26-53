@@ -91,6 +91,10 @@ Unter **Lernen** (`/study`) legt man Lernsets aus Begriff-Definition-Karten an (
 
 Als gewusst gilt eine Karte ab 80 % richtiger Wörter. Der Fortschritt folgt dem Karteikasten-System (Leitner): gewusst → eine Box höher (fällig nach 1, 3, 7, 21 Tagen), nicht gewusst → zurück in Box 0 und sofort wieder fällig; ab Box 3 gilt eine Karte als gelernt. Der Fortschritt gehört jedem Nutzer einzeln (Tabelle `quiz.card_progress`). Lernsets können für alle sichtbar gemacht und kopiert werden; bearbeiten darf nur der Besitzer. Die Intervalle stehen in `src/study.js` (`BOX_DAYS`).
 
+### Hören (Vorlesen)
+
+Die Lernart **🎧 Hören** liest die Karten nacheinander vor (Begriff, Pause, Definition, Pause); zusätzlich gibt es 🔊 „Vorlesen“ bei Karteikarten und im Lückentext/„Aus dem Kopf“. Die Stimme kommt von der Web Speech API des Geräts (`public/js/speech.js`): kein Server, keine Cloud, die Qualität hängt von den installierten deutschen Stimmen ab (Premium/Natural-Stimmen werden bevorzugt). Abkürzungen wie „§“, „Abs.“, „z. B.“ werden vor dem Vorlesen ausgeschrieben, lange Texte satzweise gesprochen (manche Browser brechen sonst ab). Hören ändert den Lernfortschritt nicht. Bei gesperrtem Display stoppt die Sprachausgabe auf vielen Handys. Eine eigene Open-Source-Stimme (z. B. Piper per WebAssembly) wäre die nächste Ausbaustufe.
+
 ## Fächer und Statistik
 
 Jedes Quiz gehört zu einem Fach. Die Fächer liegen in der Tabelle `quiz.subjects` (aktuell Politik, Soziologie, Psychologie). Ein neues Fach ergänzt man im Supabase-SQL-Editor:

@@ -25,6 +25,7 @@
       <button type="button" role="tab" data-mode="cards">🃏 Karteikarten</button>
       <button type="button" role="tab" data-mode="cloze">✏️ Lückentext</button>
       <button type="button" role="tab" data-mode="free">🧠 Aus dem Kopf</button>
+      <button type="button" role="tab" data-mode="hear" id="hear-tab" hidden>🎧 Hören</button>
     </div>
     <div class="row spread" style="margin-bottom:1rem">
       <div class="tabs" id="scope" style="margin:0">
@@ -41,6 +42,7 @@
     <div id="stage"></div>
   </main>
   <script src="/js/cloze.js"></script>
+  <script src="/js/speech.js"></script>
   <script src="/js/common.js"></script>
   <script>
     const setId = new URLSearchParams(location.search).get('id');
@@ -55,6 +57,8 @@
     let retried = new Set();
     let blanks = null;     // Lücken der aktuellen Karte
     let checked = false;
+    let hearIdx = 0;
+    let hearPlaying = false;
 
     const stage = $('#stage');
     const card = () => queue[0];
@@ -67,6 +71,9 @@
     }
 
     function startSession() {
+      Speech.cancel();
+      hearPlaying = false;
+      hearIdx = 0;
       let cards = set.cards.slice();
       if (scope === 'due') cards = cards.filter((c) => c.due);
       // Unsichere Karten zuerst, innerhalb einer Box zufällig
@@ -88,6 +95,7 @@
     function next() {
       checked = false;
       if (!queue.length) return finish();
+      if (mode === 'hear') return showHear();
       if (mode === 'cards') showCard(false);
       else if (mode === 'cloze') showCloze();
       else showFree();
@@ -135,9 +143,10 @@
         </div>
         ${flipped ? `<div class="study-actions">
           <button type="button" class="no" id="no">❌ Noch nicht</button>
-          <button type="button" class="ok" id="yes">✅ Gewusst</button></div>` :
+          <button type="button" class="ok" id="yes">✅ Gewusst</button></div>
+          ${Speech.supported ? '<div style="text-align:center;margin-top:.75rem"><button type="button" id="say">🔊 Vorlesen</button></div>' : ''}` :
           '<div class="study-actions" style="grid-template-columns:1fr"><button type="button" class="primary" id="show">Antwort zeigen</button></div>'}`;
-      if (flipped) { $('#yes').onclick = () => answer(true); $('#no').onclick = () => answer(false); $('#yes').focus(); }
+      if (flipped) { if ($('#say')) $('#say').onclick = () => { Speech.cancel(); Speech.say(c.definition); }; $('#yes').onclick = () => answer(true); $('#no').onclick = () => answer(false); $('#yes').focus(); }
       else { $('#show').onclick = $('#flip').onclick = () => showCard(true); $('#show').focus(); }
     }
 
@@ -224,11 +233,109 @@
           <div class="score-big">${pass ? '✅' : '🔁'} ${Math.round(share * 100)} %</div>
           <div class="muted">${summary}${pass ? '' : ' – das kommt gleich nochmal'}</div>
           ${extra}
+          ${Speech.supported ? '<button type="button" id="say" style="margin-top:.8rem">🔊 Vorlesen</button>' : ''}
           <button type="button" class="primary" id="go" style="margin-top:.8rem">Weiter</button>
         </div>`;
+      if ($('#say')) $('#say').onclick = () => { Speech.cancel(); Speech.say(card().definition); };
       $('#go').onclick = () => answer(pass);
       $('#go').focus();
     }
+
+
+    // --- Hören: Karten nacheinander vorlesen (Begriff, Pause, Definition, Pause) ---
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    function showHear() {
+      const list = queue;
+      if (!list.length) { stage.innerHTML = '<div class="card muted" style="text-align:center">Gerade ist keine Karte fällig – wähle oben „Alle Karten“, um sie trotzdem anzuhören.</div>'; return; }
+      const voices = Speech.voices();
+      stage.innerHTML = `
+        <div class="study-progress"><div class="level-bar"><span id="hear-bar" style="width:0%"></span></div><span class="muted" id="hear-count"></span></div>
+        <div class="card study-card" style="cursor:default">
+          <div>
+            <div class="term" id="hear-term"></div>
+            <div class="definition" id="hear-def"></div>
+          </div>
+        </div>
+        <div class="hear-controls">
+          <button type="button" id="hear-prev" aria-label="Vorherige Karte">⏮</button>
+          <button type="button" class="primary" id="hear-play" aria-label="Abspielen oder anhalten">▶ Abspielen</button>
+          <button type="button" id="hear-next" aria-label="Nächste Karte">⏭</button>
+        </div>
+        <div class="card hear-options">
+          <label for="hear-rate">Tempo</label>
+          <select id="hear-rate">${[0.8, 0.9, 1, 1.1, 1.25].map((r) => `<option value="${r}">${r === 1 ? 'Normal' : r + '×'}</option>`).join('')}</select>
+          <label for="hear-voice">Stimme</label>
+          <select id="hear-voice">${voices.map((v) => `<option value="${escapeHtml(v.voiceURI)}">${escapeHtml(v.name)}</option>`).join('') || '<option value="">Standard</option>'}</select>
+          <label class="inline-check"><input type="checkbox" id="hear-hide"> Text verbergen (nur zuhören und mitdenken)</label>
+          <label class="inline-check"><input type="checkbox" id="hear-loop"> Wiederholen, bis ich anhalte</label>
+          <p class="muted" style="margin-bottom:0">Die Stimme kommt von deinem Gerät. Bei gesperrtem Display stoppt das Vorlesen auf vielen Handys.</p>
+        </div>`;
+      $('#hear-rate').value = Speech.store.get('speech-rate', '1');
+      if (voices.length) $('#hear-voice').value = (Speech.pickVoice() || voices[0]).voiceURI;
+      $('#hear-hide').checked = Speech.store.get('hear-hide', '0') === '1';
+      $('#hear-loop').checked = Speech.store.get('hear-loop', '0') === '1';
+      hearShow();
+      $('#hear-play').onclick = () => (hearPlaying ? hearStop() : hearStart());
+      $('#hear-next').onclick = () => hearJump(1);
+      $('#hear-prev').onclick = () => hearJump(-1);
+      $('#hear-rate').onchange = (e) => { Speech.store.set('speech-rate', e.target.value); hearRestart(); };
+      $('#hear-voice').onchange = (e) => { Speech.store.set('speech-voice', e.target.value); hearRestart(); };
+      $('#hear-hide').onchange = (e) => { Speech.store.set('hear-hide', e.target.checked ? '1' : '0'); hearShow(); };
+      $('#hear-loop').onchange = (e) => Speech.store.set('hear-loop', e.target.checked ? '1' : '0');
+    }
+
+    let hearStep = 'term';   // was gerade gesprochen wird: Begriff oder Definition
+    function hearShow() {
+      if (mode !== 'hear' || !$('#hear-term')) return;
+      const c = queue[hearIdx];
+      const hide = $('#hear-hide').checked;
+      $('#hear-term').textContent = c.term;
+      $('#hear-def').textContent = c.definition;
+      $('#hear-def').style.visibility = !hide || (hearPlaying && hearStep === 'definition') ? 'visible' : 'hidden';
+      $('#hear-count').textContent = `${hearIdx + 1} / ${queue.length}`;
+      $('#hear-bar').style.width = `${((hearIdx + 1) / queue.length) * 100}%`;
+      $('#hear-play').textContent = hearPlaying ? '⏸ Pause' : '▶ Abspielen';
+      if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: c.term, artist: set.title });
+    }
+
+    async function hearStart() {
+      hearPlaying = true;
+      Speech.cancel();
+      const me = Speech.current();
+      while (hearPlaying && me === Speech.current() && mode === 'hear') {
+        const c = queue[hearIdx];
+        hearStep = 'term'; hearShow();
+        await Speech.say(c.term);
+        if (!hearPlaying || me !== Speech.current()) break;
+        await wait(1200);
+        if (!hearPlaying || me !== Speech.current()) break;
+        hearStep = 'definition'; hearShow();
+        await Speech.say(c.definition);
+        if (!hearPlaying || me !== Speech.current()) break;
+        await wait(2000);
+        if (!hearPlaying || me !== Speech.current()) break;
+        if (hearIdx + 1 < queue.length) hearIdx++;
+        else if ($('#hear-loop').checked) hearIdx = 0;
+        else { hearPlaying = false; hearIdx = 0; hearStep = 'term'; hearShow(); return; }
+      }
+    }
+    function hearStop() { hearPlaying = false; Speech.cancel(); hearShow(); }
+    function hearRestart() { if (hearPlaying) hearStart(); }
+    function hearJump(step) {
+      hearIdx = (hearIdx + step + queue.length) % queue.length;
+      hearStep = 'term';
+      Speech.cancel();
+      hearShow();
+      if (hearPlaying) hearStart();
+    }
+    if ('mediaSession' in navigator) {
+      for (const [action, fn] of [['play', () => mode === 'hear' && !hearPlaying && hearStart()], ['pause', () => hearStop()],
+        ['nexttrack', () => mode === 'hear' && hearJump(1)], ['previoustrack', () => mode === 'hear' && hearJump(-1)]]) {
+        try { navigator.mediaSession.setActionHandler(action, fn); } catch {}
+      }
+    }
+    window.addEventListener('pagehide', () => Speech.cancel());
 
     // Tastatur: Leertaste dreht die Karteikarte um, 1/2 bewertet sie
     document.addEventListener('keydown', (e) => {
@@ -251,6 +358,8 @@
         return;
       }
       $('#set-title').textContent = set.title;
+      Speech.onVoices(() => { $('#hear-tab').hidden = !Speech.supported; });
+      if (!Speech.supported && mode === 'hear') mode = 'cards';
       if (!set.cards.length) { stage.innerHTML = '<div class="card muted">Dieses Lernset hat noch keine Karten.</div>'; return; }
       if (!set.cards.some((c) => c.due)) scope = 'all';
       startSession();

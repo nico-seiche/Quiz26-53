@@ -2,6 +2,14 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-10-24c',
+    title: 'Neu: Lernen mit den Ohren',
+    items: [
+      ['🎧', 'Hören', 'Neue Lernart: Begriffe und Definitionen werden nacheinander vorgelesen – ideal für unterwegs. Tempo und Stimme sind wählbar.'],
+      ['🔊', 'Vorlesen', 'Bei Karteikarten und im Lückentext lässt sich die Lösung per Knopf anhören.'],
+    ],
+  },
+  {
     id: '2026-10-24b',
     title: 'Neu: Lernen',
     items: [

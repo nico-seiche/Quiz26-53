@@ -477,3 +477,7 @@ input.cloze-input.bad { border-color: var(--danger); background: color-mix(in sr
 .icon-btn svg { display: block; }
 
 .profile-card .level-next { font-size: .85rem; margin-top: .3rem; }
+
+.hear-controls { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: .75rem; margin: 1rem 0; }
+.hear-controls button { padding: .9rem; font-size: 1.1rem; }
+.hear-options select { width: 100%; padding: .6rem .7rem; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 12px; }
