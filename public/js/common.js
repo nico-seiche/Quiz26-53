@@ -141,3 +141,15 @@ function mountNav(active, me) {
       <span class="hide-small">${escapeHtml(me.username)}</span>`;
   }
 }
+
+// Verhindert, dass ein Eingabefeld von selbst den Fokus bekommt (und die Handy-Tastatur aufgeht):
+// Das Feld ist schreibgeschützt, bis man es wirklich antippt oder per Tastatur dorthin springt.
+function noAutoFocus(input) {
+  if (!input) return;
+  input.readOnly = true;
+  const unlock = () => { input.readOnly = false; };
+  input.addEventListener('pointerdown', unlock, { once: true });
+  input.addEventListener('keydown', unlock, { once: true });
+  input.addEventListener('focus', () => { if (input.readOnly && !input.matches(':focus-visible')) input.blur(); });
+  window.addEventListener('pageshow', () => { if (document.activeElement === input && input.readOnly) input.blur(); });
+}

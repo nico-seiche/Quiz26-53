@@ -81,6 +81,7 @@
   <script src="/js/changelog.js"></script>
   <script src="/js/common.js"></script>
   <script>
+    noAutoFocus($('#join-pin'));
     $('#join-form').onsubmit = (e) => {
       e.preventDefault();
       const pin = $('#join-pin').value.trim();

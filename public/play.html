@@ -60,6 +60,7 @@
 
     function showJoinForm() {
       $('#join').hidden = false;
+      noAutoFocus($('#pin'));
       $('#name-field').hidden = !!me;
       $('#name').value = sessionStorage.getItem('guestName') || '';
       const loginLink = `/?next=${encodeURIComponent(location.pathname + location.search)}`;
