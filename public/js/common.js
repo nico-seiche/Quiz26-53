@@ -147,6 +147,7 @@ function mountNav(active, me) {
     box.innerHTML = `<span class="level-badge" title="${me.points.toLocaleString('de-DE')} Punkte">🏅 Level ${me.level}</span>
       <span class="hide-small">${escapeHtml(me.username)}</span>`;
   }
+  mountTheme();
 }
 
 // Verhindert, dass ein Eingabefeld von selbst den Fokus bekommt (und die Handy-Tastatur aufgeht):
@@ -159,4 +160,49 @@ function noAutoFocus(input) {
   input.addEventListener('keydown', unlock, { once: true });
   input.addEventListener('focus', () => { if (input.readOnly && !input.matches(':focus-visible')) input.blur(); });
   window.addEventListener('pageshow', () => { if (document.activeElement === input && input.readOnly) input.blur(); });
+}
+
+// --- Hell/Dunkel-Schalter ---
+// Standard: dem Gerät folgen. Wer den Schalter benutzt, legt sein Thema fest (gespeichert in localStorage).
+const themeQuery = matchMedia('(prefers-color-scheme: dark)');
+function isDark() {
+  const t = document.documentElement.dataset.theme;
+  return t ? t === 'dark' : themeQuery.matches;
+}
+function setTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  try { localStorage.setItem('theme', theme); } catch {}
+  const meta = document.querySelector('meta[name=theme-color]');
+  if (meta) meta.content = theme === 'dark' ? '#14172e' : '#5b4de8';
+  document.querySelectorAll('.theme-switch').forEach(syncSwitch);
+}
+function syncSwitch(btn) {
+  const dark = isDark();
+  btn.setAttribute('aria-checked', String(dark));
+  btn.title = dark ? 'Dunkel – tippen für hell' : 'Hell – tippen für dunkel';
+  btn.querySelector('.knob').textContent = dark ? '🌙' : '☀️';
+}
+function mountTheme() {
+  if (document.querySelector('.theme-switch')) return;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'theme-switch';
+  btn.setAttribute('role', 'switch');
+  btn.setAttribute('aria-label', 'Dunkler Modus');
+  btn.innerHTML = '<span class="knob" aria-hidden="true"></span>';
+  syncSwitch(btn);
+  btn.onclick = () => setTheme(isDark() ? 'light' : 'dark');
+  const me = document.getElementById('me');
+  const header = document.querySelector('header.top');
+  if (me) me.appendChild(btn);
+  else if (header && header.lastElementChild) {
+    // Rechts neben das vorhandene Element (z. B. „Abmelden“) setzen
+    const last = header.lastElementChild;
+    const wrap = document.createElement('div');
+    wrap.className = 'row';
+    wrap.style.flexWrap = 'nowrap';
+    last.replaceWith(wrap);
+    wrap.append(last, btn);
+  }
+  themeQuery.addEventListener('change', () => document.querySelectorAll('.theme-switch').forEach(syncSwitch));
 }
