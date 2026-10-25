@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('./db');
 const { requireAuth } = require('./auth');
+const { areFriends, findUser } = require('./friends');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -161,11 +162,14 @@ router.put('/:id', async (req, res) => {
 router.post('/:id/collaborators', async (req, res) => {
   const quiz = await loadQuiz(req.params.id);
   if (!quiz || quiz.owner_id !== req.user.id) return res.status(404).json({ error: 'Quiz nicht gefunden' });
-  const username = String(req.body.username || '').trim();
-  if (!username) return res.status(400).json({ error: 'Nutzername fehlt' });
-  const user = await db.one('SELECT id, username FROM quiz.users WHERE lower(username) = lower($1)', [username]);
-  if (!user) return res.status(404).json({ error: `Nutzer „${username}“ nicht gefunden – er muss sich erst registrieren.` });
+  const input = String(req.body.username || '').trim();
+  if (!input) return res.status(400).json({ error: 'Nutzername oder #ID fehlt' });
+  const user = await findUser(input);
+  if (!user) return res.status(404).json({ error: `Spieler „${input}“ nicht gefunden.` });
   if (Number(user.id) === req.user.id) return res.status(400).json({ error: 'Das Quiz gehört dir bereits.' });
+  if (!(await areFriends(req.user.id, user.id))) {
+    return res.status(403).json({ error: `${user.username} ist noch nicht dein Freund. Schicke zuerst unter Profil → Freunde eine Anfrage.` });
+  }
   await db.query('INSERT INTO quiz.quiz_collaborators (quiz_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [quiz.id, user.id]);
   res.json({ username: user.username });
 });

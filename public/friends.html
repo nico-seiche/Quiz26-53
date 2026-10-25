@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#5b4de8">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Quiz">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <title>Quiz – Freunde</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/profile">← Profil</a>
+    <strong>Freunde</strong>
+    <span></span>
+  </header>
+  <main>
+    <div class="card">
+      <div class="muted">Deine ID – gib sie Freunden, damit sie dich finden</div>
+      <div class="row" style="margin-top:.3rem">
+        <span class="friend-code" id="my-code">#…</span>
+        <button type="button" id="copy-code">Kopieren</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-bottom:.5rem">Spieler suchen</h2>
+      <div class="suggest-box">
+        <input type="text" id="search" placeholder="Name oder #ID eingeben" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Spieler suchen">
+        <div class="suggest-list" id="suggest" hidden></div>
+      </div>
+      <p class="muted" id="search-hint" style="margin:.5rem 0 0">Tippe mindestens 2 Buchstaben oder einen Teil der ID (z. B. #123).</p>
+      <p class="error" id="error" style="margin-bottom:0"></p>
+    </div>
+
+    <div class="card" id="incoming-card" hidden>
+      <h2 style="margin-bottom:.5rem">Anfragen an dich</h2>
+      <div id="incoming" class="friend-list"></div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-bottom:.5rem">Deine Freunde <span class="muted" id="friend-count"></span></h2>
+      <div id="friends" class="friend-list"></div>
+    </div>
+
+    <div class="card" id="outgoing-card" hidden>
+      <h2 style="margin-bottom:.5rem">Gesendete Anfragen</h2>
+      <div id="outgoing" class="friend-list"></div>
+    </div>
+  </main>
+  <script src="/js/changelog.js"></script>
+  <script src="/js/common.js"></script>
+  <script>
+    let data = null;
+    const person = (u, actions) => `
+      <div class="friend-row">
+        ${avatarHtml(u.username, '2.4rem')}
+        <div class="friend-name"><strong>${escapeHtml(u.username)}</strong> <span class="muted">${escapeHtml(u.code)}</span></div>
+        <div class="row">${actions}</div>
+      </div>`;
+
+    async function load() {
+      data = await api('/api/friends');
+      $('#my-code').textContent = data.code;
+      $('#friend-count').textContent = data.friends.length ? `(${data.friends.length})` : '';
+      $('#friends').innerHTML = data.friends.length
+        ? data.friends.map((u) => person(u, `<button type="button" class="danger" data-remove="${escapeHtml(u.username)}">Entfernen</button>`)).join('')
+        : '<p class="muted" style="margin:0">Noch keine Freunde – such oben nach Namen oder ID.</p>';
+      $('#incoming-card').hidden = !data.incoming.length;
+      $('#incoming').innerHTML = data.incoming.map((u) => person(u,
+        `<button type="button" class="primary" data-accept="${escapeHtml(u.username)}">Annehmen</button>
+         <button type="button" data-remove="${escapeHtml(u.username)}">Ablehnen</button>`)).join('');
+      $('#outgoing-card').hidden = !data.outgoing.length;
+      $('#outgoing').innerHTML = data.outgoing.map((u) => person(u, `<button type="button" data-remove="${escapeHtml(u.username)}">Zurückziehen</button>`)).join('');
+    }
+
+    async function act(fn) {
+      $('#error').textContent = '';
+      try { await fn(); await load(); } catch (err) { $('#error').textContent = err.message; }
+    }
+
+    document.querySelector('main').addEventListener('click', (e) => {
+      const t = e.target;
+      if (t.dataset.accept) act(() => api('/api/friends/accept', { method: 'POST', body: { user: t.dataset.accept } }));
+      else if (t.dataset.remove) {
+        const name = t.dataset.remove;
+        const isFriend = data.friends.some((f) => f.username === name);
+        if (!isFriend || confirm(`${name} aus deinen Freunden entfernen?`)) act(() => api(`/api/friends/${encodeURIComponent(name)}`, { method: 'DELETE' }));
+      } else if (t.dataset.request) {
+        act(async () => { await api('/api/friends/request', { method: 'POST', body: { user: t.dataset.request } }); await search(); });
+      }
+    });
+
+    // --- Suche mit Vorschlägen ---
+    let timer = null;
+    let seq = 0;
+    async function search() {
+      const q = $('#search').value.trim();
+      const mine = ++seq;
+      if (q.length < 1 || (!/^#?\d+$/.test(q) && q.length < 2)) { $('#suggest').hidden = true; return; }
+      let list = [];
+      try { list = await api(`/api/friends/search?q=${encodeURIComponent(q)}`); } catch { return; }
+      if (mine !== seq) return;   // eine neuere Eingabe ist schon unterwegs
+      const label = { none: (u) => `<button type="button" class="primary" data-request="${escapeHtml(u.username)}">＋ Anfrage</button>`,
+        requested: () => '<span class="tag">Angefragt</span>', friend: () => '<span class="tag">✓ Freund</span>',
+        incoming: (u) => `<button type="button" class="primary" data-accept="${escapeHtml(u.username)}">Annehmen</button>` };
+      $('#suggest').innerHTML = list.length ? list.map((u) => person(u, label[u.relation](u))).join('')
+        : '<div class="muted" style="padding:.7rem">Niemand gefunden.</div>';
+      $('#suggest').hidden = false;
+    }
+    $('#search').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(search, 180); });
+    $('#search').addEventListener('keydown', (e) => {
+      // Enter sendet direkt eine Anfrage, wenn genau eine Person vorgeschlagen wird
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const only = $('#suggest').querySelectorAll('[data-request]');
+      if (only.length === 1) only[0].click();
+    });
+    document.addEventListener('click', (e) => { if (!e.target.closest('.suggest-box') && !e.target.closest('[data-request]')) $('#suggest').hidden = true; });
+    $('#search').addEventListener('focus', () => { if ($('#suggest').innerHTML) search(); });
+
+    $('#copy-code').onclick = async () => {
+      try { await navigator.clipboard.writeText(data.code); $('#copy-code').textContent = 'Kopiert ✓'; } catch { $('#copy-code').textContent = data.code; }
+      setTimeout(() => { $('#copy-code').textContent = 'Kopieren'; }, 1500);
+    };
+
+    requireLogin().then((me) => { mountNav('profile', me); load(); });
+  </script>
+</body>
+</html>

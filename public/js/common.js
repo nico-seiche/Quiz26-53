@@ -130,6 +130,7 @@ function mountNav(active, me) {
     <a href="${item.href}" ${item.id === active ? 'aria-current="page"' : ''}>
       <span class="nav-icon" aria-hidden="true">${item.icon}</span>
       <span>${item.label}</span>
+      ${item.id === 'profile' && me && me.friendRequests ? `<span class="nav-dot" aria-label="${me.friendRequests} Freundschaftsanfragen">${me.friendRequests}</span>` : ''}
     </a>`).join('');
   document.body.appendChild(nav);
 

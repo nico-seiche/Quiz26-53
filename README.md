@@ -81,9 +81,13 @@ Die Oberfläche folgt einem weichen Verlaufs-Design mit runden Karten, Level-Anz
 - **Sammler-Titel:** Einsteiger, Entdecker, Sammler, Legende je nach Anzahl der Erfolge.
 - Avatare sind der Anfangsbuchstabe auf einem Farbverlauf, Fach-Symbole Emojis.
 
+## Freunde
+
+Jeder Nutzer hat eine eindeutige fünfstellige ID (`quiz.users.friend_code`, 10000–99999, angezeigt als `#12345`; bei der Registrierung zufällig vergeben, Bestandsnutzer wurden per Migration `013_friends.sql` nachträglich versorgt). Unter **Profil → Freunde** (`/friends`) sucht man Spieler nach Namen (Teilstück) oder ID (Anfang); Treffer erscheinen beim Tippen als Vorschläge (`GET /api/friends/search`). Eine Anfrage wird erst mit „Annehmen“ zur Freundschaft; hat die Person schon angefragt, entsteht die Freundschaft sofort. Offene Anfragen zeigt ein roter Zähler am Profil-Symbol der Navigation. Interagieren kann man mit Freunden bisher nur, indem man sie im Quiz-Editor zum gemeinsamen Bearbeiten einlädt – dort werden Freunde beim Tippen vorgeschlagen, und nur Freunde lassen sich einladen (Tabelle `quiz.friendships`).
+
 ## Gemeinsam an Quiz arbeiten
 
-Im Quiz-Editor lädt der Besitzer unter „Zusammen bearbeiten“ andere Nutzer per Nutzername ein (Tabelle `quiz.quiz_collaborators`). Eingeladene sehen das Quiz in „Quiz“ (mit „von …“), dürfen Fragen, Titel, Fach und Modus ändern und das Quiz starten; Löschen sowie Einladen/Entfernen anderer bleibt dem Besitzer, jeder kann sich selbst aus einem Quiz austragen. Speichern prüft eine Version (`updated_at`): hat jemand anderes inzwischen gespeichert, antwortet die API mit `409` und der Editor fragt, ob die eigene Version trotzdem gespeichert werden soll. Es gibt keine Live-Zusammenarbeit im selben Moment – jeder speichert für sich. Lernsets lassen sich bisher nur teilen (ansehen/kopieren), nicht gemeinsam bearbeiten.
+Im Quiz-Editor lädt der Besitzer unter „Zusammen bearbeiten“ Freunde (Name oder #ID) ein (Tabelle `quiz.quiz_collaborators`). Eingeladene sehen das Quiz in „Quiz“ (mit „von …“), dürfen Fragen, Titel, Fach und Modus ändern und das Quiz starten; Löschen sowie Einladen/Entfernen anderer bleibt dem Besitzer, jeder kann sich selbst aus einem Quiz austragen. Speichern prüft eine Version (`updated_at`): hat jemand anderes inzwischen gespeichert, antwortet die API mit `409` und der Editor fragt, ob die eigene Version trotzdem gespeichert werden soll. Es gibt keine Live-Zusammenarbeit im selben Moment – jeder speichert für sich. Lernsets lassen sich bisher nur teilen (ansehen/kopieren), nicht gemeinsam bearbeiten.
 
 ## Lernen (Lernsets)
 

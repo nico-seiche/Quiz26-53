@@ -36,9 +36,13 @@
       <h2 style="margin-bottom:.25rem">👥 Zusammen bearbeiten</h2>
       <p class="muted" id="team-info" style="margin-top:0"></p>
       <div id="team-list" class="row"></div>
-      <div class="row" id="team-add" style="margin-top:.75rem;flex-wrap:nowrap">
-        <input type="text" id="team-name" placeholder="Nutzername deines Freundes" autocomplete="off" autocapitalize="off" spellcheck="false">
-        <button type="button" id="team-invite">Einladen</button>
+      <div id="team-add" style="margin-top:.75rem">
+        <div class="row" style="flex-wrap:nowrap">
+          <input type="text" id="team-name" placeholder="Freund suchen …" autocomplete="off" autocapitalize="off" spellcheck="false">
+          <button type="button" id="team-invite">Einladen</button>
+        </div>
+        <div class="suggest-list team-suggest" id="team-suggest" hidden></div>
+        <p class="muted" id="team-nofriends" style="margin:.5rem 0 0" hidden>Du kannst nur Freunde einladen. <a href="/friends">Freunde hinzufügen →</a></p>
       </div>
       <p class="error" id="team-error" style="margin-bottom:0"></p>
     </div>
@@ -158,7 +162,7 @@
       $('#team-card').hidden = false;
       $('#team-add').hidden = !quiz.isOwner;
       $('#team-info').textContent = quiz.isOwner
-        ? 'Lade Freunde ein: Sie können Fragen bearbeiten und das Quiz starten, löschen können nur du. Wer angemeldet ist, sieht das Quiz unter „Quiz“.'
+        ? 'Lade Freunde ein: Sie können Fragen bearbeiten und das Quiz starten, löschen können nur du.'
         : `Dieses Quiz gehört ${quiz.owner}. Du kannst Fragen bearbeiten und es starten.`;
       const chips = [`<span class="tag">👑 ${escapeHtml(quiz.owner)}${quiz.isOwner ? ' (du)' : ''}</span>`]
         .concat(quiz.collaborators.map((name) => {
@@ -178,8 +182,37 @@
       const { username: name } = await api(`/api/quizzes/${id}/collaborators`, { method: 'POST', body: { username } });
       if (!team.collaborators.some((n) => n.toLowerCase() === name.toLowerCase())) team.collaborators.push(name);
       $('#team-name').value = '';
+      $('#team-suggest').hidden = true;
       showTeam(team);
     });
+    // Vorschläge aus der Freundesliste (Name oder #ID), schon eingeladene ausgeblendet
+    let friends = null;
+    async function loadFriends() {
+      if (friends) return friends;
+      try { friends = (await api('/api/friends')).friends; } catch { friends = []; }
+      $('#team-nofriends').hidden = friends.length > 0;
+      return friends;
+    }
+    async function suggest() {
+      const list = await loadFriends();
+      const q = $('#team-name').value.trim().toLowerCase().replace(/^#/, '');
+      const taken = new Set((team ? team.collaborators : []).map((n) => n.toLowerCase()));
+      const hits = list.filter((f) => !taken.has(f.username.toLowerCase())
+        && (!q || f.username.toLowerCase().includes(q) || f.code.slice(1).startsWith(q))).slice(0, 6);
+      $('#team-suggest').innerHTML = hits.map((f) => `
+        <div class="friend-row">${avatarHtml(f.username, '2rem')}
+          <div class="friend-name"><strong>${escapeHtml(f.username)}</strong> <span class="muted">${escapeHtml(f.code)}</span></div>
+          <button type="button" class="primary" data-pick="${escapeHtml(f.username)}">Einladen</button></div>`).join('');
+      $('#team-suggest').hidden = !hits.length;
+    }
+    $('#team-name').addEventListener('input', suggest);
+    $('#team-name').addEventListener('focus', suggest);
+    $('#team-suggest').addEventListener('click', (e) => {
+      if (!e.target.dataset.pick) return;
+      $('#team-name').value = e.target.dataset.pick;
+      $('#team-invite').click();
+    });
+    document.addEventListener('click', (e) => { if (!e.target.closest('#team-add')) $('#team-suggest').hidden = true; });
     $('#team-name').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); $('#team-invite').click(); } };
     $('#team-list').onclick = (e) => {
       const name = e.target.dataset.remove;

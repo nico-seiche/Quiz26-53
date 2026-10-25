@@ -27,9 +27,15 @@
         <div class="muted">Angemeldet als</div>
         <h1 id="name" style="margin:0">…</h1>
         <span class="level-badge" id="profile-level"></span>
+        <span class="tag" id="profile-code" title="Deine Freunde-ID"></span>
         <div class="muted level-next" id="profile-next"></div>
       </div>
     </div>
+
+    <a class="card friend-link" href="/friends" id="friend-link">
+      <span>👫 Freunde &amp; ID</span>
+      <span class="muted" id="friend-hint">Freunde finden und hinzufügen →</span>
+    </a>
 
     <div class="card">
       <h2>Meine Statistik</h2>
@@ -109,6 +115,8 @@
       $('#name').textContent = me.username;
       $('#profile-avatar').innerHTML = avatarHtml(me.username, '4.5rem');
       $('#profile-level').textContent = `🏅 Level ${me.level}`;
+      $('#profile-code').textContent = me.code ? `#${me.code}` : '';
+      if (me.friendRequests) $('#friend-hint').innerHTML = `<span class="tag">${me.friendRequests} ${me.friendRequests === 1 ? 'Anfrage' : 'Anfragen'}</span>`;
       $('#profile-next').textContent = `Noch ${me.toNext.toLocaleString('de-DE')} Punkte bis Level ${me.level + 1}`;
       mountNav('profile', me);
       loadResults();

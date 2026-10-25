@@ -2,6 +2,15 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-10-25b',
+    title: 'Neu: Freunde',
+    items: [
+      ['#️⃣', 'Deine ID', 'Jeder hat jetzt eine fünfstellige ID wie #12345. Du findest sie unter Profil → Freunde.'],
+      ['🔎', 'Freunde finden', 'Such nach Namen oder ID – passende Spieler werden beim Tippen vorgeschlagen. Eine Anfrage wird erst mit „Annehmen“ zur Freundschaft.'],
+      ['👥', 'Zum Quiz einladen', 'Freunde kannst du im Quiz-Editor zum gemeinsamen Bearbeiten einladen.'],
+    ],
+  },
+  {
     id: '2026-10-25',
     title: 'Neu: Gemeinsam an Quiz arbeiten',
     items: [

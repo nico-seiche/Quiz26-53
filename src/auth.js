@@ -68,10 +68,20 @@ router.post('/register', async (req, res) => {
   if (exists) return res.status(409).json({ error: 'Nutzername ist schon vergeben' });
 
   const hash = await bcrypt.hash(password, 10);
-  const user = await db.one(
-    'INSERT INTO quiz.users (username, password_hash) VALUES ($1, $2) RETURNING id',
-    [username, hash],
-  );
+  // Fünfstellige Freunde-ID (10000–99999); bei Kollision (selten) neu würfeln
+  let user = null;
+  for (let attempt = 0; attempt < 30 && !user; attempt++) {
+    const code = String(10000 + Math.floor(Math.random() * 90000));
+    try {
+      user = await db.one(
+        'INSERT INTO quiz.users (username, password_hash, friend_code) VALUES ($1, $2, $3) RETURNING id',
+        [username, hash, code],
+      );
+    } catch (err) {
+      if (err.code !== '23505' || !/friend_code/.test(err.constraint || err.detail || '')) throw err;
+    }
+  }
+  if (!user) return res.status(503).json({ error: 'Gerade keine freie ID – bitte noch einmal versuchen' });
   setSessionCookie(req, res, await createSession(user.id));
   res.json({ id: Number(user.id), username });
 });
@@ -101,7 +111,11 @@ router.get('/me', async (req, res) => {
     'SELECT COALESCE(SUM(score), 0)::int AS points FROM quiz.game_results WHERE user_id = $1 AND player_count >= $2',
     [req.user.id, MIN_PLAYERS_FOR_SCORING],
   );
-  res.json({ ...req.user, points, ...levelInfo(points) });
+  const [{ friend_code: code }, { requests }] = await Promise.all([
+    db.one('SELECT friend_code FROM quiz.users WHERE id = $1', [req.user.id]),
+    db.one("SELECT COUNT(*)::int AS requests FROM quiz.friendships WHERE addressee_id = $1 AND status = 'pending'", [req.user.id]),
+  ]);
+  res.json({ ...req.user, code, friendRequests: requests, points, ...levelInfo(points) });
 });
 
 module.exports = { router, loadUser, requireAuth };
