@@ -2,6 +2,15 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-10-26',
+    title: 'Neu: Battle',
+    items: [
+      ['⚔️', 'Gegen einen Freund spielen', 'Fordere unter „Lernen“ bei einem Lernset einen Freund zum Lückentext-Battle heraus.'],
+      ['⏱️', 'Gleichzeitig, schnell und genau', 'Ihr füllt in 5 Runden dieselben Lücken aus. Jede richtige Lücke zählt, wer alles richtig hat, bekommt einen Tempo-Bonus.'],
+      ['🏆', 'Sieg & Revanche', 'Am Ende siehst du das Ergebnis jeder Runde – und kannst direkt Revanche fordern.'],
+    ],
+  },
+  {
     id: '2026-10-25c',
     title: 'Neu: Gleichzeitig bearbeiten',
     items: [

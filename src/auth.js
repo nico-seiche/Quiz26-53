@@ -111,11 +111,12 @@ router.get('/me', async (req, res) => {
     'SELECT COALESCE(SUM(score), 0)::int AS points FROM quiz.game_results WHERE user_id = $1 AND player_count >= $2',
     [req.user.id, MIN_PLAYERS_FOR_SCORING],
   );
-  const [{ friend_code: code }, { requests }] = await Promise.all([
+  const [{ friend_code: code }, { requests }, battleInvites] = await Promise.all([
     db.one('SELECT friend_code FROM quiz.users WHERE id = $1', [req.user.id]),
     db.one("SELECT COUNT(*)::int AS requests FROM quiz.friendships WHERE addressee_id = $1 AND status = 'pending'", [req.user.id]),
+    require('./battles').inviteCount(req.user.id),
   ]);
-  res.json({ ...req.user, code, friendRequests: requests, points, ...levelInfo(points) });
+  res.json({ ...req.user, code, friendRequests: requests, battleInvites, points, ...levelInfo(points) });
 });
 
 module.exports = { router, loadUser, requireAuth };

@@ -527,3 +527,17 @@ button.tw.bad:hover:not(:disabled) { transform: none; }
 .feature-list div { display: flex; flex-direction: column; min-width: 0; }
 .feature-list .muted { font-size: .92rem; }
 .features-link { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .8rem 1rem; margin-bottom: 1rem; border-radius: var(--radius); text-decoration: none; font-weight: 800; color: #fff; background: var(--primary-grad); box-shadow: var(--glow); }
+
+/* Battle */
+.battle-score { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: .5rem; }
+.battle-side { display: flex; align-items: center; gap: .6rem; min-width: 0; }
+.battle-side.right { justify-content: flex-end; text-align: right; }
+.battle-side strong { overflow-wrap: anywhere; }
+.battle-points { font-size: 1.5rem; font-weight: 800; line-height: 1.1; }
+.battle-vs { font-weight: 800; color: var(--muted); text-align: center; font-size: .9rem; }
+.battle-result { padding: .6rem 0; border-top: 1px solid var(--border); }
+.battle-history { text-align: left; display: grid; gap: .35rem; max-width: 26rem; margin: 0 auto; }
+.link-btn { border: 0; background: transparent; box-shadow: none; color: var(--muted); font-weight: 600; text-decoration: underline; }
+
+.battle-banner { display: block; text-decoration: none; color: var(--text); font-weight: 800; border: 2px solid #f59e0b; background: color-mix(in srgb, #f59e0b 14%, var(--card)); }
+#duel[hidden] { display: none; }

@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#5b4de8">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Quiz">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png?v=2">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2">
+  <title>Quiz – Battle</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/study">← Lernen</a>
+    <strong>⚔️ Battle</strong>
+    <span></span>
+  </header>
+  <main>
+    <p class="error" id="error"></p>
+    <div id="stage"></div>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="/js/cloze.js"></script>
+  <script src="/js/common.js"></script>
+  <script>
+    const id = new URLSearchParams(location.search).get('id');
+    const stage = $('#stage');
+    let state = null;
+    let offset = 0;            // Uhrzeit-Differenz Server − Browser
+    let shownKey = '';
+    let autoSent = false;
+
+    const nf = (n) => n.toLocaleString('de-DE');
+    const remaining = () => Math.max(0, (state.endsAt - (Date.now() + offset)) / 1000);
+
+    function scoreboard(s) {
+      return `
+        <div class="card battle-score">
+          <div class="battle-side">${avatarHtml(s.me.username, '2.6rem')}<div><strong>Du</strong><div class="battle-points" id="my-score">${nf(s.me.score)}</div></div></div>
+          <div class="battle-vs">${s.status === 'active' || s.status === 'finished' ? `Runde ${Math.min(s.round, s.rounds)}/${s.rounds}` : '⚔️'}</div>
+          <div class="battle-side right"><div><strong>${escapeHtml(s.opponent.username)}</strong><div class="battle-points" id="their-score">${nf(s.opponent.score)}</div></div>${avatarHtml(s.opponent.username, '2.6rem')}</div>
+        </div>`;
+    }
+
+    // Lückentext der Runde: Anzeige-Tokens vom Server (Lösungen sind nicht enthalten)
+    function clozeHtml(tokens, disabled) {
+      let n = 0;
+      return tokens.map((t) => t.blank
+        ? `<input class="cloze-input" type="text" data-i="${n++}" ${disabled ? 'disabled' : ''} autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Lücke ${n}" style="--w:${Math.max(4, t.len + 1)}ch">`
+        : escapeHtml(t.text)).join('');
+    }
+
+    function render() {
+      const s = state;
+      const key = [s.status, s.round, s.phase, s.submitted].join('|');
+      // Nur neu zeichnen, wenn sich der Abschnitt ändert; sonst gingen getippte Wörter verloren
+      if (key === shownKey) { liveParts(); return; }
+      shownKey = key;
+      autoSent = false;
+      if (s.status === 'invited') return renderInvite(s);
+      if (s.status === 'declined' || s.status === 'cancelled') {
+        stage.innerHTML = `<div class="card" style="text-align:center"><div class="score-big">${s.status === 'declined' ? '🙅' : '🚫'}</div>
+          <p>${s.status === 'declined' ? 'Die Einladung wurde abgelehnt.' : 'Die Einladung wurde zurückgezogen.'}</p><a class="btn" href="/study">Zurück</a></div>`;
+        return;
+      }
+      if (s.status === 'finished') return renderFinished(s);
+      if (s.phase === 'question') return renderQuestion(s);
+      return renderReveal(s);
+    }
+
+    function renderInvite(s) {
+      const mine = s.youAreChallenger;
+      stage.innerHTML = scoreboard(s) + `
+        <div class="card" style="text-align:center">
+          <div class="score-big">⚔️</div>
+          ${mine
+            ? `<h2>Warte auf ${escapeHtml(s.opponent.username)} …</h2><p class="muted">Du hast ${escapeHtml(s.opponent.username)} zu einem Lückentext-Battle mit „${escapeHtml(s.setTitle)}“ herausgefordert. Das Battle startet, sobald die Einladung angenommen wird.</p>
+               <button type="button" id="decline">Einladung zurückziehen</button>`
+            : `<h2>${escapeHtml(s.opponent.username)} fordert dich heraus!</h2><p class="muted">Lückentext-Battle mit „${escapeHtml(s.setTitle)}“: ihr füllt gleichzeitig dieselben Lücken aus, schneller und richtiger gewinnt.</p>
+               <div class="row" style="justify-content:center"><button type="button" class="primary" id="accept">Annehmen</button><button type="button" id="decline">Ablehnen</button></div>`}
+        </div>`;
+      if ($('#accept')) $('#accept').onclick = () => post('accept');
+      $('#decline').onclick = () => post('decline');
+    }
+
+    function renderQuestion(s) {
+      stage.innerHTML = scoreboard(s) + `
+        <div class="card">
+          <div class="level-bar" aria-hidden="true"><span id="timer-bar" style="width:100%"></span></div>
+          <div class="row spread" style="margin:.5rem 0 .2rem"><span class="muted" id="timer-text"></span><span class="tag" id="opp-status"></span></div>
+          <h2 style="margin:.2rem 0 1rem">${escapeHtml(s.question.term)}</h2>
+          <div class="cloze-text" id="cloze">${clozeHtml(s.question.tokens, s.submitted)}</div>
+          <div class="row" style="margin-top:1rem">
+            <button type="button" class="primary" id="submit" ${s.submitted ? 'disabled' : ''}>${s.submitted ? 'Abgegeben ✓' : 'Abgeben'}</button>
+            <button type="button" id="forfeit" class="link-btn">Aufgeben</button>
+          </div>
+        </div>`;
+      const inputs = [...document.querySelectorAll('.cloze-input')];
+      if (!s.submitted) {
+        inputs[0] && inputs[0].focus();
+        inputs.forEach((inp, k) => inp.addEventListener('keydown', (e) => {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          if (k < inputs.length - 1) inputs[k + 1].focus(); else submit();
+        }));
+      }
+      $('#submit').onclick = submit;
+      $('#forfeit').onclick = () => { if (confirm('Wirklich aufgeben? Dann gewinnt dein Gegner.')) post('forfeit'); };
+      liveParts();
+    }
+
+    // Teile, die sich laufend ändern, ohne die Eingabefelder anzufassen
+    function liveParts() {
+      const s = state;
+      if ($('#my-score')) { $('#my-score').textContent = nf(s.me.score); $('#their-score').textContent = nf(s.opponent.score); }
+      if (s.status === 'active' && s.phase === 'question' && $('#opp-status')) {
+        $('#opp-status').textContent = s.opponentSubmitted ? `✓ ${s.opponent.username} ist fertig` : `${s.opponent.username} tippt …`;
+        const left = remaining();
+        $('#timer-text').textContent = s.submitted ? 'Warte auf die Auflösung …' : `Noch ${Math.ceil(left)} s`;
+        $('#timer-bar').style.width = `${(left / s.config.roundSeconds) * 100}%`;
+        // Zeit abgelaufen: das bisher Getippte automatisch abgeben
+        if (left <= 0 && !s.submitted && !autoSent) { autoSent = true; submit(); }
+      }
+      if (s.status === 'active' && s.phase === 'reveal' && $('#next-in')) $('#next-in').textContent = Math.ceil(remaining());
+    }
+
+    function renderReveal(s) {
+      const r = s.reveal;
+      const mineHtml = (who, res) => {
+        let n = 0;
+        const text = s.question.tokens.map((t) => {
+          if (!t.blank) return escapeHtml(t.text);
+          const i = n++;
+          const given = (res.answers[i] || '').trim();
+          const ok = Cloze.matches(given, r.expected[i]);
+          return ok ? `<span class="w-ok">${escapeHtml(r.expected[i])}</span>`
+            : `<span class="w-missing">${escapeHtml(r.expected[i])}</span>${given ? `<span class="muted"> (${escapeHtml(given)})</span>` : ''}`;
+        }).join('');
+        return `<div class="battle-result"><div class="row spread"><strong>${who}</strong><span><strong>${res.correct}/${r.expected.length}</strong> richtig · <strong>+${nf(res.points)}</strong></span></div><div class="cloze-text" style="font-size:1rem;line-height:2">${text}</div></div>`;
+      };
+      stage.innerHTML = scoreboard(s) + `
+        <div class="card">
+          <h2 style="margin-top:0">${escapeHtml(s.question.term)}</h2>
+          ${mineHtml('Du', r.mine)}
+          ${mineHtml(escapeHtml(s.opponent.username), r.theirs)}
+          <p class="muted" style="margin-bottom:0">${s.round >= s.rounds ? 'Ergebnis in' : 'Nächste Runde in'} <span id="next-in">${Math.ceil(remaining())}</span> s</p>
+        </div>`;
+    }
+
+    function renderFinished(s) {
+      const head = { win: ['🏆', 'Du hast gewonnen!'], loss: ['😅', `${s.winner} gewinnt`], draw: ['🤝', 'Unentschieden'] }[s.result];
+      stage.innerHTML = scoreboard(s) + `
+        <div class="card" style="text-align:center">
+          <div class="score-big">${head[0]} ${head[1]}</div>
+          <p class="muted">${nf(s.me.score)} : ${nf(s.opponent.score)} · Lernset „${escapeHtml(s.setTitle)}“</p>
+          <div class="battle-history">${s.history.map((h, i) => `<div class="row spread"><span>${i + 1}. ${escapeHtml(h.term)}</span><span><strong class="${h.mine > h.theirs ? 'w-ok' : ''}">${nf(h.mine)}</strong> : <strong class="${h.theirs > h.mine ? 'w-ok' : ''}">${nf(h.theirs)}</strong></span></div>`).join('')}</div>
+          <div class="row" style="justify-content:center;margin-top:1rem">
+            ${s.setId ? '<button type="button" class="primary" id="rematch">⚔️ Revanche</button>' : ''}
+            <a class="btn" href="/study">Zurück</a>
+          </div>
+        </div>`;
+      if ($('#rematch')) $('#rematch').onclick = async () => {
+        try { const { id: nid } = await api('/api/battles', { method: 'POST', body: { setId: s.setId, friend: s.opponent.username } }); location.href = `/battle?id=${nid}`; }
+        catch (err) { $('#error').textContent = err.message; }
+      };
+    }
+
+    async function post(action, body) {
+      $('#error').textContent = '';
+      try { apply(await api(`/api/battles/${id}/${action}`, { method: 'POST', body })); }
+      catch (err) { $('#error').textContent = err.message; }
+    }
+
+    function submit() {
+      if (!state || state.submitted) return;
+      const answers = [...document.querySelectorAll('.cloze-input')].map((i) => i.value);
+      document.querySelectorAll('.cloze-input').forEach((i) => { i.disabled = true; });
+      $('#submit').disabled = true; $('#submit').textContent = 'Wird abgegeben …';
+      post('answer', { answers });
+    }
+
+    function apply(s) {
+      offset = s.serverNow - Date.now();
+      state = s;
+      render();
+    }
+
+    let busy = false;
+    async function refresh() {
+      if (busy) return;
+      busy = true;
+      try { apply(await api(`/api/battles/${id}`)); } catch (err) { $('#error').textContent = err.message; } finally { busy = false; }
+    }
+
+    requireLogin().then(async (me) => {
+      mountNav('study', me);
+      if (!id) { location.href = '/study'; return; }
+      await refresh();
+      setInterval(refresh, 1500);
+      setInterval(() => { if (state) liveParts(); }, 250);
+      api('/api/config').then((cfg) => {
+        if (!cfg.supabaseUrl || !cfg.supabaseKey || !window.supabase) return;
+        window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey).channel(`game:b${id}`).on('broadcast', { event: 'update' }, refresh).subscribe();
+      }).catch(() => {});
+    });
+  </script>
+</body>
+</html>

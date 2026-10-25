@@ -21,6 +21,8 @@
     <span id="me"></span>
   </header>
   <main>
+    <div id="battles"></div>
+
     <div class="row spread section-head">
       <h2>Meine Lernsets</h2>
       <a class="btn primary" href="/study-edit">+ Neues Lernset</a>
@@ -31,6 +33,15 @@
     <div class="section-head" style="margin-top:2rem"><h2>Von anderen geteilt</h2></div>
     <div class="recent-list" id="shared"></div>
   </main>
+  <div class="changelog-backdrop" id="duel" hidden>
+    <div class="changelog card" role="dialog" aria-modal="true" aria-labelledby="duel-title">
+      <button type="button" class="changelog-x" id="duel-close" aria-label="Schließen">✕</button>
+      <h2 id="duel-title">⚔️ Freund herausfordern</h2>
+      <p class="muted" id="duel-info"></p>
+      <div id="duel-list" class="friend-list"></div>
+      <p class="error" id="duel-error"></p>
+    </div>
+  </div>
   <script src="/js/changelog.js"></script>
   <script src="/js/common.js"></script>
   <script>
@@ -53,6 +64,7 @@
           </div>
           <div class="recent-meta">
             <a class="btn primary" href="/learn?id=${s.id}">Lernen</a>
+            ${s.card_count >= 3 ? `<button type="button" data-battle="${s.id}" data-title="${escapeHtml(s.title)}" title="Einen Freund zum Lückentext-Battle herausfordern">⚔️ Battle</button>` : ''}
             ${s.mine
               ? `<a class="btn" href="/study-edit?id=${s.id}">Bearbeiten</a>
                  <button class="danger" type="button" data-delete="${s.id}">Löschen</button>`
@@ -70,7 +82,45 @@
         : '<div class="card muted">Noch hat niemand ein Lernset geteilt.</div>';
     }
 
+    // --- Battle: Übersicht und Herausfordern ---
+    async function loadBattles() {
+      let b;
+      try { b = await api('/api/battles'); } catch { return; }
+      const row = (x, right) => `<div class="friend-row">${avatarHtml(x.opponent, '2.2rem')}<div class="friend-name"><strong>${escapeHtml(x.opponent)}</strong> <span class="muted">· ${escapeHtml(x.setTitle)}</span></div><div class="row">${right}</div></div>`;
+      const parts = [];
+      if (b.invites.length) parts.push(`<h3>Herausforderungen an dich</h3>${b.invites.map((x) => row(x, `<a class="btn primary" href="/battle?id=${x.id}">Ansehen</a>`)).join('')}`);
+      if (b.active.length) parts.push(`<h3>Läuft gerade</h3>${b.active.map((x) => row(x, `<a class="btn primary" href="/battle?id=${x.id}">Weiterspielen</a>`)).join('')}`);
+      if (b.waiting.length) parts.push(`<h3>Wartet auf Antwort</h3>${b.waiting.map((x) => row(x, `<a class="btn" href="/battle?id=${x.id}">Öffnen</a>`)).join('')}`);
+      if (b.recent.length) parts.push(`<h3>Letzte Battles</h3>${b.recent.map((x) => row(x, `<span class="tag">${{ win: '🏆 Sieg', loss: 'Niederlage', draw: '🤝 Remis' }[x.result]} ${nf(x.myScore)}:${nf(x.theirScore)}</span>`)).join('')}`);
+      $('#battles').innerHTML = parts.length ? `<div class="card"><h2 style="margin-bottom:.4rem">⚔️ Battle</h2>${parts.join('')}</div>` : '';
+    }
+
+    let duelSet = null;
+    async function openDuel(setId, title) {
+      duelSet = setId;
+      $('#duel-error').textContent = '';
+      $('#duel-info').textContent = `Lückentext-Battle mit „${title}“ – du und dein Freund füllt gleichzeitig dieselben Lücken aus.`;
+      $('#duel-list').innerHTML = '<span class="muted">Lade Freunde …</span>';
+      $('#duel').hidden = false;
+      const { friends } = await api('/api/friends');
+      $('#duel-list').innerHTML = friends.length ? friends.map((f) => `
+        <div class="friend-row">${avatarHtml(f.username, '2.2rem')}<div class="friend-name"><strong>${escapeHtml(f.username)}</strong> <span class="muted">${escapeHtml(f.code)}</span></div>
+        <button type="button" class="primary" data-challenge="${escapeHtml(f.username)}">Herausfordern</button></div>`).join('')
+        : '<p class="muted">Du hast noch keine Freunde. <a href="/friends">Freunde hinzufügen →</a></p>';
+    }
+    $('#duel-close').onclick = () => { $('#duel').hidden = true; };
+    $('#duel').addEventListener('click', async (e) => {
+      if (e.target === $('#duel')) $('#duel').hidden = true;
+      const friend = e.target.dataset.challenge;
+      if (!friend) return;
+      try {
+        const { id } = await api('/api/battles', { method: 'POST', body: { setId: duelSet, friend } });
+        location.href = `/battle?id=${id}`;
+      } catch (err) { $('#duel-error').textContent = err.message; }
+    });
+
     document.querySelector('main').onclick = async (e) => {
+      if (e.target.dataset.battle) return openDuel(e.target.dataset.battle, e.target.dataset.title);
       const del = e.target.dataset.delete;
       const copy = e.target.dataset.copy;
       try {
@@ -89,6 +139,8 @@
     requireLogin().then((me) => {
       mountNav('study', me);
       load();
+      loadBattles();
+      setInterval(loadBattles, 8000);
     });
   </script>
 </body>

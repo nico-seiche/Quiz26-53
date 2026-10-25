@@ -22,6 +22,8 @@
   <main>
     <h1 class="hello">Hallo, <span class="hello-name" id="hello-name">…</span> 👋</h1>
 
+    <a class="card battle-banner" id="battle-banner" href="/study" hidden></a>
+
     <div class="card join-card">
       <div class="join-art" aria-hidden="true">
         <span class="spark s1">✨</span><span id="art-avatar"></span><span class="spark s2">✨</span><span class="spark s3">❓</span>
@@ -150,6 +152,7 @@
       $('#hello-name').textContent = me.username;
       $('#art-avatar').innerHTML = avatarHtml(me.username, '4.5rem');
       mountNav('home', me);
+      if (me.battleInvites) { $('#battle-banner').hidden = false; $('#battle-banner').textContent = `⚔️ ${me.battleInvites === 1 ? 'Du wurdest' : me.battleInvites + ' Herausforderungen:'} zu einem Battle herausgefordert – jetzt ansehen →`; }
       showLevel(me, 0);
       loadOverview(me);
     });
