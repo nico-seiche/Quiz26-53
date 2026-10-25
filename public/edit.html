@@ -17,6 +17,7 @@
 <body>
   <header class="top">
     <a class="brand" href="/quizzes">← Meine Quiz</a>
+    <span class="muted save-state" id="state" aria-live="polite"></span>
     <button class="primary" type="button" id="save">Speichern</button>
   </header>
   <main>
@@ -46,70 +47,213 @@
       </div>
       <p class="error" id="team-error" style="margin-bottom:0"></p>
     </div>
+    <div class="card" id="presence-card" hidden><div class="row" id="presence"></div></div>
     <div id="questions"></div>
     <button type="button" id="add">+ Frage hinzufügen</button>
     <p class="error" id="error"></p>
   </main>
   <script src="/js/common.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   <script>
     const id = new URLSearchParams(location.search).get('id');
-    let questions = [];
-    let version = null;   // Stand beim Laden, damit gleichzeitiges Speichern auffällt
+    const live = Boolean(id);          // bestehendes Quiz: Live-Bearbeitung mit Freunden; neues Quiz: einmal speichern
     let me = null;
-    let openIndex = -1;  // Akkordeon: immer höchstens eine Frage ist aufgeklappt
+    let isOwner = true;
+    let questions = [];                // { key, id, rev, text, answers[4], correct, timeLimit, lockedBy }
+    let openKey = null;                // Akkordeon: höchstens eine Frage ist aufgeklappt
+    let draftSeq = 0;
+    let presence = [];
+    let dirty = false;
+    let saveTimer = null;
+    let saving = null;                 // laufende Speicherung (Promise)
+    let metaTimer = null;
+    let notice = '';
+
+    const blank = () => ({ key: `new-${++draftSeq}`, id: null, rev: 0, text: '', answers: ['', '', '', ''], correct: 0, timeLimit: 20, lockedBy: null });
+    const fromServer = (q) => ({ key: String(q.id), id: q.id, rev: q.rev, text: q.text, answers: [...q.answers, '', '', ''].slice(0, 4), correct: q.correct, timeLimit: q.timeLimit, lockedBy: null });
+    const byKey = (key) => questions.find((q) => q.key === key);
+    const openQ = () => byKey(openKey);
+
+    function setState(text, kind = '') {
+      $('#state').textContent = text;
+      $('#state').className = `muted save-state ${kind}`;
+    }
 
     function updateModeHint() {
       $('#mode-hint').textContent = $('#mode').value === 'team'
         ? 'Die Teilnehmer werden beim Start zufällig in zwei Teams gelost (mindestens 4 Teilnehmer). Bei ungerader Zahl bekommt das kleinere Team einen Geist-Spieler 👻 mit dem Punktedurchschnitt seiner Mitspieler.'
         : 'Jeder Teilnehmer spielt für sich allein.';
     }
-    $('#mode').onchange = updateModeHint;
-
-    function blankQuestion() {
-      return { text: '', answers: ['', '', '', ''], correct: 0, timeLimit: 20 };
-    }
+    $('#mode').addEventListener('change', updateModeHint);
 
     // Titel einer zugeklappten Frage: der eingegebene Fragetext
     function questionTitle(q, i) {
       return q.text.trim() ? `${i + 1}. ${q.text.trim()}` : `Frage ${i + 1} (noch leer)`;
     }
 
-    function render() {
-      $('#questions').innerHTML = questions.map((q, i) => {
-        const open = i === openIndex;
-        return `
-        <div class="card ${open ? '' : 'collapsed'}" data-q="${i}">
-          <div class="row question-head">
-            <button type="button" class="q-toggle" data-action="toggle" aria-expanded="${open}" aria-controls="q-body-${i}">
-              <span class="chevron" aria-hidden="true">${open ? '▾' : '▸'}</span>
-              <span class="q-title">${open ? `Frage ${i + 1}` : escapeHtml(questionTitle(q, i))}</span>
-            </button>
-            <div class="row">
-              <button type="button" data-action="up" aria-label="Nach oben" ${i === 0 ? 'disabled' : ''}>↑</button>
-              <button type="button" data-action="down" aria-label="Nach unten" ${i === questions.length - 1 ? 'disabled' : ''}>↓</button>
-              <button type="button" class="danger" data-action="remove">Entfernen</button>
-            </div>
+    // --- Darstellung: jede Karte wird nur neu gezeichnet, wenn sich ihr Inhalt ändert (sonst verliert man beim Tippen den Fokus) ---
+    function cardSignature(q, i) {
+      const open = q.key === openKey && !q.lockedBy;
+      return open ? `open|${i}|${questions.length}|${live}` : JSON.stringify([i, questions.length, q.text, q.lockedBy, q.key === openKey, live]);
+    }
+
+    function cardHtml(q, i) {
+      const open = q.key === openKey && !q.lockedBy;
+      const locked = Boolean(q.lockedBy);
+      return `
+        <div class="row question-head">
+          <button type="button" class="q-toggle" data-action="toggle" aria-expanded="${open}" aria-controls="q-body-${q.key}">
+            <span class="chevron" aria-hidden="true">${open ? '▾' : locked ? '🔒' : '▸'}</span>
+            <span class="q-title">${open ? `Frage ${i + 1}` : escapeHtml(questionTitle(q, i))}</span>
+          </button>
+          ${locked ? `<span class="tag lock-tag">✏️ ${escapeHtml(q.lockedBy)} bearbeitet</span>` : ''}
+          <div class="row">
+            <button type="button" data-action="up" aria-label="Nach oben" ${i === 0 ? 'disabled' : ''}>↑</button>
+            <button type="button" data-action="down" aria-label="Nach unten" ${i === questions.length - 1 ? 'disabled' : ''}>↓</button>
+            <button type="button" class="danger" data-action="remove" ${locked ? 'disabled' : ''}>Entfernen</button>
           </div>
-          <div id="q-body-${i}" ${open ? '' : 'hidden'}>
-            <textarea rows="2" data-field="text" placeholder="Fragetext">${escapeHtml(q.text)}</textarea>
-            <label>Antworten <span class="muted">(richtige Antwort anklicken)</span></label>
-            ${q.answers.map((a, j) => `
-              <div class="answer-row">
-                <input type="radio" name="correct-${i}" data-correct="${j}" ${q.correct === j ? 'checked' : ''}>
-                <input type="text" data-answer="${j}" value="${escapeHtml(a)}" placeholder="Antwort ${j + 1}">
-              </div>`).join('')}
-            <label>Zeit (Sekunden)</label>
-            <input type="number" min="5" max="120" data-field="timeLimit" value="${q.timeLimit}" style="max-width:120px">
-          </div>
+        </div>
+        <div id="q-body-${q.key}" ${open ? '' : 'hidden'}>
+          <textarea rows="2" data-field="text" placeholder="Fragetext">${escapeHtml(q.text)}</textarea>
+          <label>Antworten <span class="muted">(richtige Antwort anklicken)</span></label>
+          ${q.answers.map((a, j) => `
+            <div class="answer-row">
+              <input type="radio" name="correct-${q.key}" data-correct="${j}" ${q.correct === j ? 'checked' : ''}>
+              <input type="text" data-answer="${j}" value="${escapeHtml(a)}" placeholder="Antwort ${j + 1}">
+            </div>`).join('')}
+          <label>Zeit (Sekunden)</label>
+          <input type="number" min="5" max="120" data-field="timeLimit" value="${q.timeLimit}" style="max-width:120px">
         </div>`;
+    }
+
+    function render() {
+      const box = $('#questions');
+      const existing = new Map([...box.children].map((el) => [el.dataset.key, el]));
+      questions.forEach((q, i) => {
+        let el = existing.get(q.key);
+        const sig = cardSignature(q, i);
+        const open = q.key === openKey && !q.lockedBy;
+        if (!el) { el = document.createElement('div'); el.dataset.key = q.key; }
+        if (el.dataset.sig !== sig) {
+          el.dataset.sig = sig;
+          el.className = `card ${open ? '' : 'collapsed'} ${q.lockedBy ? 'locked' : ''}`;
+          el.innerHTML = cardHtml(q, i);
+        }
+        existing.delete(q.key);
+        if (box.children[i] !== el) box.insertBefore(el, box.children[i] || null);
+      });
+      existing.forEach((el) => el.remove());
+    }
+
+    function renderPresence() {
+      const others = presence.filter((p) => !p.me);
+      $('#presence-card').hidden = !live || !others.length;
+      $('#presence').innerHTML = others.map((p) => {
+        const idx = questions.findIndex((q) => q.id === p.editing);
+        return `<span class="presence-chip">${avatarHtml(p.username, '1.6rem')}<span><strong>${escapeHtml(p.username)}</strong> <span class="muted">${idx >= 0 ? `· Frage ${idx + 1}` : '· schaut zu'}</span></span></span>`;
       }).join('');
     }
 
-    // Eine Frage aufklappen, alle anderen zuklappen
-    function openQuestion(i, { focus = false } = {}) {
-      openIndex = i;
+    // --- Speichern einer Frage (nur Live-Modus) ---
+    // Gültig = so, dass der Server sie annimmt; unfertige Fragen bleiben lokal, bis sie vollständig sind.
+    function problem(q) {
+      const answers = [...q.answers];
+      while (answers.length > 2 && !answers[answers.length - 1].trim()) answers.pop();
+      if (!q.text.trim()) return 'Fragetext fehlt';
+      if (answers.some((a) => !a.trim())) return 'Antwortfeld leer';
+      if (q.correct >= answers.length) return 'Richtige Antwort markieren';
+      if (!(q.timeLimit >= 5 && q.timeLimit <= 120)) return 'Zeitlimit 5–120 Sekunden';
+      return null;
+    }
+    const payload = (q) => ({ text: q.text, answers: q.answers, correct: q.correct, timeLimit: q.timeLimit });
+
+    function scheduleSave() {
+      if (!live) return;
+      dirty = true;
+      setState('Ungespeicherte Änderungen …');
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => flush(), 700);
+    }
+
+    // Ergebnis: true = alles gespeichert (oder nichts zu speichern), false = ungespeichert (unvollständig/Fehler)
+    async function flush() {
+      clearTimeout(saveTimer);
+      if (saving) await saving;
+      const q = openQ();
+      if (!live || !dirty || !q || q.lockedBy) { dirty = false; return true; }
+      const bad = problem(q);
+      if (bad) { setState(`Noch nicht gespeichert: ${bad}`, 'warn'); return false; }
+      dirty = false;
+      setState('Speichert …');
+      saving = (async () => {
+        try {
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              if (q.id) {
+                const r = await api(`/api/quizzes/${id}/questions/${q.id}`, { method: 'PUT', body: payload(q) });
+                q.rev = r.rev;
+              } else {
+                const r = await api(`/api/quizzes/${id}/questions`, { method: 'POST', body: payload(q) });
+                q.id = r.id; q.rev = r.rev;
+                q.key = String(r.id);
+                openKey = q.key;
+                $('#questions').querySelector('[data-key^="new-"]')?.setAttribute('data-key', q.key);
+              }
+              setState('✓ Gespeichert', 'ok');
+              return true;
+            } catch (err) {
+              // Sperre kurz verloren (z. B. Tab im Hintergrund): neu anfordern und noch einmal versuchen
+              if (err.data && err.data.lost && q.id && attempt === 0) { await tick(q.id); continue; }
+              if (err.data && err.data.by) { await lostLock(q, err.data.by); return false; }
+              dirty = true;
+              setState(`Nicht gespeichert: ${err.message}`, 'warn');
+              return false;
+            }
+          }
+        } finally { saving = null; }
+      })();
+      return saving;
+    }
+
+    // Jemand anderes bearbeitet die Frage jetzt: eigene Fassung aufgeben, Stand vom Server zeigen
+    async function lostLock(q, by) {
+      notice = `${by} bearbeitet Frage ${questions.indexOf(q) + 1} gerade – deine letzten Änderungen daran wurden nicht gespeichert.`;
+      dirty = false;
+      openKey = null;
+      await tick(null);
+      showNotice();
+    }
+
+    function showNotice() { $('#error').textContent = notice; if (notice) setTimeout(() => { if ($('#error').textContent === notice) $('#error').textContent = ''; }, 8000); }
+
+    // --- Öffnen, Schließen, Anlegen, Löschen, Verschieben ---
+    async function closeOpen({ release = true } = {}) {
+      const q = openQ();
+      if (!q) return true;
+      if (live && dirty && !(await flush())) {
+        if (!confirm('Diese Frage ist noch unvollständig und wurde nicht gespeichert. Änderungen verwerfen?')) return false;
+        dirty = false;
+        if (!q.id) questions.splice(questions.indexOf(q), 1);
+      }
+      if (live && !q.id && !q.text.trim() && !q.answers.some((a) => a.trim())) questions.splice(questions.indexOf(q), 1);
+      openKey = null;
+      if (live && release) await tick(null);
+      return true;
+    }
+
+    async function openQuestion(key, { focus = false } = {}) {
+      const q = byKey(key);
+      if (!q) return;
+      if (q.lockedBy) { $('#error').textContent = `${q.lockedBy} bearbeitet diese Frage gerade.`; return; }
+      if (openKey && !(await closeOpen({ release: false }))) return;
+      if (live && q.id) {
+        const state = await tick(q.id);
+        if (state && state.denied) { $('#error').textContent = `${state.denied.by} bearbeitet diese Frage gerade.`; return; }
+      }
+      $('#error').textContent = '';
+      openKey = q.key;
       render();
-      const card = document.querySelector(`[data-q="${i}"]`);
+      const card = $('#questions').querySelector(`[data-key="${q.key}"]`);
       if (card) {
         card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         if (focus) card.querySelector('textarea').focus({ preventScroll: true });
@@ -118,42 +262,155 @@
 
     // Eingaben direkt ins Datenmodell übernehmen
     $('#questions').addEventListener('input', (e) => {
-      const card = e.target.closest('[data-q]');
-      if (!card) return;
-      const q = questions[card.dataset.q];
+      const card = e.target.closest('[data-key]');
+      const q = card && byKey(card.dataset.key);
+      if (!q || q.lockedBy) return;
       const t = e.target;
       if (t.dataset.field === 'text') q.text = t.value;
       if (t.dataset.field === 'timeLimit') q.timeLimit = Number(t.value);
       if (t.dataset.answer !== undefined) q.answers[t.dataset.answer] = t.value;
       if (t.dataset.correct !== undefined) q.correct = Number(t.dataset.correct);
+      scheduleSave();
     });
 
-    $('#questions').addEventListener('click', (e) => {
+    $('#questions').addEventListener('click', async (e) => {
       const button = e.target.closest('[data-action]');
       if (!button) return;
+      const q = byKey(button.closest('[data-key]').dataset.key);
+      const i = questions.indexOf(q);
       const action = button.dataset.action;
-      const i = Number(button.closest('[data-q]').dataset.q);
-      if (action === 'toggle') return i === openIndex ? (openIndex = -1, render()) : openQuestion(i);
+      if (action === 'toggle') {
+        if (q.key === openKey) { await closeOpen(); render(); } else await openQuestion(q.key);
+        return;
+      }
       if (action === 'remove') {
+        if (live && q.id) {
+          try { await api(`/api/quizzes/${id}/questions/${q.id}`, { method: 'DELETE' }); } catch (err) { $('#error').textContent = err.message; return; }
+        }
+        if (openKey === q.key) { openKey = null; dirty = false; }
         questions.splice(i, 1);
-        if (openIndex === i) openIndex = -1;
-        else if (openIndex > i) openIndex--;
+        render();
+        if (live) tick(null);
+        return;
       }
-      // Die aufgeklappte Frage wandert beim Verschieben mit
-      if (action === 'up' || action === 'down') {
-        const j = action === 'up' ? i - 1 : i + 1;
-        [questions[j], questions[i]] = [questions[i], questions[j]];
-        if (openIndex === i) openIndex = j;
-        else if (openIndex === j) openIndex = i;
-      }
+      // Verschieben (Reihenfolge ist für alle gleich)
+      const j = action === 'up' ? i - 1 : i + 1;
+      if (j < 0 || j >= questions.length) return;
+      [questions[j], questions[i]] = [questions[i], questions[j]];
       render();
+      if (live) {
+        try { await api(`/api/quizzes/${id}/order`, { method: 'PUT', body: { ids: questions.filter((x) => x.id).map((x) => x.id) } }); }
+        catch (err) { $('#error').textContent = err.message; await tick(undefined); }
+      }
     });
 
-    $('#add').onclick = () => {
-      questions.push(blankQuestion());
-      openQuestion(questions.length - 1, { focus: true });
+    $('#add').onclick = async () => {
+      if (openKey && !(await closeOpen({ release: false }))) return;
+      const q = blank();
+      questions.push(q);
+      openKey = q.key;
+      if (live) await tick(null);
+      render();
+      const card = $('#questions').querySelector(`[data-key="${q.key}"]`);
+      card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      card.querySelector('textarea').focus({ preventScroll: true });
     };
 
+    // --- Live: Lebenszeichen senden und Stand der anderen holen ---
+    let ticking = null;
+    async function tick(editing) {
+      // editing: Frage-ID anfordern, null = freigeben, undefined = unverändert
+      if (!live) return null;
+      if (ticking) await ticking;
+      const q = openQ();
+      const want = editing !== undefined ? editing : (q && q.id ? q.id : null);
+      ticking = (async () => {
+        try {
+          const state = await api(`/api/quizzes/${id}/live`, { method: 'POST', body: { editing: want } });
+          applyLive(state);
+          return state;
+        } catch (err) {
+          setState('Keine Verbindung – Änderungen werden nachgeholt …', 'warn');
+          return null;
+        } finally { ticking = null; }
+      })();
+      return ticking;
+    }
+
+    function applyLive(state) {
+      presence = state.presence;
+      // Eigene Meta-Eingaben nur ersetzen, wenn ich nichts gerade tippe (und nur Besitzer tippen überhaupt)
+      const metaFocus = ['title', 'subject', 'mode'].includes(document.activeElement && document.activeElement.id);
+      if (!isOwner || !metaFocus) {
+        if (state.meta.title !== $('#title').value && !metaTimer) $('#title').value = state.meta.title;
+        $('#subject').value = state.meta.subjectId || '';
+        $('#mode').value = state.meta.mode || 'single';
+        updateModeHint();
+      }
+      const serverIds = new Set(state.questions.map((q) => q.id));
+      const mineOpen = openQ();
+      const mineHeld = mineOpen && mineOpen.id && state.presence.some((p) => p.me && p.editing === mineOpen.id);
+      // Habe ich die Sperre meiner offenen Frage verloren? (z. B. lange Pause)
+      if (mineOpen && mineOpen.id && !mineHeld && !state.denied && serverIds.has(mineOpen.id) && !saving) {
+        // Wird beim nächsten Tick neu angefordert, da want = offene Frage; hier nichts tun
+      }
+      if (state.denied && mineOpen && mineOpen.id === state.denied.question) {
+        notice = `${state.denied.by} bearbeitet diese Frage gerade.`;
+        openKey = null; dirty = false;
+        showNotice();
+      }
+      const local = new Map(questions.map((q) => [q.id, q]));
+      const next = state.questions.map((sq) => {
+        const l = local.get(sq.id);
+        const holding = l && l.key === openKey && !state.denied;
+        if (holding && (dirty || (saving !== null))) return l;          // meine laufende Bearbeitung nicht überschreiben
+        if (l && l.rev === sq.rev && !(l.key === openKey)) return l;    // unverändert
+        const fresh = fromServer(sq);
+        if (l && l.key === openKey && holding) { fresh.key = l.key; return Object.assign(l, fresh, { key: l.key }); }
+        return fresh;
+      });
+      // Entwürfe (noch nicht gespeicherte neue Fragen) bleiben am Ende
+      const drafts = questions.filter((q) => !q.id);
+      questions = next.concat(drafts);
+      // Wer bearbeitet was?
+      const lockers = new Map(state.presence.filter((p) => !p.me && p.editing).map((p) => [p.editing, p.username]));
+      for (const q of questions) q.lockedBy = q.id ? (lockers.get(q.id) || null) : null;
+      if (openKey && !byKey(openKey)) openKey = null;
+      render();
+      renderPresence();
+      if (!dirty && !saving && $('#state').className.includes('warn') && $('#state').textContent.startsWith('Keine Verbindung')) setState('');
+    }
+
+    // Echtzeit-Signal (Supabase) beschleunigt das Aktualisieren; Polling alle 2,5 s bleibt als Sicherheitsnetz
+    function startLive() {
+      setInterval(() => tick(undefined), 2500);
+      api('/api/config').then((cfg) => {
+        if (!cfg.supabaseUrl || !cfg.supabaseKey || !window.supabase) return;
+        window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey)
+          .channel(`game:q${id}`).on('broadcast', { event: 'update' }, () => tick(undefined)).subscribe();
+      }).catch(() => {});
+      window.addEventListener('pagehide', () => {
+        navigator.sendBeacon(`/api/quizzes/${id}/live`, new Blob([JSON.stringify({ leave: true })], { type: 'application/json' }));
+      });
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(undefined); });
+    }
+
+    // --- Titel, Fach, Modus: nur der Besitzer ---
+    function metaChanged() {
+      if (!live || !isOwner) return;
+      clearTimeout(metaTimer);
+      setState('Ungespeicherte Änderungen …');
+      metaTimer = setTimeout(async () => {
+        metaTimer = null;
+        try {
+          await api(`/api/quizzes/${id}/meta`, { method: 'PATCH', body: { title: $('#title').value, subjectId: Number($('#subject').value) || null, mode: $('#mode').value } });
+          setState('✓ Gespeichert', 'ok');
+        } catch (err) { setState(`Nicht gespeichert: ${err.message}`, 'warn'); }
+      }, 700);
+    }
+    $('#title').addEventListener('input', metaChanged);
+    $('#subject').addEventListener('change', metaChanged);
+    $('#mode').addEventListener('change', metaChanged);
 
     // --- Zusammenarbeit ---
     let team = null;
@@ -227,35 +484,29 @@
       });
     };
 
+    // Speichern: bei neuen Quiz einmal anlegen, bei bestehenden nur noch zum Abschluss sicherstellen und zurück zur Liste
     $('#save').onclick = async () => {
       $('#error').textContent = '';
-      // Leere Antwortfelder am Ende ignorieren (Fragen mit 2–3 Antworten erlauben)
-      const payload = questions.map((q) => {
+      if (live) {
+        if (metaTimer) { clearTimeout(metaTimer); metaTimer = null; metaChanged(); await new Promise((r) => setTimeout(r, 900)); }
+        if (!(await closeOpen())) return;
+        location.href = '/quizzes';
+        return;
+      }
+      // Neues Quiz: leere Antwortfelder am Ende ignorieren (Fragen mit 2–3 Antworten erlauben)
+      const list = questions.map((q) => {
         const answers = [...q.answers];
         while (answers.length > 2 && !answers[answers.length - 1].trim()) answers.pop();
-        return { ...q, answers };
+        return { text: q.text, answers, correct: q.correct, timeLimit: q.timeLimit };
       });
       try {
-        const body = { title: $('#title').value, subjectId: Number($('#subject').value) || null, mode: $('#mode').value, questions: payload };
-        if (id) {
-          try {
-            await api(`/api/quizzes/${id}`, { method: 'PUT', body: { ...body, version } });
-          } catch (err) {
-            if (!err.data || !err.data.conflict) throw err;
-            // Jemand anderes hat zwischenzeitlich gespeichert: bewusst entscheiden, nichts stillschweigend überschreiben
-            if (!confirm(`${err.message}\n\nOK: Deine Version trotzdem speichern (seine Änderungen gehen verloren).\nAbbrechen: nicht speichern – lade die Seite neu, um seine Änderungen zu sehen.`)) {
-              $('#error').textContent = `${err.message} Lade die Seite neu, um die Änderungen zu sehen (deine ungespeicherten Änderungen gehen dabei verloren).`;
-              return;
-            }
-            await api(`/api/quizzes/${id}`, { method: 'PUT', body: { ...body, version, force: true } });
-          }
-        } else await api('/api/quizzes', { method: 'POST', body });
+        await api('/api/quizzes', { method: 'POST', body: { title: $('#title').value, subjectId: Number($('#subject').value) || null, mode: $('#mode').value, questions: list } });
         location.href = '/quizzes';
       } catch (err) {
         $('#error').textContent = err.message;
         // Fehler in einer Frage ("Frage 3: …"): diese Frage aufklappen
         const match = /^Frage (\d+):/.exec(err.message);
-        if (match && questions[match[1] - 1]) openQuestion(match[1] - 1);
+        if (match && questions[match[1] - 1]) { openKey = questions[match[1] - 1].key; render(); }
       }
     };
 
@@ -263,20 +514,23 @@
       me = user;
       const subjects = await api('/api/subjects');
       $('#subject').innerHTML += subjects.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
-      if (id) {
+      if (live) {
         const quiz = await api(`/api/quizzes/${id}`);
+        isOwner = quiz.isOwner;
         $('#title').value = quiz.title;
         $('#subject').value = quiz.subject_id || '';
         $('#mode').value = quiz.mode || 'single';
-        version = quiz.version;
+        for (const el of [$('#title'), $('#subject'), $('#mode')]) el.disabled = !isOwner;
+        if (!isOwner) $('#mode-hint').insertAdjacentHTML('afterend', '<p class="muted" style="margin:.25rem 0 0">Titel, Fach und Modus ändert nur der Besitzer.</p>');
+        questions = quiz.questions.map(fromServer);
+        $('#save').textContent = 'Fertig';
         showTeam(quiz);
-        questions = quiz.questions.map((q) => ({
-          ...q,
-          answers: [...q.answers, '', '', ''].slice(0, 4),
-        }));
+        startLive();
+        tick(undefined);
       } else {
-        questions = [blankQuestion()];
-        openIndex = 0;
+        const q = blank();
+        questions = [q];
+        openKey = q.key;
         $('#team-card').hidden = false;
         $('#team-add').hidden = true;
         $('#team-info').textContent = 'Speichere das Quiz zuerst – danach kannst du Freunde zum gemeinsamen Bearbeiten einladen.';

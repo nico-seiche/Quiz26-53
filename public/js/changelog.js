@@ -2,6 +2,15 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-10-25c',
+    title: 'Neu: Gleichzeitig bearbeiten',
+    items: [
+      ['⚡', 'Live zusammen arbeiten', 'Mehrere Freunde können dasselbe Quiz gleichzeitig bearbeiten. Änderungen speichern sich automatisch und erscheinen bei allen nach wenigen Sekunden.'],
+      ['🔒', 'Eine Frage, eine Person', 'Wer eine Frage bearbeitet, sperrt sie kurz für die anderen („Anna bearbeitet“). So überschreibt sich niemand.'],
+      ['🟢', 'Wer ist dabei?', 'Oben siehst du, wer gerade im Quiz ist und an welcher Frage.'],
+    ],
+  },
+  {
     id: '2026-10-25b',
     title: 'Neu: Freunde',
     items: [

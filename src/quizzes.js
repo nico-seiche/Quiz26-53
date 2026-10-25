@@ -14,6 +14,8 @@ async function loadQuiz(id) {
   quiz.owner_id = Number(quiz.owner_id);
   const rows = await db.query('SELECT * FROM quiz.questions WHERE quiz_id = $1 ORDER BY position', [id]);
   quiz.questions = rows.map((q) => ({
+    id: Number(q.id),
+    rev: q.rev,
     text: q.text,
     answers: q.answers,
     correct: q.correct,
@@ -132,30 +134,173 @@ router.get('/:id', async (req, res) => {
   });
 });
 
-router.put('/:id', async (req, res) => {
+// --- Gleichzeitiges Bearbeiten ---
+// Lock-Dauer: Der Browser meldet sich alle paar Sekunden; wer länger schweigt, verliert seine Sperre.
+const LOCK_SECONDS = 8;
+const isId = (v) => /^\d+$/.test(String(v));
+const notifyQuiz = (quizId) => db.query('SELECT quiz.notify($1)', [`q${quizId}`]).catch(() => {});
+
+// Prüft eine einzelne Frage (gleiche Regeln wie beim Anlegen eines Quiz) und liefert sie bereinigt
+function cleanQuestion(input) {
+  try {
+    const q = { ...input, answers: (Array.isArray(input.answers) ? input.answers : []).map((a) => String(a || '')) };
+    // Leere Antwortfelder am Ende gelten als nicht vorhanden (Fragen mit 2–3 Antworten)
+    while (q.answers.length > 2 && !q.answers[q.answers.length - 1].trim()) q.answers.pop();
+    return { ok: validateQuestions([q])[0] };
+  } catch (msg) {
+    return { error: String(msg).replace(/^Frage 1: /, '') };
+  }
+}
+
+// Wer hält gerade welche Sperre? Nur frische Einträge zählen.
+const fresh = `seen_at > now() - interval '${LOCK_SECONDS} seconds'`;
+
+// Lebenszeichen + Lesen: wird alle paar Sekunden vom Editor aufgerufen.
+// editing: Frage-ID, die ich bearbeiten will (Sperre anfordern), null = keine, fehlt = unverändert lassen.
+router.post('/:id/live', async (req, res) => {
   const quiz = await loadQuiz(req.params.id);
   if (!quiz || !(await canEdit(quiz, req.user.id))) return res.status(404).json({ error: 'Quiz nicht gefunden' });
-  const body = await readBody(req, res);
-  if (!body) return;
-  const conflict = await db.tx(async (client) => {
-    // Zeile sperren und Version prüfen: hat inzwischen jemand anderes gespeichert?
-    const { rows } = await client.query(`
-      SELECT ${VERSION_SQL} AS version, ub.username AS by_name
-      FROM quiz.quizzes q LEFT JOIN quiz.users ub ON ub.id = q.updated_by WHERE q.id = $1 FOR UPDATE OF q`, [quiz.id]);
-    if (req.body.version && !req.body.force && rows[0].version !== req.body.version) return rows[0].by_name || 'Jemand';
-    await client.query('UPDATE quiz.quizzes SET title = $1, subject_id = $2, mode = $3, updated_at = now(), updated_by = $4 WHERE id = $5', [
-      body.title, body.subjectId, body.mode, req.user.id, quiz.id,
-    ]);
-    await saveQuestions(client, quiz.id, body.questions);
-    return null;
-  });
-  if (conflict) {
-    return res.status(409).json({
-      conflict: true,
-      error: `${conflict} hat dieses Quiz inzwischen geändert.`,
-    });
+  const { editing, leave } = req.body || {};
+  let denied = null;
+  let lockChanged = false;
+
+  if (leave) {
+    await db.query('DELETE FROM quiz.quiz_presence WHERE quiz_id = $1 AND user_id = $2', [quiz.id, req.user.id]);
+    await notifyQuiz(quiz.id);
+    return res.json({ ok: true });
   }
-  res.json({ id: quiz.id });
+
+  await db.tx(async (client) => {
+    await client.query('SELECT pg_advisory_xact_lock($1)', [quiz.id]);
+    const { rows: [mine] } = await client.query(
+      `SELECT question_id, (${fresh}) AS alive FROM quiz.quiz_presence WHERE quiz_id = $1 AND user_id = $2`, [quiz.id, req.user.id]);
+    const before = mine && mine.alive && mine.question_id ? Number(mine.question_id) : null;
+    let qid = before;
+    if (editing === null) qid = null;
+    else if (editing !== undefined && isId(editing) && quiz.questions.some((q) => q.id === Number(editing))) {
+      const { rows: [holder] } = await client.query(`
+        SELECT u.username FROM quiz.quiz_presence p JOIN quiz.users u ON u.id = p.user_id
+        WHERE p.quiz_id = $1 AND p.question_id = $2 AND p.user_id <> $3 AND p.${fresh}`, [quiz.id, editing, req.user.id]);
+      if (holder) denied = { question: Number(editing), by: holder.username };
+      else qid = Number(editing);
+    }
+    await client.query(`
+      INSERT INTO quiz.quiz_presence (quiz_id, user_id, question_id, seen_at) VALUES ($1, $2, $3, now())
+      ON CONFLICT (quiz_id, user_id) DO UPDATE SET question_id = $3, seen_at = now()`, [quiz.id, req.user.id, qid]);
+    lockChanged = qid !== before;
+  });
+  if (lockChanged) await notifyQuiz(quiz.id);
+
+  const fresh2 = await loadQuiz(quiz.id);
+  const [presence, meta] = await Promise.all([
+    db.query(`SELECT u.username, p.question_id, (p.user_id = $2) AS me FROM quiz.quiz_presence p JOIN quiz.users u ON u.id = p.user_id
+              WHERE p.quiz_id = $1 AND p.${fresh} ORDER BY p.seen_at`, [quiz.id, req.user.id]),
+    db.one('SELECT title, subject_id, mode FROM quiz.quizzes WHERE id = $1', [quiz.id]),
+  ]);
+  res.json({
+    serverNow: Date.now(),
+    meta: { title: meta.title, subjectId: meta.subject_id, mode: meta.mode },
+    questions: fresh2.questions,
+    presence: presence.map((p) => ({ username: p.username, editing: p.question_id ? Number(p.question_id) : null, me: p.me })),
+    denied,
+  });
+});
+
+// Hält der Nutzer gerade die (frische) Sperre dieser Frage? Sonst Fehlertext für die Antwort.
+async function lockProblem(quizId, questionId, userId) {
+  const mine = await db.one(`SELECT 1 FROM quiz.quiz_presence WHERE quiz_id = $1 AND user_id = $2 AND question_id = $3 AND ${fresh}`,
+    [quizId, userId, questionId]);
+  if (mine) return null;
+  const other = await db.one(`SELECT u.username FROM quiz.quiz_presence p JOIN quiz.users u ON u.id = p.user_id
+    WHERE p.quiz_id = $1 AND p.question_id = $2 AND p.user_id <> $3 AND p.${fresh}`, [quizId, questionId, userId]);
+  return other ? { by: other.username, error: `${other.username} bearbeitet diese Frage gerade.` }
+    : { lost: true, error: 'Die Bearbeitung war kurz unterbrochen – bitte noch einmal versuchen.' };
+}
+
+// Neue Frage ans Ende; der Ersteller behält sie gleich in Bearbeitung
+router.post('/:id/questions', async (req, res) => {
+  const quiz = await loadQuiz(req.params.id);
+  if (!quiz || !(await canEdit(quiz, req.user.id))) return res.status(404).json({ error: 'Quiz nicht gefunden' });
+  const { ok, error } = cleanQuestion(req.body);
+  if (error) return res.status(400).json({ error });
+  const created = await db.tx(async (client) => {
+    await client.query('SELECT pg_advisory_xact_lock($1)', [quiz.id]);
+    const { rows: [pos] } = await client.query('SELECT COALESCE(MAX(position) + 1, 0) AS next FROM quiz.questions WHERE quiz_id = $1', [quiz.id]);
+    const { rows: [row] } = await client.query(`
+      INSERT INTO quiz.questions (quiz_id, position, text, answers, correct, time_limit)
+      VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, rev`, [quiz.id, pos.next, ok.text, JSON.stringify(ok.answers), ok.correct, ok.timeLimit]);
+    await client.query(`
+      INSERT INTO quiz.quiz_presence (quiz_id, user_id, question_id, seen_at) VALUES ($1, $2, $3, now())
+      ON CONFLICT (quiz_id, user_id) DO UPDATE SET question_id = $3, seen_at = now()`, [quiz.id, req.user.id, row.id]);
+    await client.query('UPDATE quiz.quizzes SET updated_at = now(), updated_by = $1 WHERE id = $2', [req.user.id, quiz.id]);
+    return row;
+  });
+  await notifyQuiz(quiz.id);
+  res.json({ id: Number(created.id), rev: created.rev });
+});
+
+router.put('/:id/questions/:qid', async (req, res) => {
+  const quiz = await loadQuiz(req.params.id);
+  if (!quiz || !(await canEdit(quiz, req.user.id)) || !quiz.questions.some((q) => q.id === Number(req.params.qid))) {
+    return res.status(404).json({ error: 'Frage nicht gefunden' });
+  }
+  const problem = await lockProblem(quiz.id, Number(req.params.qid), req.user.id);
+  if (problem) return res.status(409).json({ ...problem, lock: true });
+  const { ok, error } = cleanQuestion(req.body);
+  if (error) return res.status(400).json({ error });
+  const row = await db.one(`
+    UPDATE quiz.questions SET text = $1, answers = $2, correct = $3, time_limit = $4, rev = rev + 1
+    WHERE id = $5 AND quiz_id = $6 RETURNING rev`, [ok.text, JSON.stringify(ok.answers), ok.correct, ok.timeLimit, req.params.qid, quiz.id]);
+  await db.query('UPDATE quiz.quizzes SET updated_at = now(), updated_by = $1 WHERE id = $2', [req.user.id, quiz.id]);
+  await notifyQuiz(quiz.id);
+  res.json({ rev: row.rev });
+});
+
+router.delete('/:id/questions/:qid', async (req, res) => {
+  const quiz = await loadQuiz(req.params.id);
+  if (!quiz || !(await canEdit(quiz, req.user.id)) || !quiz.questions.some((q) => q.id === Number(req.params.qid))) {
+    return res.status(404).json({ error: 'Frage nicht gefunden' });
+  }
+  const other = await db.one(`SELECT u.username FROM quiz.quiz_presence p JOIN quiz.users u ON u.id = p.user_id
+    WHERE p.quiz_id = $1 AND p.question_id = $2 AND p.user_id <> $3 AND p.${fresh}`, [quiz.id, req.params.qid, req.user.id]);
+  if (other) return res.status(409).json({ error: `${other.username} bearbeitet diese Frage gerade.` });
+  await db.tx(async (client) => {
+    await client.query('DELETE FROM quiz.questions WHERE id = $1 AND quiz_id = $2', [req.params.qid, quiz.id]);
+    await client.query(`UPDATE quiz.questions q SET position = n.pos FROM
+      (SELECT id, row_number() OVER (ORDER BY position, id) - 1 AS pos FROM quiz.questions WHERE quiz_id = $1) n
+      WHERE q.id = n.id`, [quiz.id]);
+    await client.query('UPDATE quiz.quizzes SET updated_at = now(), updated_by = $1 WHERE id = $2', [req.user.id, quiz.id]);
+  });
+  await notifyQuiz(quiz.id);
+  res.json({ ok: true });
+});
+
+// Reihenfolge: komplette Liste der Frage-IDs
+router.put('/:id/order', async (req, res) => {
+  const quiz = await loadQuiz(req.params.id);
+  if (!quiz || !(await canEdit(quiz, req.user.id))) return res.status(404).json({ error: 'Quiz nicht gefunden' });
+  const ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number) : [];
+  const have = quiz.questions.map((q) => q.id).sort((a, b) => a - b);
+  if (ids.length !== have.length || [...ids].sort((a, b) => a - b).some((v, i) => v !== have[i])) {
+    return res.status(409).json({ error: 'Die Fragen haben sich inzwischen geändert.', stale: true });
+  }
+  await db.tx(async (client) => {
+    for (const [i, qid] of ids.entries()) await client.query('UPDATE quiz.questions SET position = $1 WHERE id = $2 AND quiz_id = $3', [i, qid, quiz.id]);
+  });
+  await notifyQuiz(quiz.id);
+  res.json({ ok: true });
+});
+
+// Titel, Fach und Spielmodus ändert nur der Besitzer
+router.patch('/:id/meta', async (req, res) => {
+  const quiz = await loadQuiz(req.params.id);
+  if (!quiz || quiz.owner_id !== req.user.id) return res.status(403).json({ error: 'Nur der Besitzer ändert Titel, Fach und Modus.' });
+  const body = await readBody({ body: { ...req.body, questions: [] } }, res);
+  if (!body) return;
+  await db.query('UPDATE quiz.quizzes SET title = $1, subject_id = $2, mode = $3, updated_at = now(), updated_by = $4 WHERE id = $5',
+    [body.title, body.subjectId, body.mode, req.user.id, quiz.id]);
+  await notifyQuiz(quiz.id);
+  res.json({ ok: true });
 });
 
 // Mitarbeiter einladen (nur Besitzer)
