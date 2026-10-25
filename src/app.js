@@ -8,11 +8,14 @@ const leaderboard = require('./leaderboard');
 const study = require('./study');
 const friends = require('./friends');
 const battles = require('./battles');
+const avatars = require('./avatars');
 const db = require('./db');
 
 // Die API; lokal von server.js gestartet, auf Vercel als Serverless-Funktion (api/index.js)
 const app = express();
 app.set('trust proxy', true);
+// Profilbild: rohes JPEG (kleiner als 150 kB), muss vor dem JSON-Parser stehen
+app.use('/api/me/avatar', express.raw({ type: 'image/jpeg', limit: '200kb' }));
 app.use(express.json());
 app.use(auth.loadUser);
 
@@ -49,6 +52,8 @@ app.use('/api/leaderboard', leaderboard.router);
 app.use('/api/study', study.router);
 app.use('/api/friends', friends.router);
 app.use('/api/battles', battles.router);
+app.use('/api/avatar', avatars.imageRouter);
+app.use('/api/me/avatar', avatars.meRouter);
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Nicht gefunden' }));
 

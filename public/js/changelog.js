@@ -2,6 +2,14 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-10-26b',
+    title: 'Neu: Profilbild',
+    items: [
+      ['📷', 'Dein eigenes Bild', 'Tippe auf dein Profilbild unter „Profil“ und mach ein Foto oder wähle eins aus der Galerie.'],
+      ['👀', 'Überall sichtbar', 'Freunde sehen dein Bild in der Bestenliste, in der Freundesliste und im Battle.'],
+    ],
+  },
+  {
     id: '2026-10-26',
     title: 'Neu: Battle',
     items: [

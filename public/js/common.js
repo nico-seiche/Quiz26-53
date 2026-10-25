@@ -19,7 +19,9 @@ async function api(path, options = {}) {
 // Leitet zur Anmeldung um, wenn niemand eingeloggt ist
 async function requireLogin() {
   try {
-    return await api('/api/auth/me');
+    const me = await api('/api/auth/me');
+    window.__me = me;   // für avatarHtml: eigenes Bild sofort nach dem Ändern anzeigen
+    return me;
   } catch {
     const next = encodeURIComponent(location.pathname + location.search);
     location.href = `/?next=${next}`;
@@ -109,7 +111,10 @@ const AVATAR_GRADIENTS = [
 function avatarHtml(name, size = '2rem') {
   let hash = 0;
   for (const ch of String(name)) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
-  return `<span class="avatar" style="--size:${size};--avatar:${AVATAR_GRADIENTS[hash % AVATAR_GRADIENTS.length]}" aria-hidden="true">${escapeHtml(String(name).charAt(0).toUpperCase())}</span>`;
+  // Foto liegt über dem Buchstaben; gibt es keins (404), verschwindet das <img> und der Buchstabe bleibt
+  const mine = window.__me && String(window.__me.username).toLowerCase() === String(name).toLowerCase();
+  const ver = mine && window.__me.avatarVer ? `?v=${window.__me.avatarVer}` : '';
+  return `<span class="avatar" style="--size:${size};--avatar:${AVATAR_GRADIENTS[hash % AVATAR_GRADIENTS.length]}" aria-hidden="true">${escapeHtml(String(name).charAt(0).toUpperCase())}<img class="avatar-img" src="/api/avatar/${encodeURIComponent(name)}${ver}" alt="" loading="lazy" onerror="this.remove()"></span>`;
 }
 
 // Schwebende Navigation am unteren Rand (Home, Quiz, Bestenliste, Profil) und Level-Anzeige in der Kopfzeile.
