@@ -592,3 +592,16 @@ button.tw.bad:hover:not(:disabled) { transform: none; }
 .react-row button:active { transform: scale(.9); }
 .react-row button.sent { animation: react-pop .4s ease-out; }
 @keyframes react-pop { 40% { transform: scale(1.35); } }
+
+/* Host-Lobby: passt genau auf den Bildschirm, ohne Scrollen */
+html:has(body.lobby-lock), body.lobby-lock { height: 100dvh; overflow: hidden; }
+body.lobby-lock { display: flex; flex-direction: column; }
+body.lobby-lock main.host { width: 100%; flex: 1; min-height: 0; display: flex; flex-direction: column; padding-top: .75rem; padding-bottom: .75rem; overflow: hidden; }
+body.lobby-lock #view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+body.lobby-lock .float-area { flex: 1; min-height: 8rem; }
+body.lobby-lock .info-bar, body.lobby-lock .lobby-top { flex: none; }
+body.lobby-lock #team-options { flex: none; margin: .6rem 0 0; padding: .6rem 1rem; }
+body.lobby-lock #team-options h3 { display: none; }
+body.lobby-lock #error:empty { display: none; }
+body.lobby-lock .lobby-top { margin-bottom: .5rem; }
+body.lobby-lock .info-bar { margin-bottom: .5rem; }

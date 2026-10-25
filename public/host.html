@@ -378,6 +378,8 @@
     function render() {
       const s = state;
       updateControls(s);
+      // In der Lobby füllt alles genau den Bildschirm aus: kein Scrollen
+      document.body.classList.toggle('lobby-lock', s.state === 'lobby');
 
       // Lobby: nur Infoleiste und Blasen aktualisieren, damit die schwebenden Namen nicht jedes Mal neu starten
       if (s.state === 'lobby' && $('#float-area') && $('#info-bar')) {
