@@ -550,3 +550,45 @@ button.tw.bad:hover:not(:disabled) { transform: none; }
 .avatar-preview { display: grid; place-items: center; margin: .5rem 0 1rem; }
 .avatar-preview canvas { width: 9rem; height: 9rem; border-radius: 50%; background: var(--bg); box-shadow: 0 0 0 4px rgba(124, 77, 255, .25); }
 #avatar-dialog[hidden] { display: none; }
+
+/* Host-Lobby */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.info-bar { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; margin-bottom: 1rem; }
+.info-item { display: inline-flex; align-items: center; gap: .4rem; padding: .25rem .75rem; border-radius: 999px; font-size: .95rem; font-weight: 700; background: var(--card); border: 1px solid var(--border); box-shadow: var(--shadow); }
+.info-item.ok { border-color: var(--ok); }
+.info-item.wait { border-color: #f59e0b; }
+.lobby-top { display: flex; align-items: center; justify-content: center; gap: 2rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.lobby-qr { width: 150px; height: 150px; border-radius: 14px; background: #fff; padding: 6px; box-shadow: var(--shadow); }
+.lobby-top .pin { font-size: 3rem; margin: 0; }
+.lobby-top { margin-bottom: .75rem; gap: 1.5rem; }
+.float-area { position: relative; overflow: hidden; min-height: max(22rem, calc(100vh - 21rem)); border-radius: var(--radius); border: 1px solid var(--border); background: radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--primary) 12%, transparent), transparent 55%), radial-gradient(circle at 80% 80%, color-mix(in srgb, #ec4899 12%, transparent), transparent 55%), var(--card); box-shadow: var(--shadow); }
+.float-empty { position: absolute; inset: 0; display: grid; place-items: center; font-size: 1.2rem; }
+.bubble {
+  position: absolute; display: inline-flex; align-items: center; gap: .55rem; padding: .35rem .9rem .35rem .4rem; border-radius: 999px;
+  font-weight: 800; font-size: 1.15rem; background: var(--bg); border: 1px solid var(--border); box-shadow: 0 6px 18px rgba(79, 70, 229, .18);
+  animation: bubble-in .5s cubic-bezier(.2, 1.4, .4, 1) both, drift var(--d, 12s) ease-in-out var(--delay, 0s) infinite;
+}
+@keyframes bubble-in { from { opacity: 0; scale: .2; } to { opacity: 1; scale: 1; } }
+@keyframes drift {
+  0%, 100% { translate: 0 0; }
+  25% { translate: var(--dx) calc(var(--dy) * -.6); }
+  50% { translate: calc(var(--dx) * -.5) var(--dy); }
+  75% { translate: calc(var(--dx) * -1) calc(var(--dy) * .4); }
+}
+.reaction { position: absolute; z-index: 5; display: flex; flex-direction: column; align-items: center; pointer-events: none; transform: translateX(-50%); animation: reaction-rise 3.1s ease-out forwards; }
+.reaction-emoji { font-size: 3.4rem; line-height: 1; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, .25)); }
+.reaction-name { font-size: .85rem; font-weight: 800; padding: .1rem .5rem; border-radius: 999px; background: var(--card); border: 1px solid var(--border); }
+@keyframes reaction-rise {
+  0% { opacity: 0; translate: 0 10px; scale: .3; }
+  12% { opacity: 1; scale: 1.25; }
+  25% { scale: 1; }
+  100% { opacity: 0; translate: var(--sway) -220px; scale: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .bubble { animation: bubble-in .01s both; } .reaction { animation: reaction-rise 3s linear forwards; } }
+@media (max-width: 640px) { .lobby-qr { width: 150px; height: 150px; } .lobby-top .pin { font-size: 2.6rem; } }
+/* Reaktionen auf dem Handy */
+.react-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: .6rem; margin-top: 1rem; }
+.react-row button { font-size: 2.2rem; line-height: 1; padding: .7rem 0; border-radius: 16px; }
+.react-row button:active { transform: scale(.9); }
+.react-row button.sent { animation: react-pop .4s ease-out; }
+@keyframes react-pop { 40% { transform: scale(1.35); } }

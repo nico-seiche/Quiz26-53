@@ -350,8 +350,44 @@ router.get('/:pin/qr', requireAuth, requireHost, async (req, res) => {
   res.json({ joinUrl, qr });
 });
 
+// Die vier Reaktionen, die Teilnehmer in der Lobby schicken können
+const REACTIONS = ['👋', '🔥', '😂', '🎉'];
+
 router.get('/:pin/host', requireAuth, requireHost, async (req, res) => {
-  res.json(hostView(await loadGame(req.params.pin)));
+  const data = await loadGame(req.params.pin);
+  const view = hostView(data);
+  // Fach des Quiz (für die Infoleiste in der Lobby)
+  const sid = data.game.quiz.subjectId;
+  const subject = sid ? await db.one('SELECT name, icon FROM quiz.subjects WHERE id = $1', [sid]) : null;
+  view.subject = subject ? { name: subject.name, icon: subject.icon } : null;
+  // Neue Reaktionen seit dem letzten Abruf (after = zuletzt gesehene ID); ohne after nur der aktuelle Stand
+  if (data.game.state === 'lobby') {
+    const after = /^\d+$/.test(String(req.query.after)) ? req.query.after : null;
+    const rows = after === null ? [] : await db.query(
+      'SELECT id, name, emoji FROM quiz.game_reactions WHERE game_pin = $1 AND id > $2 ORDER BY id LIMIT 30', [req.params.pin, after]);
+    const { max } = await db.one('SELECT COALESCE(MAX(id), 0)::text AS max FROM quiz.game_reactions WHERE game_pin = $1', [req.params.pin]);
+    view.reactions = rows.map((r) => ({ id: Number(r.id), name: r.name, emoji: r.emoji }));
+    view.reactionCursor = Number(max);
+  }
+  res.json(view);
+});
+
+// Reaktion eines Teilnehmers in der Lobby (Gäste und Angemeldete)
+router.post('/:pin/react', async (req, res) => {
+  const key = playerKey(req);
+  const emoji = String(req.body.emoji || '');
+  if (!key || !REACTIONS.includes(emoji)) return res.status(400).json({ error: 'Ungültige Reaktion' });
+  const row = await db.one(`
+    SELECT p.name, g.state, (SELECT MAX(created_at) FROM quiz.game_reactions r WHERE r.game_pin = g.pin AND r.player_key = p.key) AS last
+    FROM quiz.games g JOIN quiz.game_players p ON p.game_pin = g.pin AND p.key = $2 WHERE g.pin = $1`, [req.params.pin, key]);
+  if (!row) return res.status(404).json({ error: 'Du bist diesem Spiel nicht beigetreten' });
+  if (row.state !== 'lobby') return res.status(409).json({ error: 'Reaktionen gibt es nur in der Warteschlange' });
+  // Höchstens eine Reaktion alle 0,6 Sekunden pro Spieler (gegen Dauerfeuer)
+  if (row.last && Date.now() - new Date(row.last).getTime() < 600) return res.status(429).json({ error: 'Nicht so schnell' });
+  await db.query('INSERT INTO quiz.game_reactions (game_pin, player_key, name, emoji) VALUES ($1, $2, $3, $4)', [req.params.pin, key, row.name, emoji]);
+  await db.query("DELETE FROM quiz.game_reactions WHERE game_pin = $1 AND created_at < now() - interval '10 minutes'", [req.params.pin]);
+  await db.query('SELECT quiz.notify($1)', [req.params.pin]).catch(() => {});
+  res.json({ ok: true });
 });
 
 router.post('/:pin/next', requireAuth, requireHost, async (req, res) => {

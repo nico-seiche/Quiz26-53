@@ -255,6 +255,91 @@
       later(() => box.remove(), 8000);
     }
 
+    // --- Lobby: Infoleiste, schwebende Namen, Reaktionen ---
+
+    // Kleine Infoleiste oben: Teilnehmer, Modus, Fragen, Fach, Wertung (als Symbole mit Kurztext)
+    function infoBar(s) {
+      const n = s.players.length;
+      const counts = n >= s.minPlayers;
+      const items = [
+        ['👥', `${n}`, `${n} ${n === 1 ? 'Teilnehmer' : 'Teilnehmer'}`, 'info-count'],
+        [s.teamCount ? '🦊' : '👤', s.teamCount ? 'Team' : 'Einzel', s.teamCount ? 'Team-Modus: zwei Teams' : 'Einzel-Modus: jeder für sich'],
+        ['❓', `${s.total}`, `${s.total} Fragen`],
+      ];
+      if (s.subject) items.push([s.subject.icon || '📘', s.subject.name, `Fach: ${s.subject.name}`]);
+      items.push([counts ? '🏅' : '⏳', counts ? 'zählt' : `noch ${s.minPlayers - n}`,
+        counts ? 'Das Quiz zählt für die Gesamtwertung.' : `Zählt erst ab ${s.minPlayers} Teilnehmern für die Gesamtwertung (noch ${s.minPlayers - n}).`, counts ? 'ok' : 'wait']);
+      return `<div class="info-bar" id="info-bar">${items.map(([icon, text, title, cls = '']) =>
+        `<span class="info-item ${cls}" title="${escapeHtml(title)}"><span aria-hidden="true">${icon}</span>${escapeHtml(text)}<span class="sr-only"> – ${escapeHtml(title)}</span></span>`).join('')}</div>`;
+    }
+
+    function lobbyHtml(s) {
+      return `
+        ${infoBar(s)}
+        <div class="lobby-top">
+          ${joinInfo ? `<img class="lobby-qr" src="${joinInfo.qr}" alt="QR-Code zum Beitreten">` : ''}
+          <div>
+            <div class="muted">Beitreten unter <strong>${escapeHtml(joinInfo ? joinInfo.joinUrl.split('/play')[0] : location.origin)}</strong></div>
+            <div class="muted">Game-PIN</div>
+            <div class="pin">${escapeHtml(s.pin)}</div>
+          </div>
+        </div>
+        <div class="float-area" id="float-area">
+          <div class="float-empty muted" id="float-empty">Warte auf Teilnehmer …</div>
+        </div>`;
+    }
+
+    // Namen schweben lassen: bestehende Blasen bleiben (sonst startet ihre Animation neu), neue poppen auf
+    const bubbles = new Map();
+    function syncBubbles(s) {
+      const area = $('#float-area');
+      if (!area) { bubbles.clear(); return; }
+      if (!area.dataset.ready) { bubbles.clear(); area.dataset.ready = '1'; }
+      $('#float-empty').hidden = s.players.length > 0;
+      const names = new Set(s.players.map((p) => p.name));
+      for (const [name, el] of bubbles) if (!names.has(name)) { el.remove(); bubbles.delete(name); }
+      s.players.forEach((p, i) => {
+        if (bubbles.has(p.name)) return;
+        const n = bubbles.size;
+        // Verteilung nach dem goldenen Schnitt: gleichmäßig über die Fläche, stabil pro Spieler
+        const fx = (n * 0.618034 + 0.13) % 1;
+        const fy = (n * 0.381966 + 0.29 + (n % 3) * 0.11) % 1;
+        const el = document.createElement('div');
+        el.className = 'bubble';
+        el.style.cssText = `left:${6 + fx * 74}%;top:${6 + fy * 76}%;--d:${(9 + (n * 7) % 8)}s;--delay:${-(n * 1.7) % 9}s;--dx:${(n % 2 ? 1 : -1) * (30 + (n * 13) % 50)}px;--dy:${(n % 3 ? 1 : -1) * (20 + (n * 17) % 40)}px`;
+        el.innerHTML = `${avatarHtml(p.name, '2rem')}<span>${escapeHtml(p.name)}${p.guest ? ' <span class="muted">(Gast)</span>' : ''}</span>`;
+        el.dataset.name = p.name;
+        area.appendChild(el);
+        bubbles.set(p.name, el);
+      });
+    }
+
+    // Reaktion eines Spielers: Emoji steigt von seiner Blase auf
+    function showReaction(r) {
+      const area = $('#float-area');
+      if (!area) return;
+      const bubble = bubbles.get(r.name);
+      const box = area.getBoundingClientRect();
+      const rect = bubble ? bubble.getBoundingClientRect() : null;
+      const x = rect ? rect.left - box.left + rect.width / 2 : Math.random() * box.width;
+      const y = rect ? rect.top - box.top : box.height * 0.7;
+      const el = document.createElement('div');
+      el.className = 'reaction';
+      el.style.left = `${x}px`;
+      el.style.top = `${y}px`;
+      el.style.setProperty('--sway', `${(Math.random() - 0.5) * 70}px`);
+      el.innerHTML = `<span class="reaction-emoji">${r.emoji}</span><span class="reaction-name">${escapeHtml(r.name)}</span>`;
+      area.appendChild(el);
+      setTimeout(() => el.remove(), 3200);
+    }
+
+    let reactionCursor = null;
+    function handleReactions(s) {
+      if (s.state !== 'lobby') return;
+      if (reactionCursor !== null) (s.reactions || []).forEach((r, i) => setTimeout(() => showReaction(r), i * 140));
+      if (s.reactionCursor !== undefined) reactionCursor = s.reactionCursor;
+    }
+
     // --- Hauptansicht ---
 
     // --- Team-Modus in der Lobby ---
@@ -294,6 +379,13 @@
       const s = state;
       updateControls(s);
 
+      // Lobby: nur Infoleiste und Blasen aktualisieren, damit die schwebenden Namen nicht jedes Mal neu starten
+      if (s.state === 'lobby' && $('#float-area') && $('#info-bar')) {
+        $('#info-bar').outerHTML = infoBar(s);
+        syncBubbles(s);
+        return;
+      }
+
       // Zwischenstand, Teams und Siegerehrung nur einmal aufbauen, sonst startet die Animation bei jedem Nachladen neu
       const key = `${s.state}:${s.questionIndex}`;
       if (['scoreboard', 'finished', 'teams'].includes(s.state) && key === lastKey) return;
@@ -304,24 +396,7 @@
 
       let html = '';
       if (s.state === 'lobby') {
-        html = `
-          <div class="card join-box">
-            ${joinInfo ? `<img src="${joinInfo.qr}" alt="QR-Code zum Beitreten">` : ''}
-            <div>
-              <p class="big">Beitreten unter<br><strong>${escapeHtml(joinInfo ? joinInfo.joinUrl.split('/play')[0] : location.origin)}</strong></p>
-              <p class="muted">Game-PIN</p>
-              <div class="pin">${escapeHtml(s.pin)}</div>
-            </div>
-          </div>
-          <div class="card">
-            <h3>${s.players.length} Teilnehmer</h3>
-            <p class="muted">${s.players.length >= s.minPlayers
-              ? 'Dieses Quiz zählt für die Gesamtwertung.'
-              : `Mit weniger als ${s.minPlayers} Teilnehmern zählt das Quiz nicht für die Gesamtwertung (noch ${s.minPlayers - s.players.length} fehlen).`}</p>
-            <div class="players">${s.players.map((p) =>
-              `<span class="chip">${escapeHtml(p.name)}${guestTag(p)}</span>`).join('') ||
-              '<span class="muted">Warte auf Teilnehmer …</span>'}</div>
-          </div>`;
+        html = lobbyHtml(s);
       } else if (s.state === 'teams') {
         html = teamsHtml(s);
       } else if (s.state === 'question' || s.state === 'reveal') {
@@ -340,6 +415,7 @@
         html = podiumHtml(s);
       }
       $('#view').innerHTML = html;
+      if (s.state === 'lobby') syncBubbles(s);
 
       if (s.state === 'question') {
         const update = () => {
@@ -364,7 +440,13 @@
         $('#error').textContent = err.message;
         return;
       }
-      live = liveGame(pin, () => api(`/api/games/${encodeURIComponent(pin)}/host`), (s) => {
+      // Host-Stand laden; in der Lobby kommen neue Reaktionen mit (after = zuletzt gesehene ID)
+      const loadHost = async () => {
+        const s = await api(`/api/games/${encodeURIComponent(pin)}/host${reactionCursor !== null ? `?after=${reactionCursor}` : ''}`);
+        handleReactions(s);
+        return s;
+      };
+      live = liveGame(pin, loadHost, (s) => {
         state = s;
         render();
       });

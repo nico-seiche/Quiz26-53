@@ -2,6 +2,15 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-10-27',
+    title: 'Neu: Lobby-Reaktionen',
+    items: [
+      ['🫧', 'Schwebende Namen', 'In der Warteschlange schweben alle Teilnehmer als Blasen über den Host-Bildschirm.'],
+      ['🔥', 'Reaktionen', 'Wer wartet, kann dem Host-Bildschirm 👋 🔥 😂 🎉 schicken – sie steigen bei der Person auf.'],
+      ['ℹ️', 'Infoleiste', 'Oben stehen kompakt Teilnehmerzahl, Modus, Fragen, Fach und ob das Quiz zählt.'],
+    ],
+  },
+  {
     id: '2026-10-26b',
     title: 'Neu: Profilbild',
     items: [

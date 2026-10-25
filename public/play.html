@@ -76,7 +76,7 @@
       const s = state;
       $('#status').textContent = `${s.team ? s.team.emoji + ' ' : ''}${s.name}${s.guest ? ' (Gast)' : ''} · ${s.score} Punkte`;
       const key = `${s.state}:${s.questionIndex}`;
-      if (s.state === 'finished' && key === lastKey) return;
+      if ((s.state === 'finished' || (s.state === 'lobby' && document.querySelector('.react-row'))) && key === lastKey) return;
       lastKey = key;
       stopTimer();
       let html = '';
@@ -86,6 +86,8 @@
           <h2>${escapeHtml(s.title)}</h2>
           <p class="big">Du bist drin! 🎉</p>
           <p class="muted">Warte, bis der Host das Quiz startet …</p>
+          <p class="muted" style="margin-bottom:0">Schick eine Reaktion an den Bildschirm:</p>
+          <div class="react-row">${['👋', '🔥', '😂', '🎉'].map((e) => `<button type="button" data-react="${e}" aria-label="Reaktion ${e}">${e}</button>`).join('')}</div>
           ${s.teamCount ? '<p class="muted">👥 Team-Modus: Beim Start wirst du einem Team zugelost.</p>' : ''}
         </div>`;
       } else if (s.state === 'teams') {
@@ -222,7 +224,17 @@
       }
     }
 
+    // Reaktion in der Lobby: höchstens eine alle 0,7 s
+    let lastReact = 0;
     $('#view').addEventListener('click', async (e) => {
+      const react = e.target.closest('[data-react]');
+      if (react) {
+        if (Date.now() - lastReact < 700) return;
+        lastReact = Date.now();
+        react.classList.remove('sent'); void react.offsetWidth; react.classList.add('sent');
+        api(`/api/games/${encodeURIComponent(joinedPin)}/react`, { method: 'POST', body: { emoji: react.dataset.react } }).catch(() => {});
+        return;
+      }
       const choice = e.target.closest('[data-choice]');
       if (!choice || choice.disabled) return;
       document.querySelectorAll('[data-choice]').forEach((b) => { b.disabled = true; });
