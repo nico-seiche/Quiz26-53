@@ -151,7 +151,7 @@
       $('#presence-card').hidden = !live || !others.length;
       $('#presence').innerHTML = others.map((p) => {
         const idx = questions.findIndex((q) => q.id === p.editing);
-        return `<span class="presence-chip">${avatarHtml(p.username, '1.6rem')}<span><strong>${escapeHtml(p.username)}</strong> <span class="muted">${idx >= 0 ? `· Frage ${idx + 1}` : '· schaut zu'}</span></span></span>`;
+        return `<span class="presence-chip">${avatarHtml(p.username, '1.6rem')}<span><strong>${profileLink(p.username, escapeHtml(p.username))}</strong> <span class="muted">${idx >= 0 ? `· Frage ${idx + 1}` : '· schaut zu'}</span></span></span>`;
       }).join('');
     }
 
@@ -422,10 +422,10 @@
       $('#team-info').textContent = quiz.isOwner
         ? 'Lade Freunde ein: Sie können Fragen bearbeiten und das Quiz starten, löschen können nur du.'
         : `Dieses Quiz gehört ${quiz.owner}. Du kannst Fragen bearbeiten und es starten.`;
-      const chips = [`<span class="tag">👑 ${escapeHtml(quiz.owner)}${quiz.isOwner ? ' (du)' : ''}</span>`]
+      const chips = [`<span class="tag">👑 ${profileLink(quiz.owner, escapeHtml(quiz.owner))}${quiz.isOwner ? ' (du)' : ''}</span>`]
         .concat(quiz.collaborators.map((name) => {
           const removable = quiz.isOwner || name.toLowerCase() === me.username.toLowerCase();
-          return `<span class="tag">${escapeHtml(name)}${name.toLowerCase() === me.username.toLowerCase() ? ' (du)' : ''}${removable
+          return `<span class="tag">${profileLink(name, escapeHtml(name))}${name.toLowerCase() === me.username.toLowerCase() ? ' (du)' : ''}${removable
             ? ` <button type="button" class="chip-x" data-remove="${escapeHtml(name)}" aria-label="${quiz.isOwner ? 'Entfernen' : 'Verlassen'}" title="${quiz.isOwner ? 'Entfernen' : 'Quiz verlassen'}">✕</button>` : ''}</span>`;
         }));
       $('#team-list').innerHTML = chips.join('');

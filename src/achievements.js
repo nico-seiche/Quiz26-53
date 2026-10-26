@@ -167,4 +167,4 @@ router.get('/', requireAuth, async (req, res) => {
   res.json({ minPlayers: MIN_PLAYERS_FOR_SCORING, earned: earned.size, total: ACHIEVEMENTS.length, title: collectorTitle(earned.size), achievements });
 });
 
-module.exports = { router, awardForGame, publicInfo, ACHIEVEMENTS };
+module.exports = { router, awardForGame, publicInfo, ACHIEVEMENTS, collectorTitle };

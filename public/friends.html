@@ -61,8 +61,8 @@
     let data = null;
     const person = (u, actions) => `
       <div class="friend-row">
-        ${avatarHtml(u.username, '2.4rem')}
-        <div class="friend-name"><strong>${escapeHtml(u.username)}</strong> <span class="muted">${escapeHtml(u.code)}</span></div>
+        ${profileLink(u.username, avatarHtml(u.username, '2.4rem'))}
+        <div class="friend-name">${profileLink(u.username, `<strong>${escapeHtml(u.username)}</strong>`)} <span class="muted">${escapeHtml(u.code)}</span></div>
         <div class="row">${actions}</div>
       </div>`;
 

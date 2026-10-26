@@ -87,7 +87,7 @@
     async function loadBattles() {
       let b;
       try { b = await api('/api/battles'); } catch { return; }
-      const row = (x, right) => `<div class="friend-row">${avatarHtml(x.opponent, '2.2rem')}<div class="friend-name"><strong>${escapeHtml(x.opponent)}</strong> <span class="muted">· ${escapeHtml(x.setTitle)}</span></div><div class="row">${right}</div></div>`;
+      const row = (x, right) => `<div class="friend-row">${profileLink(x.opponent, avatarHtml(x.opponent, '2.2rem'))}<div class="friend-name">${profileLink(x.opponent, `<strong>${escapeHtml(x.opponent)}</strong>`)} <span class="muted">· ${escapeHtml(x.setTitle)}</span></div><div class="row">${right}</div></div>`;
       const parts = [];
       if (b.invites.length) parts.push(`<h3>Herausforderungen an dich</h3>${b.invites.map((x) => row(x, `<a class="btn primary" href="/battle?id=${x.id}">Ansehen</a>`)).join('')}`);
       if (b.active.length) parts.push(`<h3>Läuft gerade</h3>${b.active.map((x) => row(x, `<a class="btn primary" href="/battle?id=${x.id}">Weiterspielen</a>`)).join('')}`);

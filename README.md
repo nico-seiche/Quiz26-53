@@ -97,6 +97,10 @@ Beim Üben mit Lernsets (`POST /api/study/cards/:id/review` mit `mode` und `shar
 
 Oben rechts neben dem Level (auf Seiten mit Navigation; auf dem Profil neben „Abmelden“) steht ein Schalter ☀️/🌙. Ohne Eingriff folgt die Seite dem Gerät (`prefers-color-scheme`); wer den Schalter benutzt, legt sein Thema in `localStorage` fest (`theme`: `light`/`dark`, als `data-theme` am `<html>`; ein kleines Skript im `<head>` setzt es vor dem Zeichnen, damit nichts aufblitzt). Die dunklen Farben stehen in `public/style.css` doppelt: einmal in der Medienabfrage (`:root:not([data-theme="light"])`) und einmal für `:root[data-theme="dark"]` – bei neuen dunklen Anpassungen beide ergänzen.
 
+## Spielerprofile
+
+Namen und Avatare registrierter Spieler sind Links (`profileLink()` in `public/js/common.js`) zu `/user?name=…` (Bestenliste, Freunde, Battle, Quiz-Editor). `GET /api/users/:name` (`src/users.js`) liefert Level, Gesamtpunkte, Platz, Tage-Serie, Punkte je Fach, Erfolge, Battle-Bilanz (gesamt und gegen den Betrachter) sowie die letzten fünf gewerteten Spiele; der Betrachter kann dort eine Freundschaftsanfrage senden/annehmen oder einen Freund entfernen. Lernpunkte und Lernfortschritt gehören nicht dazu. Das eigene Profil leitet auf `/profile` um. Gäste haben kein Profil und sind nicht verlinkt.
+
 ## Profilbild
 
 Auf der Profilseite tippt man auf das eigene Bild und nimmt ein Foto auf oder wählt eins aus der Galerie. Der Browser schneidet quadratisch aus der Mitte zu, verkleinert auf 256 × 256 px und lädt es als JPEG hoch (`POST /api/me/avatar`, höchstens 150 kB, Dateianfang wird geprüft). Gespeichert wird es in `quiz.user_avatars`; `GET /api/avatar/<name>` liefert es nur angemeldeten Nutzern (ETag, 10 Minuten Cache). `avatarHtml()` in `public/js/common.js` legt das Bild über den Anfangsbuchstaben und entfernt es bei 404 – deshalb zeigen Bestenliste, Freunde, Battle usw. automatisch das Foto. Eigene Änderungen sind sofort sichtbar, andere sehen sie nach spätestens 10 Minuten.

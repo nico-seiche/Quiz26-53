@@ -2,6 +2,15 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-10-29',
+    title: 'Neu: Spielerprofile',
+    items: [
+      ['👤', 'Profile ansehen', 'Tippe auf einen Namen oder ein Bild – in der Bestenliste, bei Freunden, im Battle oder im Quiz-Editor – und sieh das Profil des Spielers.'],
+      ['📊', 'Alle Infos', 'Level, Punkte, Platz, Punkte pro Fach, Erfolge, Battle-Bilanz und zuletzt gespielte Quiz.'],
+      ['➕', 'Direkt befreunden', 'Auf dem Profil schickst du eine Freundschaftsanfrage oder nimmst eine an.'],
+    ],
+  },
+  {
     id: '2026-10-28',
     title: 'Neu: Lernpunkte',
     items: [

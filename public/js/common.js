@@ -119,6 +119,11 @@ function avatarHtml(name, size = '2rem') {
 
 // Schwebende Navigation am unteren Rand (Home, Quiz, Bestenliste, Profil) und Level-Anzeige in der Kopfzeile.
 // me: Antwort von /api/auth/me (Name, Level)
+// Name/Avatar als Link zum Spielerprofil (nur für registrierte Spieler, nicht für Gäste)
+function profileLink(name, inner) {
+  return `<a class="profile-link" href="/user?name=${encodeURIComponent(name)}">${inner}</a>`;
+}
+
 function mountNav(active, me) {
   document.body.classList.add('has-nav');
   const items = [

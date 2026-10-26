@@ -44,7 +44,7 @@
         <div class="card battle-score">
           <div class="battle-side">${avatarHtml(s.me.username, '2.6rem')}<div><strong>Du</strong><div class="battle-points" id="my-score">${nf(s.me.score)}</div></div></div>
           <div class="battle-vs">${s.status === 'active' || s.status === 'finished' ? `Runde ${Math.min(s.round, s.rounds)}/${s.rounds}` : '⚔️'}</div>
-          <div class="battle-side right"><div><strong>${escapeHtml(s.opponent.username)}</strong><div class="battle-points" id="their-score">${nf(s.opponent.score)}</div></div>${avatarHtml(s.opponent.username, '2.6rem')}</div>
+          <div class="battle-side right">${profileLink(s.opponent.username, `<span><strong>${escapeHtml(s.opponent.username)}</strong></span>`)}<div class="battle-points" id="their-score">${nf(s.opponent.score)}</div>${profileLink(s.opponent.username, avatarHtml(s.opponent.username, '2.6rem'))}</div>
         </div>`;
     }
 
