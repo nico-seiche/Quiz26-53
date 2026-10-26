@@ -149,7 +149,7 @@ function mountNav(active, me) {
 
   const box = document.getElementById('me');
   if (box && me) {
-    box.innerHTML = `<span class="level-badge" title="${me.points.toLocaleString('de-DE')} Punkte">🏅 Level ${me.level}</span>
+    box.innerHTML = `<span class="level-badge" title="${(me.xp ?? me.points).toLocaleString('de-DE')} Level-Punkte (Quiz ${me.points.toLocaleString('de-DE')} + Lernen ${(me.learnPoints || 0).toLocaleString('de-DE')})">🏅 Level ${me.level}</span>
       <span class="hide-small">${escapeHtml(me.username)}</span>`;
   }
   mountTheme();

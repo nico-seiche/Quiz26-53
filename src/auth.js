@@ -106,18 +106,18 @@ router.post('/logout', async (req, res) => {
 
 router.get('/me', async (req, res) => {
   if (!req.user) return res.status(401).json({ error: 'Nicht angemeldet' });
-  // Gewertete Gesamtpunkte und Level (für die Anzeige in der Kopfzeile)
-  const { points } = await db.one(
-    'SELECT COALESCE(SUM(score), 0)::int AS points FROM quiz.game_results WHERE user_id = $1 AND player_count >= $2',
-    [req.user.id, MIN_PLAYERS_FOR_SCORING],
-  );
+  // Gewertete Quizpunkte und Lernpunkte; das Level ergibt sich aus beiden zusammen
+  const { points, learn } = await db.one(`
+    SELECT (SELECT COALESCE(SUM(score), 0)::int FROM quiz.game_results WHERE user_id = $1 AND player_count >= $2) AS points,
+           (SELECT COALESCE(SUM(points), 0)::int FROM quiz.learn_events WHERE user_id = $1) AS learn`,
+  [req.user.id, MIN_PLAYERS_FOR_SCORING]);
   const [{ friend_code: code }, { requests }, battleInvites, avatar] = await Promise.all([
     db.one('SELECT friend_code FROM quiz.users WHERE id = $1', [req.user.id]),
     db.one("SELECT COUNT(*)::int AS requests FROM quiz.friendships WHERE addressee_id = $1 AND status = 'pending'", [req.user.id]),
     require('./battles').inviteCount(req.user.id),
     db.one('SELECT EXTRACT(EPOCH FROM updated_at)::bigint AS ver FROM quiz.user_avatars WHERE user_id = $1', [req.user.id]),
   ]);
-  res.json({ ...req.user, code, friendRequests: requests, battleInvites, avatarVer: avatar ? Number(avatar.ver) : 0, points, ...levelInfo(points) });
+  res.json({ ...req.user, code, friendRequests: requests, battleInvites, avatarVer: avatar ? Number(avatar.ver) : 0, points, learnPoints: learn, xp: points + learn, ...levelInfo(points + learn) });
 });
 
 module.exports = { router, loadUser, requireAuth };

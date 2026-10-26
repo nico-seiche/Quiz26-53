@@ -2,6 +2,14 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-10-30',
+    title: 'Neu: Lernen bringt Level',
+    items: [
+      ['⬆️', 'Lernpunkte zählen fürs Level', 'Deine Lernpunkte werden jetzt zu den Quizpunkten addiert – so steigst du auch durchs Üben im Level auf.'],
+      ['🏆', 'Bestenliste bleibt Quiz', 'In der Bestenliste zählen weiterhin nur die Quizpunkte.'],
+    ],
+  },
+  {
     id: '2026-10-29',
     title: 'Neu: Spielerprofile',
     items: [

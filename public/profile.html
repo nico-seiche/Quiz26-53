@@ -32,6 +32,7 @@
         <span class="level-badge" id="profile-level"></span>
         <span class="tag" id="profile-code" title="Deine Freunde-ID"></span>
         <div class="muted level-next" id="profile-next"></div>
+        <div class="muted level-next" id="profile-xp"></div>
       </div>
     </div>
 
@@ -50,7 +51,7 @@
 
     <div class="card" id="learn-card">
       <h2 style="margin-bottom:.25rem">🧠 Lernpunkte</h2>
-      <p class="muted" style="margin-top:0">Fürs Üben mit Lernsets – nicht in der Bestenliste, aber auf deinem Profil für andere sichtbar.</p>
+      <p class="muted" style="margin-top:0">Fürs Üben mit Lernsets – sie zählen fürs Level, aber nicht für die Bestenliste, und sind auf deinem Profil für andere sichtbar.</p>
       <div class="row" style="align-items:flex-end">
         <div class="stat-total" id="lp-total">0</div>
         <span class="tag" id="lp-today"></span>
@@ -222,6 +223,7 @@
       $('#profile-level').textContent = `🏅 Level ${me.level}`;
       $('#profile-code').textContent = me.code ? `#${me.code}` : '';
       if (me.friendRequests) $('#friend-hint').innerHTML = `<span class="tag">${me.friendRequests} ${me.friendRequests === 1 ? 'Anfrage' : 'Anfragen'}</span>`;
+      $('#profile-xp').textContent = `Level-Punkte ${me.xp.toLocaleString('de-DE')} = ${me.points.toLocaleString('de-DE')} Quiz + ${me.learnPoints.toLocaleString('de-DE')} Lernen`;
       $('#profile-next').textContent = `Noch ${me.toNext.toLocaleString('de-DE')} Punkte bis Level ${me.level + 1}`;
       mountNav('profile', me);
       loadResults();

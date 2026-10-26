@@ -60,7 +60,7 @@
           ${avatarHtml(p.username, '4.5rem')}
           <div style="min-width:0">
             <h1 style="margin:0;overflow-wrap:anywhere">${escapeHtml(p.username)}</h1>
-            <span class="level-badge">🏅 Level ${p.level}</span>
+            <span class="level-badge" title="${nf(p.xp)} Level-Punkte (Quiz + Lernen)">🏅 Level ${p.level}</span>
             <span class="tag" title="Freunde-ID">${escapeHtml(p.code)}</span>
             ${p.achievements.title ? `<span class="tag">${escapeHtml(p.achievements.title)}</span>` : ''}
             <div class="muted level-next">Dabei seit ${escapeHtml(since)}</div>

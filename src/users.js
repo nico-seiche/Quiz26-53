@@ -64,7 +64,7 @@ router.get('/:username', async (req, res) => {
   res.json({
     username: user.username, code: `#${user.friend_code}`, memberSince: user.created_at, isMe: id === me,
     relation: id === me ? 'self' : !relation ? 'none' : relation.status === 'accepted' ? 'friend' : relation.outgoing ? 'requested' : 'incoming',
-    points, ...levelInfo(points), rank: rankRow.rank, userCount: userCount.n,
+    points, xp: points + learn.total, ...levelInfo(points + learn.total), rank: rankRow.rank, userCount: userCount.n,
     games: subjects.reduce((sum, s) => sum + s.games, 0), dayStreak: dayStreak(days.map((d) => d.day)),
     subjects, minPlayers: MIN_PLAYERS_FOR_SCORING,
     achievements: {

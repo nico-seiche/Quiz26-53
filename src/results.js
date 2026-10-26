@@ -54,9 +54,11 @@ router.get('/', requireAuth, async (req, res) => {
   `, [req.user.id, MIN_PLAYERS_FOR_SCORING]);
 
   const total = subjects.reduce((sum, s) => sum + s.points, 0);
+  const { learn } = await db.one('SELECT COALESCE(SUM(points), 0)::int AS learn FROM quiz.learn_events WHERE user_id = $1', [req.user.id]);
   res.json({
     total,
-    level: levelInfo(total),
+    learnPoints: learn,
+    level: levelInfo(total + learn),
     today,
     dayStreak: dayStreak(dayRows.map((r) => r.day)),
     games: subjects.reduce((sum, s) => sum + s.games, 0),

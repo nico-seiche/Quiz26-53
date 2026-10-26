@@ -74,7 +74,7 @@ supabase/          Datenbank-Migrationen
 
 Die Oberfläche folgt einem weichen Verlaufs-Design mit runden Karten, Level-Anzeige und bunter Navigation. Hinter den Home-Kacheln stehen echte Daten:
 
-- **Level:** alle 2.000 gewerteten Punkte ein Level (`POINTS_PER_LEVEL` in `src/config.js`).
+- **Level:** alle 2.000 Level-Punkte (gewertete Quizpunkte plus Lernpunkte) ein Level (`POINTS_PER_LEVEL` in `src/config.js`).
 - **Tage-Serie:** aufeinanderfolgende Tage (Europa/Berlin) mit mindestens einem gewerteten Spiel; sie bleibt bestehen, wenn man gestern gespielt hat.
 - **„+X heute“:** gewertete Punkte des heutigen Tages.
 - **„Aufsteiger!“:** der Platz in der Gesamtwertung ist seit dem letzten gewerteten Spiel besser geworden.
@@ -91,7 +91,7 @@ Der Host-Bildschirm zeigt in der Warteschlange oben eine kleine Infoleiste (Teil
 
 ## Lernpunkte
 
-Beim Üben mit Lernsets (`POST /api/study/cards/:id/review` mit `mode` und `share`) gibt es kleine Punkte (Tabelle `quiz.learn_events`): Karteikarten 5 (gewusst) bzw. 1, Lückentext bis 10, „Aus dem Kopf“ und „Tippen“ bis 15, anteilig nach dem Anteil richtiger Wörter. Pro Karte und Tag zählen höchstens 3 Wiederholungen (`LEARN_PER_CARD_PER_DAY` in `src/study.js`). Die Punkte fließen **nicht** in Bestenliste, Level oder Erfolge ein; angezeigt werden sie im eigenen Profil und auf dem Spielerprofil für andere („🧠 Lernpunkte“: gesamt, heute, 7 Tage, Balken der letzten 7 Tage und Aufteilung nach Lernart, `GET /api/study/stats`). Beim Lernen blendet ein „🧠 +8“ die Punkte ein, die Zusammenfassung nennt die Summe der Runde. Hören gibt keine Punkte.
+Beim Üben mit Lernsets (`POST /api/study/cards/:id/review` mit `mode` und `share`) gibt es kleine Punkte (Tabelle `quiz.learn_events`): Karteikarten 5 (gewusst) bzw. 1, Lückentext bis 10, „Aus dem Kopf“ und „Tippen“ bis 15, anteilig nach dem Anteil richtiger Wörter. Pro Karte und Tag zählen höchstens 3 Wiederholungen (`LEARN_PER_CARD_PER_DAY` in `src/study.js`). Die Punkte zählen **fürs Level** (Level-Punkte = gewertete Quizpunkte + Lernpunkte, alle `POINTS_PER_LEVEL`), aber **nicht** für Bestenliste und Erfolge; angezeigt werden sie im eigenen Profil und auf dem Spielerprofil für andere („🧠 Lernpunkte“: gesamt, heute, 7 Tage, Balken der letzten 7 Tage und Aufteilung nach Lernart, `GET /api/study/stats`). Beim Lernen blendet ein „🧠 +8“ die Punkte ein, die Zusammenfassung nennt die Summe der Runde. Hören gibt keine Punkte.
 
 ## Hell/Dunkel-Schalter
 
