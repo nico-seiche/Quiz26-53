@@ -91,7 +91,7 @@ Der Host-Bildschirm zeigt in der Warteschlange oben eine kleine Infoleiste (Teil
 
 ## Lernpunkte
 
-Beim Üben mit Lernsets (`POST /api/study/cards/:id/review` mit `mode` und `share`) gibt es kleine Punkte (Tabelle `quiz.learn_events`): Karteikarten 5 (gewusst) bzw. 1, Lückentext bis 10, „Aus dem Kopf“ und „Tippen“ bis 15, anteilig nach dem Anteil richtiger Wörter. Pro Karte und Tag zählen höchstens 3 Wiederholungen (`LEARN_PER_CARD_PER_DAY` in `src/study.js`). Die Punkte fließen **nicht** in Bestenliste, Level oder Erfolge ein; angezeigt werden sie nur im eigenen Profil („🧠 Lernpunkte“: gesamt, heute, 7 Tage, Balken der letzten 7 Tage und Aufteilung nach Lernart, `GET /api/study/stats`). Beim Lernen blendet ein „🧠 +8“ die Punkte ein, die Zusammenfassung nennt die Summe der Runde. Hören gibt keine Punkte.
+Beim Üben mit Lernsets (`POST /api/study/cards/:id/review` mit `mode` und `share`) gibt es kleine Punkte (Tabelle `quiz.learn_events`): Karteikarten 5 (gewusst) bzw. 1, Lückentext bis 10, „Aus dem Kopf“ und „Tippen“ bis 15, anteilig nach dem Anteil richtiger Wörter. Pro Karte und Tag zählen höchstens 3 Wiederholungen (`LEARN_PER_CARD_PER_DAY` in `src/study.js`). Die Punkte fließen **nicht** in Bestenliste, Level oder Erfolge ein; angezeigt werden sie im eigenen Profil und auf dem Spielerprofil für andere („🧠 Lernpunkte“: gesamt, heute, 7 Tage, Balken der letzten 7 Tage und Aufteilung nach Lernart, `GET /api/study/stats`). Beim Lernen blendet ein „🧠 +8“ die Punkte ein, die Zusammenfassung nennt die Summe der Runde. Hören gibt keine Punkte.
 
 ## Hell/Dunkel-Schalter
 
@@ -99,7 +99,7 @@ Oben rechts neben dem Level (auf Seiten mit Navigation; auf dem Profil neben „
 
 ## Spielerprofile
 
-Namen und Avatare registrierter Spieler sind Links (`profileLink()` in `public/js/common.js`) zu `/user?name=…` (Bestenliste, Freunde, Battle, Quiz-Editor). `GET /api/users/:name` (`src/users.js`) liefert Level, Gesamtpunkte, Platz, Tage-Serie, Punkte je Fach, Erfolge, Battle-Bilanz (gesamt und gegen den Betrachter) sowie die letzten fünf gewerteten Spiele; der Betrachter kann dort eine Freundschaftsanfrage senden/annehmen oder einen Freund entfernen. Lernpunkte und Lernfortschritt gehören nicht dazu. Das eigene Profil leitet auf `/profile` um. Gäste haben kein Profil und sind nicht verlinkt.
+Namen und Avatare registrierter Spieler sind Links (`profileLink()` in `public/js/common.js`) zu `/user?name=…` (Bestenliste, Freunde, Battle, Quiz-Editor). `GET /api/users/:name` (`src/users.js`) liefert Level, Gesamtpunkte, Platz, Tage-Serie, Punkte je Fach, Erfolge, Battle-Bilanz (gesamt und gegen den Betrachter) sowie die letzten fünf gewerteten Spiele; der Betrachter kann dort eine Freundschaftsanfrage senden/annehmen oder einen Freund entfernen. Dazu kommen die Lernpunkte (gesamt, 7 Tage, nach Lernart); der Lernfortschritt je Karte gehört nicht dazu. Das eigene Profil leitet auf `/profile` um. Gäste haben kein Profil und sind nicht verlinkt.
 
 ## Profilbild
 

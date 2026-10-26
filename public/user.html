@@ -30,7 +30,7 @@
   <script>
     const name = new URLSearchParams(location.search).get('name');
     const nf = (n) => n.toLocaleString('de-DE');
-    const WEEK = { win: 'Siege', loss: 'Niederlagen', draw: 'Remis' };
+    const MODE_NAMES = { cards: '🃏 Karteikarten', cloze: '✏️ Lückentext', free: '🧠 Aus dem Kopf', type: '⌨️ Tippen' };
     let me = null;
     let p = null;
 
@@ -52,6 +52,7 @@
       const since = new Date(p.memberSince).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
       const bar = (v, max) => `<div class="stat-bar"><span style="width:${max ? (v / max) * 100 : 0}%"></span></div>`;
       const maxSubject = Math.max(1, ...p.subjects.map((s) => s.points));
+      const maxMode = Math.max(1, ...p.learn.byMode.map((m) => m.points));
       const bt = p.battles.wins + p.battles.losses + p.battles.draws;
       const vs = p.vsMe;
       $('#page').innerHTML = `
@@ -77,6 +78,12 @@
           <h2 style="margin-bottom:.4rem">Punkte nach Fach</h2>
           <p class="muted" style="margin-top:0">${nf(p.games)} ${p.games === 1 ? 'gewertetes Spiel' : 'gewertete Spiele'} (ab ${p.minPlayers} Teilnehmern)</p>
           ${p.subjects.map((s) => `<div class="stat-row wide"><span>${s.icon || ''} ${escapeHtml(s.name)}</span>${bar(s.points, maxSubject)}<span class="stat-points">${nf(s.points)}</span></div>`).join('')}
+        </div>
+
+        <div class="card">
+          <h2 style="margin-bottom:.25rem">🧠 Lernpunkte</h2>
+          <div class="row" style="align-items:flex-end"><div class="stat-total">${nf(p.learn.total)}</div><span class="tag">7 Tage +${nf(p.learn.week)}</span></div>
+          ${p.learn.byMode.length ? p.learn.byMode.map((m) => `<div class="stat-row wide" title="${m.reviews} ${m.reviews === 1 ? 'Karte' : 'Karten'} geübt"><span>${MODE_NAMES[m.mode] || m.mode}</span>${bar(m.points, maxMode)}<span class="stat-points">${nf(m.points)}</span></div>`).join('') : '<p class="muted" style="margin:.4rem 0 0">Noch nichts geübt.</p>'}
         </div>
 
         <div class="card">

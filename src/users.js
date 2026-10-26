@@ -9,14 +9,16 @@ const router = express.Router();
 router.use(requireAuth);
 
 // Öffentliches Profil eines Spielers: Level, Punkte, Platz, Fächer, Erfolge, Battles, zuletzt gespielt.
-// Nicht enthalten: Lernpunkte und Lernfortschritt (die gehören nur dem Spieler selbst).
+// Lernpunkte (gesamt, 7 Tage, nach Lernart) sind sichtbar, der Lernfortschritt je Karte nicht.
+const TODAY = "(now() AT TIME ZONE 'Europe/Berlin')::date";
+const DAY = "(created_at AT TIME ZONE 'Europe/Berlin')::date";
 router.get('/:username', async (req, res) => {
   const user = await db.one('SELECT id, username, friend_code, created_at FROM quiz.users WHERE lower(username) = lower($1)', [req.params.username]);
   if (!user) return res.status(404).json({ error: 'Spieler nicht gefunden' });
   const id = Number(user.id);
   const me = req.user.id;
 
-  const [subjects, other, rankRow, userCount, days, earnedRows, recent, battles, relation] = await Promise.all([
+  const [subjects, other, rankRow, userCount, days, earnedRows, recent, battles, relation, learn, learnModes] = await Promise.all([
     db.query(`
       SELECT s.name, s.icon, COALESCE(SUM(r.score), 0)::int AS points, COUNT(r.id)::int AS games
       FROM quiz.subjects s LEFT JOIN quiz.game_results r ON r.subject_id = s.id AND r.user_id = $1 AND r.player_count >= $2
@@ -42,6 +44,9 @@ router.get('/:username', async (req, res) => {
     db.one(`
       SELECT status, (requester_id = $1) AS outgoing FROM quiz.friendships
       WHERE LEAST(requester_id, addressee_id) = LEAST($1::bigint, $2::bigint) AND GREATEST(requester_id, addressee_id) = GREATEST($1::bigint, $2::bigint)`, [me, id]),
+    db.one(`SELECT COALESCE(SUM(points), 0)::int AS total, COALESCE(SUM(points) FILTER (WHERE ${DAY} > ${TODAY} - 7), 0)::int AS week
+            FROM quiz.learn_events WHERE user_id = $1`, [id]),
+    db.query('SELECT mode, SUM(points)::int AS points, COUNT(*)::int AS reviews FROM quiz.learn_events WHERE user_id = $1 GROUP BY mode ORDER BY SUM(points) DESC', [id]),
   ]);
 
   if (other.games) subjects.push({ name: 'Ohne Fach', icon: '📘', ...other });
@@ -67,6 +72,7 @@ router.get('/:username', async (req, res) => {
       items: ACHIEVEMENTS.map((a) => ({ icon: a.icon, name: a.name, description: a.description, earned: earned.has(a.key) })),
     },
     battles: record, vsMe, recent,
+    learn: { total: learn.total, week: learn.week, byMode: learnModes },
   });
 });
 
