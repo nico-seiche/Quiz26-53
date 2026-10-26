@@ -56,10 +56,11 @@ function setSessionCookie(req, res, { token, expiresAt }) {
 const router = express.Router();
 
 router.post('/register', async (req, res) => {
-  const username = String(req.body.username || '').trim();
+  const username = String(req.body.username || '').trim().normalize('NFC');
   const password = String(req.body.password || '');
-  if (!/^[A-Za-z0-9_.-]{3,20}$/.test(username)) {
-    return res.status(400).json({ error: 'Nutzername: 3–20 Zeichen (Buchstaben, Zahlen, _ . -)' });
+  // Buchstaben aller Sprachen (auch Umlaute, ß, é …), Zahlen und _ . -
+  if (!/^[\p{L}\p{N}_.-]{3,20}$/u.test(username)) {
+    return res.status(400).json({ error: 'Nutzername: 3–20 Zeichen (Buchstaben inkl. Umlaute, Zahlen, _ . -)' });
   }
   if (password.length < 6) {
     return res.status(400).json({ error: 'Passwort muss mindestens 6 Zeichen haben' });
@@ -87,7 +88,7 @@ router.post('/register', async (req, res) => {
 });
 
 router.post('/login', async (req, res) => {
-  const username = String(req.body.username || '').trim();
+  const username = String(req.body.username || '').trim().normalize('NFC');
   const password = String(req.body.password || '');
   const user = await db.one('SELECT * FROM quiz.users WHERE lower(username) = lower($1)', [username]);
   if (!user || !(await bcrypt.compare(password, user.password_hash))) {

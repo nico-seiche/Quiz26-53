@@ -9,7 +9,7 @@ const CODE = /^#?(\d{1,5})$/;
 
 // Nutzer anhand von Name oder #ID finden (exakt)
 async function findUser(input) {
-  const text = String(input || '').trim();
+  const text = String(input || '').trim().normalize('NFC');
   if (!text) return null;
   const m = text.match(/^#(\d{5})$/) || (/^\d{5}$/.test(text) ? [null, text] : null);
   if (m) return db.one('SELECT id, username, friend_code FROM quiz.users WHERE friend_code = $1', [m[1]]);
