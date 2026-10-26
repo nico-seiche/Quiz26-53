@@ -10,6 +10,14 @@ const MAX_CARDS = 300;
 const BOX_DAYS = [0, 1, 3, 7, 21];
 const MASTERED_BOX = 3;
 
+// Lernpunkte je Lernart: Höchstpunkte pro Karte, bei Lückentext/Aus dem Kopf/Tippen anteilig nach Richtigkeit.
+// Karteikarten sind Selbsteinschätzung: gewusst 5, nicht gewusst 1 (fürs Üben).
+const LEARN_MAX = { cards: 5, cloze: 10, free: 15, type: 15 };
+// Je Karte und Tag zählen höchstens so viele Wiederholungen (verhindert Punkte-Farmen an einer Karte)
+const LEARN_PER_CARD_PER_DAY = 3;
+const DAY = "(created_at AT TIME ZONE 'Europe/Berlin')::date";
+const TODAY = "(now() AT TIME ZONE 'Europe/Berlin')::date";
+
 const isId = (id) => /^\d+$/.test(String(id));
 
 // Prüft Titel, Fach und Karten aus dem Request; liefert die bereinigten Daten oder wirft einen Fehlertext
@@ -103,6 +111,22 @@ router.post('/', async (req, res) => {
   res.json({ id });
 });
 
+// Übersicht der eigenen Lernpunkte (Profil)
+router.get('/stats', async (req, res) => {
+  const [total, byMode, days] = await Promise.all([
+    db.one(`SELECT COALESCE(SUM(points), 0)::int AS total, COUNT(*)::int AS reviews,
+              COALESCE(SUM(points) FILTER (WHERE ${DAY} = ${TODAY}), 0)::int AS today,
+              COALESCE(SUM(points) FILTER (WHERE ${DAY} > ${TODAY} - 7), 0)::int AS week
+            FROM quiz.learn_events WHERE user_id = $1`, [req.user.id]),
+    db.query('SELECT mode, SUM(points)::int AS points, COUNT(*)::int AS reviews FROM quiz.learn_events WHERE user_id = $1 GROUP BY mode ORDER BY SUM(points) DESC', [req.user.id]),
+    db.query(`SELECT to_char(d.day, 'YYYY-MM-DD') AS day, COALESCE(SUM(e.points), 0)::int AS points
+              FROM generate_series(${TODAY} - 6, ${TODAY}, interval '1 day') AS d(day)
+              LEFT JOIN quiz.learn_events e ON e.user_id = $1 AND ${DAY.replace('created_at', 'e.created_at')} = d.day::date
+              GROUP BY d.day ORDER BY d.day`, [req.user.id]),
+  ]);
+  res.json({ ...total, byMode, days });
+});
+
 // Kartenreihenfolge ist fest; Fortschritt (box, fällig) gehört dem jeweiligen Nutzer
 router.get('/:id', async (req, res) => {
   const set = await loadSet(req.params.id, req.user.id);
@@ -180,7 +204,19 @@ router.post('/cards/:cardId/review', async (req, res) => {
       box = $3, due_at = now() + $4 * interval '1 day', reviews = card_progress.reviews + 1, last_at = now()
     RETURNING box, due_at
   `, [req.user.id, card.id, box, BOX_DAYS[box]]);
-  res.json({ box: Number(row.box), dueAt: row.due_at });
+
+  // Lernpunkte (zählen nur im Profil)
+  const mode = String(req.body.mode || 'cards');
+  let points = 0;
+  if (LEARN_MAX[mode]) {
+    const share = mode === 'cards' ? (req.body.known ? 1 : 0.2) : Math.max(0, Math.min(1, Number(req.body.share) || 0));
+    const { n } = await db.one(`SELECT COUNT(*)::int AS n FROM quiz.learn_events WHERE user_id = $1 AND card_id = $2 AND ${DAY} = ${TODAY}`, [req.user.id, card.id]);
+    if (n < LEARN_PER_CARD_PER_DAY) {
+      points = Math.max(1, Math.round(LEARN_MAX[mode] * share));
+      await db.query('INSERT INTO quiz.learn_events (user_id, card_id, mode, points) VALUES ($1, $2, $3, $4)', [req.user.id, card.id, mode, points]);
+    }
+  }
+  res.json({ box: Number(row.box), dueAt: row.due_at, points });
 });
 
 module.exports = { router };

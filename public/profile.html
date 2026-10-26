@@ -48,6 +48,18 @@
       <p class="muted" id="rule" style="margin-bottom:0"></p>
     </div>
 
+    <div class="card" id="learn-card">
+      <h2 style="margin-bottom:.25rem">🧠 Lernpunkte</h2>
+      <p class="muted" style="margin-top:0">Fürs Üben mit Lernsets – sie erscheinen nicht in der Bestenliste.</p>
+      <div class="row" style="align-items:flex-end">
+        <div class="stat-total" id="lp-total">0</div>
+        <span class="tag" id="lp-today"></span>
+        <span class="tag" id="lp-week"></span>
+      </div>
+      <div class="lp-days" id="lp-days" aria-label="Lernpunkte der letzten 7 Tage"></div>
+      <div id="lp-modes" style="margin-top:.75rem"></div>
+    </div>
+
     <div class="card" id="erfolge">
       <div class="row spread">
         <h2>Meine Erfolge</h2>
@@ -181,7 +193,30 @@
       try { await sendAvatar('DELETE'); location.reload(); } catch (err) { $('#avatar-error').textContent = err.message; }
     };
 
+    const MODE_NAMES = { cards: '🃏 Karteikarten', cloze: '✏️ Lückentext', free: '🧠 Aus dem Kopf', type: '⌨️ Tippen' };
+    async function loadLearn() {
+      const s = await api('/api/study/stats');
+      $('#lp-total').textContent = s.total.toLocaleString('de-DE');
+      $('#lp-today').textContent = `heute +${s.today.toLocaleString('de-DE')}`;
+      $('#lp-week').textContent = `7 Tage +${s.week.toLocaleString('de-DE')}`;
+      const max = Math.max(1, ...s.days.map((d) => d.points));
+      const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+      $('#lp-days').innerHTML = s.days.map((d) => `
+        <div class="lp-day" title="${new Date(d.day + 'T12:00:00').toLocaleDateString('de-DE')}: ${d.points} Punkte">
+          <div class="lp-bar"><span style="height:${(d.points / max) * 100}%"></span></div>
+          <span class="muted">${WEEKDAYS[new Date(d.day + 'T12:00:00').getDay()]}</span>
+        </div>`).join('');
+      const mm = Math.max(1, ...s.byMode.map((m) => m.points));
+      $('#lp-modes').innerHTML = s.byMode.map((m) => `
+        <div class="stat-row" title="${m.reviews} ${m.reviews === 1 ? 'Karte' : 'Karten'} geübt">
+          <span>${MODE_NAMES[m.mode] || m.mode}</span>
+          <div class="stat-bar"><span style="width:${(m.points / mm) * 100}%"></span></div>
+          <span class="stat-points">${m.points.toLocaleString('de-DE')}</span>
+        </div>`).join('') || '<p class="muted" style="margin:0">Noch nichts geübt – öffne unter „Lernen“ ein Lernset.</p>';
+    }
+
     requireLogin().then((me) => {
+      loadLearn().catch(() => {});
       $('#name').textContent = me.username;
       $('#profile-avatar').innerHTML = avatarHtml(me.username, '4.5rem');
       $('#profile-level').textContent = `🏅 Level ${me.level}`;

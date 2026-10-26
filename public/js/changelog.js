@@ -2,6 +2,15 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-10-28',
+    title: 'Neu: Lernpunkte',
+    items: [
+      ['🧠', 'Punkte fürs Üben', 'Beim Lernen mit Karteikarten, Lückentext, „Aus dem Kopf“ und „Tippen“ sammelst du jetzt Lernpunkte.'],
+      ['🔒', 'Nicht in der Bestenliste', 'Lernpunkte sind nur für dich: Du findest sie im Profil mit den letzten 7 Tagen und den Lernarten.'],
+      ['🌙', 'Hell & Dunkel', 'Neu: der Schalter oben rechts wechselt zwischen hellem und dunklem Modus.'],
+    ],
+  },
+  {
     id: '2026-10-27',
     title: 'Neu: Lobby-Reaktionen',
     items: [

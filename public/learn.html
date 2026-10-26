@@ -61,6 +61,9 @@
     let blanks = null;     // Lücken der aktuellen Karte
     let checked = false;
     let hearIdx = 0;
+    let lastShare = 0;      // Anteil richtig der zuletzt ausgewerteten Karte (für die Lernpunkte)
+    let sessionPoints = 0;  // in dieser Runde gesammelte Lernpunkte
+    const pendingSaves = [];
     let hearPlaying = false;
 
     const stage = $('#stage');
@@ -84,6 +87,7 @@
       queue = cards;
       total = cards.length;
       known = 0;
+      sessionPoints = 0;
       retried = new Set();
       markTabs();
       next();
@@ -116,6 +120,7 @@
         <div class="card" style="text-align:center">
           <div class="score-big">🎉 Geschafft!</div>
           <p>${known} von ${total} ${total === 1 ? 'Karte' : 'Karten'} gewusst.</p>
+          ${sessionPoints ? `<p><strong>🧠 +${sessionPoints} Lernpunkte</strong> <span class="muted">· siehst du im Profil</span></p>` : ''}
           <div class="row" style="justify-content:center">
             <button type="button" class="primary" id="again">Nochmal</button>
             <a class="btn" href="/study">Zu den Lernsets</a>
@@ -131,8 +136,21 @@
       if (isKnown) known++;
       else if (!retried.has(c.id)) { retried.add(c.id); queue.push(c); total++; }
       c.due = false;
-      api(`/api/study/cards/${c.id}/review`, { method: 'POST', body: { known: isKnown } }).catch((e) => { $('#error').textContent = e.message; });
-      next();
+      const saved = api(`/api/study/cards/${c.id}/review`, { method: 'POST', body: { known: isKnown, mode, share: mode === 'cards' ? undefined : lastShare } })
+        .then((r) => { if (r.points) { sessionPoints += r.points; pointsToast(r.points); } })
+        .catch((e) => { $('#error').textContent = e.message; });
+      pendingSaves.push(saved);
+      // Letzte Karte: kurz auf die Speicherung warten, damit die Punkte in der Zusammenfassung stimmen
+      if (!queue.length) Promise.allSettled(pendingSaves).then(next); else next();
+    }
+
+    // Kleine Einblendung „+8“ für die Lernpunkte
+    function pointsToast(n) {
+      const el = document.createElement('div');
+      el.className = 'points-toast';
+      el.textContent = `🧠 +${n}`;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 1400);
     }
 
     // --- Karteikarten ---
@@ -230,6 +248,7 @@
     // Auswertung unter der Aufgabe: ab PASS gewusst, sonst nochmal
     function resultBox(share, summary, extra = '') {
       const pass = share >= PASS;
+      lastShare = share;
       $('#check').hidden = true; $('#skip').hidden = true;
       $('#result').dataset.pass = pass ? 1 : 0;
       $('#result').innerHTML = `
