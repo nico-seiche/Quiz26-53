@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <script>try{var d=document.documentElement,t=localStorage.getItem("theme"),m=localStorage.getItem("motion");if(t)d.dataset.theme=t;if(m==="off"||(m!=="on"&&matchMedia("(prefers-reduced-motion: reduce)").matches))d.classList.add("reduce-motion")}catch(e){}</script>
+  <script>try{var d=document.documentElement,t=localStorage.getItem("theme"),m=localStorage.getItem("motion");if(t)d.dataset.theme=t;if(m==="off"||(m==="auto"&&matchMedia("(prefers-reduced-motion: reduce)").matches))d.classList.add("reduce-motion")}catch(e){}</script>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#5b4de8">
   <meta name="mobile-web-app-capable" content="yes">
@@ -86,7 +86,7 @@
       <ul class="feature-list">
         <li><span class="fi">➕</span><div><strong>Auf den Home-Bildschirm</strong><span class="muted">Im Browser-Menü „Zum Home-Bildschirm“ wählen – dann startet die Seite wie eine App ohne Adressleiste.</span></div></li>
         <li><span class="fi">🌙</span><div><strong>Heller &amp; dunkler Modus</strong><span class="muted">Folgt automatisch deinem Handy – oder stelle es selbst mit dem Schalter oben rechts ein (☀️/🌙).</span></div></li>
-        <li><span class="fi">🎬</span><div><strong>Animationen an/aus</strong><span class="muted">Folgt der Einstellung deines Geräts. Unter Profil kannst du sie auch fest einschalten – nützlich, wenn dein Browser sie wegen der Systemeinstellung abschaltet.</span></div></li>
+        <li><span class="fi">🎬</span><div><strong>Animationen an/aus</strong><span class="muted">Standardmäßig immer an. Unter Profil kannst du sie ausschalten oder der Einstellung deines Geräts folgen lassen.</span></div></li>
         <li><span class="fi">✨</span><div><strong>Neuigkeiten</strong><span class="muted">Bei neuen Funktionen zeigt die Seite einmal ein kleines Fenster mit den Highlights.</span></div></li>
       </ul>
     </section>

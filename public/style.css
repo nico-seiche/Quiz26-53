@@ -580,28 +580,31 @@ button.tw.bad:hover:not(:disabled) { transform: none; }
 .lobby-top { margin-bottom: .75rem; gap: 1.5rem; }
 .float-area { position: relative; overflow: hidden; min-height: max(22rem, calc(100vh - 21rem)); border-radius: var(--radius); border: 1px solid var(--border); background: radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--primary) 12%, transparent), transparent 55%), radial-gradient(circle at 80% 80%, color-mix(in srgb, #ec4899 12%, transparent), transparent 55%), var(--card); box-shadow: var(--shadow); }
 .float-empty { position: absolute; inset: 0; display: grid; place-items: center; font-size: 1.2rem; }
-.bubble {
-  position: absolute; display: inline-flex; align-items: center; gap: .55rem; padding: .35rem .9rem .35rem .4rem; border-radius: 999px;
+/* Blase = äußerer Rahmen (schwebt) + innere Pille (poppt auf). Nur klassisches "transform", das läuft in jedem Browser. */
+.bubble { position: absolute; animation: drift var(--d, 12s) ease-in-out var(--delay, 0s) infinite; }
+.bubble-pill {
+  display: inline-flex; align-items: center; gap: .55rem; padding: .35rem .9rem .35rem .4rem; border-radius: 999px;
   font-weight: 800; font-size: 1.15rem; background: var(--bg); border: 1px solid var(--border); box-shadow: 0 6px 18px rgba(79, 70, 229, .18);
-  animation: bubble-in .5s cubic-bezier(.2, 1.4, .4, 1) both, drift var(--d, 12s) ease-in-out var(--delay, 0s) infinite;
+  animation: bubble-in .5s cubic-bezier(.2, 1.4, .4, 1) both;
 }
-@keyframes bubble-in { from { opacity: 0; scale: .2; } to { opacity: 1; scale: 1; } }
+@keyframes bubble-in { from { opacity: 0; transform: scale(.2); } to { opacity: 1; transform: scale(1); } }
 @keyframes drift {
-  0%, 100% { translate: 0 0; }
-  25% { translate: var(--dx) calc(var(--dy) * -.6); }
-  50% { translate: calc(var(--dx) * -.5) var(--dy); }
-  75% { translate: calc(var(--dx) * -1) calc(var(--dy) * .4); }
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(var(--dx), calc(var(--dy) * -.6)); }
+  50% { transform: translate(calc(var(--dx) * -.5), var(--dy)); }
+  75% { transform: translate(calc(var(--dx) * -1), calc(var(--dy) * .4)); }
 }
 .reaction { position: absolute; z-index: 5; display: flex; flex-direction: column; align-items: center; pointer-events: none; transform: translateX(-50%); animation: reaction-rise 3.1s ease-out forwards; }
 .reaction-emoji { font-size: 3.4rem; line-height: 1; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, .25)); }
 .reaction-name { font-size: .85rem; font-weight: 800; padding: .1rem .5rem; border-radius: 999px; background: var(--card); border: 1px solid var(--border); }
 @keyframes reaction-rise {
-  0% { opacity: 0; translate: 0 10px; scale: .3; }
-  12% { opacity: 1; scale: 1.25; }
-  25% { scale: 1; }
-  100% { opacity: 0; translate: var(--sway) -220px; scale: 1; }
+  0% { opacity: 0; transform: translate(-50%, 10px) scale(.3); }
+  12% { opacity: 1; transform: translate(-50%, 0) scale(1.25); }
+  25% { transform: translate(-50%, -10px) scale(1); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--sway)), -220px) scale(1); }
 }
-.reduce-motion .bubble { animation: bubble-in .01s both; }
+.reduce-motion .bubble { animation: none; }
+.reduce-motion .bubble-pill { animation: none; }
 .reduce-motion .reaction { animation: reaction-rise 3s linear forwards; }
 @media (max-width: 640px) { .lobby-qr { width: 150px; height: 150px; } .lobby-top .pin { font-size: 2.6rem; } }
 /* Reaktionen auf dem Handy */
@@ -634,7 +637,7 @@ body.lobby-lock .info-bar { margin-bottom: .5rem; }
 
 /* Lernpunkte */
 .points-toast { position: fixed; left: 50%; top: 4.5rem; z-index: 90; transform: translateX(-50%); padding: .35rem .9rem; border-radius: 999px; font-weight: 800; color: #fff; background: var(--primary-grad); box-shadow: var(--glow); pointer-events: none; animation: points-up 1.4s ease-out forwards; }
-@keyframes points-up { 0% { opacity: 0; translate: 0 10px; } 15% { opacity: 1; translate: 0 0; } 80% { opacity: 1; } 100% { opacity: 0; translate: 0 -14px; } }
+@keyframes points-up { 0% { opacity: 0; transform: translate(-50%, 10px); } 15% { opacity: 1; transform: translate(-50%, 0); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -14px); } }
 .lp-days { display: flex; gap: .5rem; align-items: flex-end; height: 5.5rem; margin-top: .75rem; }
 .lp-day { flex: 1; display: flex; flex-direction: column; align-items: center; gap: .2rem; height: 100%; font-size: .75rem; }
 .lp-bar { flex: 1; width: 100%; display: flex; align-items: flex-end; background: var(--bg); border-radius: 8px; overflow: hidden; }

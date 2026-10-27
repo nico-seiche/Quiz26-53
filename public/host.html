@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <script>try{var d=document.documentElement,t=localStorage.getItem("theme"),m=localStorage.getItem("motion");if(t)d.dataset.theme=t;if(m==="off"||(m!=="on"&&matchMedia("(prefers-reduced-motion: reduce)").matches))d.classList.add("reduce-motion")}catch(e){}</script>
+  <script>try{var d=document.documentElement,t=localStorage.getItem("theme"),m=localStorage.getItem("motion");if(t)d.dataset.theme=t;if(m==="off"||(m==="auto"&&matchMedia("(prefers-reduced-motion: reduce)").matches))d.classList.add("reduce-motion")}catch(e){}</script>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#5b4de8">
   <meta name="mobile-web-app-capable" content="yes">
@@ -308,7 +308,7 @@
         const el = document.createElement('div');
         el.className = 'bubble';
         el.style.cssText = `left:${6 + fx * 74}%;top:${6 + fy * 76}%;--d:${(9 + (n * 7) % 8)}s;--delay:${-(n * 1.7) % 9}s;--dx:${(n % 2 ? 1 : -1) * (30 + (n * 13) % 50)}px;--dy:${(n % 3 ? 1 : -1) * (20 + (n * 17) % 40)}px`;
-        el.innerHTML = `${avatarHtml(p.name, '2rem')}<span>${escapeHtml(p.name)}${p.guest ? ' <span class="muted">(Gast)</span>' : ''}</span>`;
+        el.innerHTML = `<span class="bubble-pill">${avatarHtml(p.name, '2rem')}<span>${escapeHtml(p.name)}${p.guest ? ' <span class="muted">(Gast)</span>' : ''}</span></span>`;
         el.dataset.name = p.name;
         area.appendChild(el);
         bubbles.set(p.name, el);

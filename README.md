@@ -95,7 +95,7 @@ Beim Üben mit Lernsets (`POST /api/study/cards/:id/review` mit `mode` und `shar
 
 ## Animationen (auch bei reduzierter Bewegung)
 
-Systeme wie Windows („Animationseffekte“ aus) melden `prefers-reduced-motion: reduce`; dann schaltete die Seite Animationen ab – im Edge sah man deshalb nichts Bewegtes. Jetzt entscheidet die Klasse `reduce-motion` am `<html>`, gesetzt durch das kleine Skript im `<head>` aller Seiten: Einstellung `motion` in `localStorage` (`auto` = Gerät folgen, `on` = immer an, `off` = aus). Auf der Profilseite gibt es dafür die Auswahl „🎬 Animationen“ samt Hinweis, wenn das Gerät Animationen abgeschaltet hat. Die Regeln dafür stehen in `public/style.css` als `.reduce-motion …`; Host- und Spielseite lesen dieselbe Klasse.
+Systeme wie Windows („Animationseffekte“ aus) melden `prefers-reduced-motion: reduce`; dann schaltete die Seite Animationen ab – im Edge sah man deshalb nichts Bewegtes. Jetzt sind Animationen **standardmäßig immer an**; die Klasse `reduce-motion` am `<html>` (gesetzt vom kleinen Skript im `<head>` aller Seiten) entsteht nur, wenn `localStorage.motion` auf `off` steht oder auf `auto` (= Gerät folgen) und das Gerät reduzierte Bewegung meldet. Zusätzlich verwenden die Animationen nur klassisches `transform`/`opacity` (keine einzelnen `translate`/`scale`-Eigenschaften), damit sie auch in älteren Browsern laufen. Auf der Profilseite gibt es dafür die Auswahl „🎬 Animationen“ (An / Wie mein Gerät / Aus) samt Hinweis. Die Regeln dafür stehen in `public/style.css` als `.reduce-motion …`; Host- und Spielseite lesen dieselbe Klasse.
 
 ## Hell/Dunkel-Schalter
 

@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <script>try{var d=document.documentElement,t=localStorage.getItem("theme"),m=localStorage.getItem("motion");if(t)d.dataset.theme=t;if(m==="off"||(m!=="on"&&matchMedia("(prefers-reduced-motion: reduce)").matches))d.classList.add("reduce-motion")}catch(e){}</script>
+  <script>try{var d=document.documentElement,t=localStorage.getItem("theme"),m=localStorage.getItem("motion");if(t)d.dataset.theme=t;if(m==="off"||(m==="auto"&&matchMedia("(prefers-reduced-motion: reduce)").matches))d.classList.add("reduce-motion")}catch(e){}</script>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#5b4de8">
   <meta name="mobile-web-app-capable" content="yes">
@@ -44,8 +44,8 @@
     <div class="card">
       <h2 style="margin-bottom:.4rem">🎬 Animationen</h2>
       <select id="motion" aria-label="Animationen">
-        <option value="auto">Automatisch (wie dein Gerät)</option>
-        <option value="on">Immer an</option>
+        <option value="on">An (Standard)</option>
+        <option value="auto">Wie mein Gerät</option>
         <option value="off">Aus</option>
       </select>
       <p class="muted" id="motion-hint" style="margin:.5rem 0 0"></p>
@@ -160,13 +160,14 @@
     (() => {
       const sel = $('#motion');
       const systemReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-      let saved = 'auto';
-      try { saved = localStorage.getItem('motion') || 'auto'; } catch {}
+      let saved = 'on';
+      try { saved = localStorage.getItem('motion') || 'on'; } catch {}
       sel.value = saved;
       const hint = () => {
         $('#motion-hint').textContent = saved === 'auto' && systemReduced
-          ? 'Dein Gerät hat Animationen abgeschaltet (z. B. Windows: Einstellungen → Barrierefreiheit → Visuelle Effekte → „Animationseffekte“). Wähle „Immer an“, um sie hier trotzdem zu sehen.'
-          : saved === 'off' ? 'Die Seite kommt ohne Bewegung aus.' : 'Bewegungen wie das Schweben der Namen, Konfetti und der animierte Zwischenstand sind aktiv.';
+          ? 'Dein Gerät hat Animationen abgeschaltet (Windows: Einstellungen → Barrierefreiheit → Visuelle Effekte → „Animationseffekte“), deshalb bleibt hier alles ruhig. Wähle „An“, um sie trotzdem zu sehen.'
+          : saved === 'off' ? 'Die Seite kommt ohne Bewegung aus.'
+          : saved === 'auto' ? 'Die Seite folgt der Einstellung deines Geräts.' : 'Bewegungen wie das Schweben der Namen, Konfetti und der animierte Zwischenstand sind aktiv, auch wenn dein Gerät sie sonst abschaltet.';
       };
       hint();
       sel.onchange = () => {

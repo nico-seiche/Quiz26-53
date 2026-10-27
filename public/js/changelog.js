@@ -2,10 +2,11 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
-    id: '2026-10-31',
-    title: 'Neu: Animationen einstellen',
+    id: '2026-11-01',
+    title: 'Animationen sind immer an',
     items: [
-      ['🎬', 'Animationen an/aus', 'Siehst du keine Bewegung (z. B. im Edge auf Windows)? Unter Profil → Animationen kannst du sie fest einschalten.'],
+      ['🎬', 'Jetzt auf jedem Gerät', 'Schwebende Namen, Konfetti, Reaktionen und die animierte Rangliste laufen jetzt standardmäßig immer – auch im Edge auf Windows.'],
+      ['⚙️', 'Einstellbar', 'Unter Profil → Animationen kannst du sie ausschalten oder der Einstellung deines Geräts folgen lassen.'],
       ['🔤', 'Umlaute im Nutzernamen', 'Nutzernamen dürfen jetzt Umlaute wie ä, ö, ü und ß enthalten.'],
     ],
   },
