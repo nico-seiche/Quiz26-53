@@ -652,3 +652,7 @@ body.lobby-lock .info-bar { margin-bottom: .5rem; }
 .stat-row.wide { grid-template-columns: minmax(8.5rem, auto) 1fr auto; }
 .stat-row.wide > span:first-child { white-space: nowrap; }
 @media (max-width: 640px) { .stat-row.wide { grid-template-columns: 8.5rem 1fr auto; } }
+
+/* Automatik im Host-Kopf */
+.auto-timer { font-weight: 800; min-width: 5.5rem; text-align: right; }
+#auto.on { border-color: var(--ok); color: var(--ok); }

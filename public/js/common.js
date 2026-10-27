@@ -71,6 +71,8 @@ function liveGame(pin, load, render) {
     clearTimeout(timer);
     // Kurz nach Ablauf der Frage neu laden, damit sie aufgelöst wird
     if (state.state === 'question') timer = setTimeout(refresh, remaining(state) * 1000 + 600);
+    // Automatik: kurz nach dem nächsten automatischen Schritt neu laden
+    else if (state.autoAt) timer = setTimeout(refresh, Math.max(0, state.autoAt - (Date.now() + offset)) + 500);
     render(state);
   }
 

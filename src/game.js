@@ -131,6 +131,43 @@ async function finish(client, game) {
   await awardForGame(client, game, players);
 }
 
+// Automatischer Ablauf: so lange bleibt jeder Zustand stehen, bevor es von selbst weitergeht (Sekunden)
+const AUTO_DELAY = { teams: 6, reveal: 5, scoreboard: 4 };
+
+// Ein Schritt im Ablauf (vom Host per Klick oder automatisch ausgelöst)
+async function advanceState(client, game) {
+  if (game.state === 'lobby' && game.team_count > 0) {
+    const { rows } = await client.query('SELECT COUNT(*)::int AS n FROM quiz.game_players WHERE game_pin = $1', [game.pin]);
+    const needed = game.team_count * MIN_PLAYERS_PER_TEAM;
+    if (rows[0].n < needed) {
+      return { error: `Für ${game.team_count} Teams braucht es mindestens ${needed} Teilnehmer.`, status: 409 };
+    }
+    await assignTeams(client, game);
+    await client.query("UPDATE quiz.games SET state = 'teams' WHERE pin = $1", [game.pin]);
+  } else if (game.state === 'lobby' || game.state === 'teams') {
+    await startQuestion(client, game, 0);
+  } else if (game.state === 'question') {
+    await reveal(client, game);
+  } else if (game.state === 'reveal') {
+    await client.query("UPDATE quiz.games SET state = 'scoreboard' WHERE pin = $1", [game.pin]);
+  } else if (game.state === 'scoreboard') {
+    const next = game.question_index + 1;
+    if (next < game.quiz.questions.length) await startQuestion(client, game, next);
+    else await finish(client, game);
+  } else {
+    return {};
+  }
+  return { changed: true };
+}
+
+// Ist im Automatik-Modus der nächste Schritt fällig? (Zeit seit dem letzten Zustandswechsel, gemessen von der Datenbank)
+async function autoDue(client, game) {
+  const delay = AUTO_DELAY[game.state];
+  if (!game.auto || !delay) return false;
+  const { rows } = await client.query('SELECT EXTRACT(EPOCH FROM (now() - state_since)) AS since FROM quiz.games WHERE pin = $1', [game.pin]);
+  return Number(rows[0].since) >= delay;
+}
+
 // Führt eine Änderung am Spiel unter Sperre aus; löst vorher fällige Fragen auf und benachrichtigt danach
 async function updateGame(pin, fn) {
   return db.tx(async (client) => {
@@ -142,6 +179,14 @@ async function updateGame(pin, fn) {
       game.state = 'reveal';
       changed = true;
     }
+    // Automatik: einen fälligen Schritt von selbst ausführen (höchstens einer pro Aufruf, danach beginnt die Wartezeit neu)
+    if (await autoDue(client, game)) {
+      const step = await advanceState(client, game);
+      if (step.changed) {
+        changed = true;
+        Object.assign(game, await lockGame(client, pin));
+      }
+    }
     const result = (fn && (await fn(client, game))) || {};
     if (changed || result.changed) await notify(client, pin);
     return result;
@@ -151,7 +196,10 @@ async function updateGame(pin, fn) {
 // Liest das Spiel; ist die Zeit einer Frage abgelaufen, wird sie erst aufgelöst
 async function loadGame(pin) {
   let game = await db.one('SELECT * FROM quiz.games WHERE pin = $1', [pin]);
-  if (game && game.state === 'question' && Date.now() >= game.ends_at.getTime()) {
+  const sinceRow = game && game.auto && AUTO_DELAY[game.state]
+    ? await db.one('SELECT EXTRACT(EPOCH FROM (now() - state_since)) AS since FROM quiz.games WHERE pin = $1', [pin]) : null;
+  if (game && ((game.state === 'question' && Date.now() >= game.ends_at.getTime())
+      || (sinceRow && Number(sinceRow.since) >= AUTO_DELAY[game.state]))) {
     await updateGame(pin);
     game = await db.one('SELECT * FROM quiz.games WHERE pin = $1', [pin]);
   }
@@ -179,6 +227,9 @@ async function loadGame(pin) {
         WHERE a.game_pin = $1 ORDER BY a.earned_at, a.achievement_key
       `, [pin])
     : [];
+  // Sekunden seit dem letzten Zustandswechsel (für die Anzeige „weiter in …“)
+  const since = await db.one('SELECT EXTRACT(EPOCH FROM (now() - state_since)) AS s FROM quiz.games WHERE pin = $1', [pin]);
+  game.since_s = Number(since.s);
   return { game, players, answers, previous, achievements };
 }
 
@@ -207,8 +258,11 @@ function baseView({ game }) {
     total: game.quiz.questions.length,
     minPlayers: MIN_PLAYERS_FOR_SCORING,
     teamCount: game.team_count,
+    auto: game.auto,
     serverNow: Date.now(),
   };
+  // Zeitpunkt des nächsten automatischen Schritts (Millisekunden, Serveruhr)
+  if (game.auto && AUTO_DELAY[game.state]) view.autoAt = Date.now() + Math.max(0, AUTO_DELAY[game.state] - game.since_s) * 1000;
   if (game.state === 'question' || game.state === 'reveal') {
     const q = currentQuestion(game);
     view.question = { text: q.text, answers: q.answers, timeLimit: q.timeLimit };
@@ -391,28 +445,15 @@ router.post('/:pin/react', async (req, res) => {
 });
 
 router.post('/:pin/next', requireAuth, requireHost, async (req, res) => {
+  const result = await updateGame(req.params.pin, (client, game) => advanceState(client, game));
+  if (result.error) return res.status(result.status).json({ error: result.error });
+  res.json(hostView(await loadGame(req.params.pin)));
+});
+
+// Automatik an/aus (der Host kann jederzeit selbst weiterklicken)
+router.post('/:pin/auto', requireAuth, requireHost, async (req, res) => {
   const result = await updateGame(req.params.pin, async (client, game) => {
-    if (game.state === 'lobby' && game.team_count > 0) {
-      const { rows } = await client.query('SELECT COUNT(*)::int AS n FROM quiz.game_players WHERE game_pin = $1', [game.pin]);
-      const needed = game.team_count * MIN_PLAYERS_PER_TEAM;
-      if (rows[0].n < needed) {
-        return { error: `Für ${game.team_count} Teams braucht es mindestens ${needed} Teilnehmer.`, status: 409 };
-      }
-      await assignTeams(client, game);
-      await client.query("UPDATE quiz.games SET state = 'teams' WHERE pin = $1", [game.pin]);
-    } else if (game.state === 'lobby' || game.state === 'teams') {
-      await startQuestion(client, game, 0);
-    } else if (game.state === 'question') {
-      await reveal(client, game);
-    } else if (game.state === 'reveal') {
-      await client.query("UPDATE quiz.games SET state = 'scoreboard' WHERE pin = $1", [game.pin]);
-    } else if (game.state === 'scoreboard') {
-      const next = game.question_index + 1;
-      if (next < game.quiz.questions.length) await startQuestion(client, game, next);
-      else await finish(client, game);
-    } else {
-      return {};
-    }
+    await client.query('UPDATE quiz.games SET auto = $2 WHERE pin = $1', [game.pin, Boolean(req.body.auto)]);
     return { changed: true };
   });
   if (result.error) return res.status(result.status).json({ error: result.error });

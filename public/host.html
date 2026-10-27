@@ -20,6 +20,8 @@
     <a class="brand" href="/dashboard">← Dashboard</a>
     <strong id="title"></strong>
     <div class="row">
+      <span class="muted auto-timer" id="auto-timer" aria-live="off"></span>
+      <button type="button" id="auto" aria-pressed="true" title="Das Quiz läuft nach dem Start von selbst weiter">⏩ Automatik: an</button>
       <button type="button" class="danger" id="end">Beenden</button>
       <button type="button" class="primary" id="next">Starten</button>
     </div>
@@ -39,6 +41,7 @@
     const reducedMotion = document.documentElement.classList.contains('reduce-motion');
     const BOARD_ROWS = 10;
     let joinInfo = null;
+    let autoOffset = 0;
     let state = null;
     let tick = null;
     let live;
@@ -372,6 +375,12 @@
         reveal: 'Rangliste zeigen',
         scoreboard: s.questionIndex + 1 < s.total ? 'Nächste Frage' : 'Siegerehrung',
       }[s.state] || '';
+      // Mit Automatik heißt der Knopf „weiter jetzt“: er überspringt nur die Wartezeit
+      if (s.auto && ['teams', 'reveal', 'scoreboard'].includes(s.state)) nextBtn.textContent = '⏭ Sofort weiter';
+      $('#auto').hidden = s.state === 'finished';
+      $('#auto').textContent = `⏩ Automatik: ${s.auto ? 'an' : 'aus'}`;
+      $('#auto').setAttribute('aria-pressed', String(s.auto));
+      $('#auto').classList.toggle('on', s.auto);
       nextBtn.disabled = s.state === 'lobby' && s.players.length < Math.max(1, s.teamCount * 2);
       updateTeamOptions(s);
     }
@@ -451,6 +460,7 @@
       };
       live = liveGame(pin, loadHost, (s) => {
         state = s;
+        autoOffset = s.serverNow - Date.now();
         render();
       });
       const act = async (action) => {
@@ -464,6 +474,17 @@
         }
       };
       $('#next').onclick = () => act('next');
+      $('#auto').onclick = async () => {
+        try { live.apply(await api(`/api/games/${encodeURIComponent(pin)}/auto`, { method: 'POST', body: { auto: !state.auto } })); }
+        catch (err) { $('#error').textContent = err.message; }
+      };
+      // „Weiter in 3 s“ neben den Knöpfen
+      setInterval(() => {
+        const el = $('#auto-timer');
+        if (!state || !state.auto || !state.autoAt) { el.textContent = ''; return; }
+        const left = Math.max(0, Math.ceil((state.autoAt - (Date.now() + autoOffset)) / 1000));
+        el.textContent = `Weiter in ${left} s`;
+      }, 250);
       $('#end').onclick = () => {
         if (confirm('Spiel wirklich beenden?')) act('end');
       };

@@ -2,6 +2,15 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-02',
+    title: 'Neu: Quiz läuft von selbst',
+    items: [
+      ['⏩', 'Automatischer Ablauf', 'Nach dem Start läuft das Quiz allein weiter: Frage, Auflösung, Rangliste, nächste Frage – ohne dass der Host klicken muss.'],
+      ['⏱️', 'Rangliste ca. 4 Sekunden', 'Der Zwischenstand bleibt etwa 4 Sekunden stehen, die Auflösung der Antwort 5 Sekunden. „Weiter in … s“ zeigt den Countdown.'],
+      ['🎛️', 'Jederzeit eingreifen', 'Der Schalter „Automatik“ oben beim Host stellt es aus; „Sofort weiter“ überspringt die Wartezeit.'],
+    ],
+  },
+  {
     id: '2026-11-01',
     title: 'Animationen sind immer an',
     items: [
