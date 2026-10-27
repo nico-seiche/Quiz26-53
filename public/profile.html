@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <script>try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+  <script>try{var d=document.documentElement,t=localStorage.getItem("theme"),m=localStorage.getItem("motion");if(t)d.dataset.theme=t;if(m==="off"||(m!=="on"&&matchMedia("(prefers-reduced-motion: reduce)").matches))d.classList.add("reduce-motion")}catch(e){}</script>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#5b4de8">
   <meta name="mobile-web-app-capable" content="yes">
@@ -40,6 +40,16 @@
       <span>👫 Freunde &amp; ID</span>
       <span class="muted" id="friend-hint">Freunde finden und hinzufügen →</span>
     </a>
+
+    <div class="card">
+      <h2 style="margin-bottom:.4rem">🎬 Animationen</h2>
+      <select id="motion" aria-label="Animationen">
+        <option value="auto">Automatisch (wie dein Gerät)</option>
+        <option value="on">Immer an</option>
+        <option value="off">Aus</option>
+      </select>
+      <p class="muted" id="motion-hint" style="margin:.5rem 0 0"></p>
+    </div>
 
     <div class="card">
       <h2>Meine Statistik</h2>
@@ -145,6 +155,26 @@
     }
 
     $('#more').onclick = () => { showAll = true; loadResults(); };
+
+    // --- Animationen: Gerät folgen, immer an oder aus ---
+    (() => {
+      const sel = $('#motion');
+      const systemReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let saved = 'auto';
+      try { saved = localStorage.getItem('motion') || 'auto'; } catch {}
+      sel.value = saved;
+      const hint = () => {
+        $('#motion-hint').textContent = saved === 'auto' && systemReduced
+          ? 'Dein Gerät hat Animationen abgeschaltet (z. B. Windows: Einstellungen → Barrierefreiheit → Visuelle Effekte → „Animationseffekte“). Wähle „Immer an“, um sie hier trotzdem zu sehen.'
+          : saved === 'off' ? 'Die Seite kommt ohne Bewegung aus.' : 'Bewegungen wie das Schweben der Namen, Konfetti und der animierte Zwischenstand sind aktiv.';
+      };
+      hint();
+      sel.onchange = () => {
+        saved = sel.value;
+        try { localStorage.setItem('motion', saved); } catch {}
+        location.reload();   // Skripte lesen die Einstellung beim Laden
+      };
+    })();
 
     // --- Profilbild ändern ---
     let pendingBlob = null;

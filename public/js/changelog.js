@@ -2,6 +2,14 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-10-31',
+    title: 'Neu: Animationen einstellen',
+    items: [
+      ['🎬', 'Animationen an/aus', 'Siehst du keine Bewegung (z. B. im Edge auf Windows)? Unter Profil → Animationen kannst du sie fest einschalten.'],
+      ['🔤', 'Umlaute im Nutzernamen', 'Nutzernamen dürfen jetzt Umlaute wie ä, ö, ü und ß enthalten.'],
+    ],
+  },
+  {
     id: '2026-10-30',
     title: 'Neu: Lernen bringt Level',
     items: [

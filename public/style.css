@@ -86,7 +86,8 @@ button:hover:not(:disabled), .btn:hover { transform: translateY(-1px); }
 button.primary, .btn.primary {
   background: var(--primary-grad); border-color: transparent; color: var(--primary-text); box-shadow: var(--glow);
 }
-@media (prefers-reduced-motion: reduce) { button, .btn { transition: none; } button:hover:not(:disabled), .btn:hover { transform: none; } }
+.reduce-motion button, .reduce-motion .btn { transition: none; }
+.reduce-motion button:hover:not(:disabled), .reduce-motion .btn:hover { transform: none; }
 button.danger { color: var(--danger); }
 button:disabled { opacity: .5; cursor: default; }
 .row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
@@ -187,11 +188,9 @@ ol.ranking li { padding: .25rem 0; }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes crown { from { transform: translateY(0) rotate(-6deg); } to { transform: translateY(-.35rem) rotate(6deg); } }
 @keyframes fall { to { transform: translateY(110vh) rotate(720deg); } }
-@media (prefers-reduced-motion: reduce) {
-  .board-row { transition: none; }
-  .slot, .winner-title, .fade-in, .pop-in, .slot .crown { animation: none; }
-  .confetti { display: none; }
-}
+.reduce-motion .board-row { transition: none; }
+.reduce-motion .slot, .reduce-motion .winner-title, .reduce-motion .fade-in, .reduce-motion .pop-in, .reduce-motion .slot .crown { animation: none; }
+.reduce-motion .confetti { display: none; }
 
 /* Countdown-Ring unter den Antworten (Teilnehmeransicht) */
 .timer-ring { position: relative; width: 6.5rem; height: 6.5rem; margin: 1.5rem auto 0; }
@@ -278,7 +277,7 @@ body.has-nav main { padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 0p
 .bottom-nav a[aria-current="page"] { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--primary); }
 .bottom-nav a[aria-current="page"] .nav-icon { transform: scale(1.12); }
 .bottom-nav a:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
-@media (prefers-reduced-motion: reduce) { .bottom-nav a, .bottom-nav .nav-icon { transition: none; } }
+.reduce-motion .bottom-nav a, .reduce-motion .bottom-nav .nav-icon { transition: none; }
 
 /* Avatar (Anfangsbuchstabe auf buntem Verlauf) und Level-Anzeige */
 .avatar {
@@ -381,7 +380,8 @@ body.has-nav main { padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 0p
   .recent-row { grid-template-columns: auto 1fr; }
   .recent-meta { grid-column: 1 / -1; justify-content: flex-start; }
 }
-@media (prefers-reduced-motion: reduce) { .tile { transition: none; } .tile:hover { transform: none; } }
+.reduce-motion .tile { transition: none; }
+.reduce-motion .tile:hover { transform: none; }
 #erfolge { scroll-margin-top: 1rem; }
 
 .profile-card { display: flex; align-items: center; gap: 1.1rem; }
@@ -437,7 +437,7 @@ select {
 .changelog-x { position: absolute; top: .6rem; right: .6rem; padding: .3rem .6rem; }
 .changelog-ok { width: 100%; }
 @keyframes changelog-in { from { opacity: 0; transform: translateY(12px) scale(.97); } }
-@media (prefers-reduced-motion: reduce) { .changelog { animation: none; } }
+.reduce-motion .changelog { animation: none; }
 
 /* Lernplattform */
 .study-card {
@@ -601,7 +601,8 @@ button.tw.bad:hover:not(:disabled) { transform: none; }
   25% { scale: 1; }
   100% { opacity: 0; translate: var(--sway) -220px; scale: 1; }
 }
-@media (prefers-reduced-motion: reduce) { .bubble { animation: bubble-in .01s both; } .reaction { animation: reaction-rise 3s linear forwards; } }
+.reduce-motion .bubble { animation: bubble-in .01s both; }
+.reduce-motion .reaction { animation: reaction-rise 3s linear forwards; }
 @media (max-width: 640px) { .lobby-qr { width: 150px; height: 150px; } .lobby-top .pin { font-size: 2.6rem; } }
 /* Reaktionen auf dem Handy */
 .react-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: .6rem; margin-top: 1rem; }
@@ -629,7 +630,7 @@ body.lobby-lock .info-bar { margin-bottom: .5rem; }
 .theme-switch[aria-checked="true"] .knob { transform: translateX(1.5rem); }
 .theme-switch:hover:not(:disabled) { transform: none; }
 .theme-switch:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
-@media (prefers-reduced-motion: reduce) { .theme-switch .knob { transition: none; } }
+.reduce-motion .theme-switch .knob { transition: none; }
 
 /* Lernpunkte */
 .points-toast { position: fixed; left: 50%; top: 4.5rem; z-index: 90; transform: translateX(-50%); padding: .35rem .9rem; border-radius: 999px; font-weight: 800; color: #fff; background: var(--primary-grad); box-shadow: var(--glow); pointer-events: none; animation: points-up 1.4s ease-out forwards; }
