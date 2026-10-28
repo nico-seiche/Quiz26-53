@@ -194,3 +194,9 @@ Die Erfolge sind in `src/achievements.js` definiert (Name, Symbol, Beschreibung)
 ## Punkte
 
 Aktuell einfache Wertung: richtige Antwort = 500–1000 Punkte, je schneller desto mehr. Die Logik steckt in `scoreAnswer()` in `src/game.js`. Am Spielende werden die Punkte aller eingeloggten Teilnehmenden in `quiz.game_results` gespeichert; Gäste werden nicht gespeichert. Laufende Spiele werden nach einem Tag gelöscht.
+
+## Mehrfachauswahl und Umfragen
+
+- **Mehrfachauswahl:** Im Editor kann jede Frage „Mehrere Antworten gleichzeitig wählbar“ sein (`questions.multi`, richtige Antworten als Bitmaske in `correct_mask`). Spieler schalten Antworten um und geben mit einem Button ab; Antworten werden als Bitmaske in `game_answers.mask` gespeichert (`choice` = kleinster gewählter Index). Punkte: Anteil `(richtige − falsche) / Anzahl richtiger` (mindestens 0) mal die Geschwindigkeitspunkte; Serie, Bonus und Erfolge nur bei komplett richtiger Antwort. Hilfsfunktionen in `src/answers.js`.
+- **Umfragen:** `quizzes.kind = 'poll'`. Keine richtige Antwort, keine Punkte, keine Rangliste, kein Eintrag in Erfolgen oder Ergebnissen. Nach jeder Frage zeigt der Host ein Balkendiagramm, am Ende alle Diagramme (`public/js/poll.js`). Das Ergebnis wird in `poll_runs` gespeichert und ist für Besitzer und Mitbearbeiter unter `/poll-results?quiz=<id>` abrufbar (`/api/polls`).
+- Migration: `supabase/migrations/021_multi_poll.sql`.

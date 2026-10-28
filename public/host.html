@@ -36,6 +36,7 @@
   </main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   <script src="/js/common.js"></script>
+  <script src="/js/poll.js"></script>
   <script>
     const pin = new URLSearchParams(location.search).get('pin');
     const reducedMotion = document.documentElement.classList.contains('reduce-motion');
@@ -81,7 +82,7 @@
 
     function answersHtml(q, reveal, distribution) {
       return `<div class="answers">${q.answers.map((a, i) => `
-        <div class="answer c${i} ${reveal && i !== q.correct ? 'dim' : ''}">
+        <div class="answer c${i} ${reveal && q.correctSet && !q.correctSet.includes(i) ? 'dim' : ''}">
           ${escapeHtml(a)}${distribution ? ` <span style="float:right">${distribution[i]}</span>` : ''}
         </div>`).join('')}</div>`;
     }
@@ -375,8 +376,12 @@
         reveal: 'Rangliste zeigen',
         scoreboard: s.questionIndex + 1 < s.total ? 'Nächste Frage' : 'Siegerehrung',
       }[s.state] || '';
+      if (s.kind === 'poll') {
+        nextBtn.textContent = { lobby: 'Umfrage starten', question: 'Ergebnis zeigen', reveal: s.questionIndex + 1 < s.total ? 'Nächste Frage' : 'Gesamtergebnis' }[s.state] || nextBtn.textContent;
+      }
       // Mit Automatik heißt der Knopf „weiter jetzt“: er überspringt nur die Wartezeit
       if (s.auto && ['teams', 'reveal', 'scoreboard'].includes(s.state)) nextBtn.textContent = '⏭ Sofort weiter';
+      $('#view').dataset.kind = s.kind;
       $('#auto').hidden = s.state === 'finished';
       $('#auto').textContent = `⏩ Automatik: ${s.auto ? 'an' : 'aus'}`;
       $('#auto').setAttribute('aria-pressed', String(s.auto));
@@ -419,10 +424,17 @@
             <span class="muted">${s.answeredCount} / ${s.players.length} geantwortet</span>
           </div>
           <div class="question-text">${escapeHtml(s.question.text)}</div>
+          ${s.question.multi ? `<div class="multi-hint host-hint">☑️ ${s.kind === 'poll' ? 'Mehrfachauswahl: jeder darf mehrere Antworten wählen' : 'Mehrere Antworten sind richtig – wählt alle richtigen!'}</div>`
+            : s.kind === 'poll' ? '<div class="multi-hint plain host-hint">📊 Umfrage – es gibt kein richtig oder falsch</div>' : ''}
           ${reveal ? '' : '<div class="timer" id="timer"></div>'}
-          ${answersHtml(s.question, reveal, reveal ? s.distribution : null)}`;
+          ${reveal && s.kind === 'poll'
+            ? `<div class="card">${pollChartHtml({ text: '', answers: s.question.answers, multi: s.question.multi, counts: s.distribution, respondents: s.answeredCount }, { big: true })}</div>`
+            : answersHtml(s.question, reveal, reveal ? s.distribution : null)}`;
       } else if (s.state === 'scoreboard') {
         html = scoreboardHtml(s);
+      } else if (s.state === 'finished' && s.kind === 'poll') {
+        html = `<h2 class="center" style="margin-top:0">📊 Ergebnisse: ${escapeHtml(s.title)}</h2>${s.poll ? pollResultsHtml(s.poll, { big: true }) : ''}
+          <p class="center muted">Die Ergebnisse sind gespeichert – du findest sie später unter „Quiz“ beim Knopf „📊 Ergebnisse“.</p>`;
       } else if (s.state === 'finished') {
         html = podiumHtml(s);
       }
@@ -439,7 +451,7 @@
         tick = setInterval(update, 250);
       } else if (s.state === 'scoreboard') {
         animateScoreboard(s);
-      } else if (s.state === 'finished' && s.players.length && !reducedMotion) {
+      } else if (s.state === 'finished' && s.kind !== 'poll' && s.players.length && !reducedMotion) {
         const places = Math.min(3, podiumEntries(s).length);
         later(confetti, (0.6 + (places - 1) * 1.8) * 1000 + 300);
       }

@@ -10,6 +10,7 @@ const friends = require('./friends');
 const battles = require('./battles');
 const avatars = require('./avatars');
 const users = require('./users');
+const polls = require('./polls');
 const db = require('./db');
 
 // Die API; lokal von server.js gestartet, auf Vercel als Serverless-Funktion (api/index.js)
@@ -55,6 +56,7 @@ app.use('/api/friends', friends.router);
 app.use('/api/battles', battles.router);
 app.use('/api/avatar', avatars.imageRouter);
 app.use('/api/users', users.router);
+app.use('/api/polls', polls.router);
 app.use('/api/me/avatar', avatars.meRouter);
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Nicht gefunden' }));

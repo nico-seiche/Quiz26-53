@@ -2,6 +2,16 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-04',
+    title: 'Neu: Mehrfachauswahl und Umfragen',
+    items: [
+      ['☑️', 'Mehrere Antworten richtig', 'Im Editor kannst du pro Frage „Mehrere Antworten gleichzeitig wählbar“ ankreuzen. Spieler sehen den Hinweis, tippen alle richtigen an und geben ab.'],
+      ['🎯', 'Teilpunkte', 'Wer nur einen Teil richtig hat, bekommt anteilig Punkte; falsche Kreuze ziehen ab. Serie und Bonus gibt es nur bei komplett richtig.'],
+      ['📊', 'Umfragen', 'Beim Erstellen „Umfrage“ wählen: kein richtig oder falsch, keine Punkte. Am Ende zeigt ein Diagramm alle Ergebnisse, zum Drüberreden.'],
+      ['🗂️', 'Ergebnisse bleiben', 'Jede Umfrage wird gespeichert – unter „Quiz“ findest du sie über „📊 Ergebnisse“.'],
+    ],
+  },
+  {
     id: '2026-11-03',
     title: 'Neu: Lernsets gemeinsam bearbeiten',
     items: [

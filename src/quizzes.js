@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('./db');
 const { requireAuth } = require('./auth');
 const { areFriends, findUser } = require('./friends');
+const { indexes, bit } = require('./answers');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -19,6 +20,9 @@ async function loadQuiz(id) {
     text: q.text,
     answers: q.answers,
     correct: q.correct,
+    multi: q.multi,
+    correctMask: q.correct_mask,
+    correctSet: q.multi && q.correct_mask ? indexes(q.correct_mask, q.answers.length) : [],
     timeLimit: q.time_limit,
   }));
   return quiz;
@@ -34,22 +38,29 @@ async function canEdit(quiz, userId) {
 const VERSION_SQL = `to_char(q.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US')`;
 
 // Prüft die Fragen aus dem Request und liefert eine bereinigte Liste oder wirft einen Fehlertext
-function validateQuestions(input) {
+// kind: "quiz" (richtige Antwort bzw. mehrere richtige) oder "poll" (Umfrage ohne richtig/falsch)
+function validateQuestions(input, kind = 'quiz') {
   if (!Array.isArray(input)) throw 'Fragen fehlen';
   return input.map((q, i) => {
     const nr = i + 1;
     const text = String(q.text || '').trim();
     const answers = (Array.isArray(q.answers) ? q.answers : []).map((a) => String(a || '').trim());
-    const correct = Number(q.correct);
     const timeLimit = Number(q.timeLimit) || 20;
+    const multi = Boolean(q.multi);
     if (!text) throw `Frage ${nr}: Fragetext fehlt`;
     if (answers.length < 2 || answers.length > 4) throw `Frage ${nr}: 2–4 Antworten erforderlich`;
     if (answers.some((a) => !a)) throw `Frage ${nr}: leere Antwort`;
-    if (!Number.isInteger(correct) || correct < 0 || correct >= answers.length) {
-      throw `Frage ${nr}: richtige Antwort markieren`;
-    }
     if (timeLimit < 5 || timeLimit > 120) throw `Frage ${nr}: Zeitlimit 5–120 Sekunden`;
-    return { text, answers, correct, timeLimit };
+    // Umfrage: keine richtige Antwort
+    if (kind === 'poll') return { text, answers, correct: 0, timeLimit, multi, correctMask: null };
+    if (!multi) {
+      const correct = Number(q.correct);
+      if (!Number.isInteger(correct) || correct < 0 || correct >= answers.length) throw `Frage ${nr}: richtige Antwort markieren`;
+      return { text, answers, correct, timeLimit, multi: false, correctMask: null };
+    }
+    const set = [...new Set((Array.isArray(q.correctSet) ? q.correctSet : []).map(Number))];
+    if (!set.length || set.some((x) => !Number.isInteger(x) || x < 0 || x >= answers.length)) throw `Frage ${nr}: mindestens eine richtige Antwort markieren`;
+    return { text, answers, correct: Math.min(...set), timeLimit, multi: true, correctMask: set.reduce((m, x) => m | bit(x), 0) };
   });
 }
 
@@ -57,9 +68,9 @@ async function saveQuestions(client, quizId, questions) {
   await client.query('DELETE FROM quiz.questions WHERE quiz_id = $1', [quizId]);
   for (const [i, q] of questions.entries()) {
     await client.query(`
-      INSERT INTO quiz.questions (quiz_id, position, text, answers, correct, time_limit)
-      VALUES ($1, $2, $3, $4, $5, $6)
-    `, [quizId, i, q.text, JSON.stringify(q.answers), q.correct, q.timeLimit]);
+      INSERT INTO quiz.questions (quiz_id, position, text, answers, correct, time_limit, multi, correct_mask)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `, [quizId, i, q.text, JSON.stringify(q.answers), q.correct, q.timeLimit, q.multi, q.correctMask]);
   }
 }
 
@@ -69,20 +80,21 @@ async function readBody(req, res) {
     res.status(400).json({ error: 'Titel fehlt' });
     return null;
   }
-  const mode = req.body.mode === undefined ? 'single' : req.body.mode;
+  const kind = req.body.kind === 'poll' ? 'poll' : 'quiz';
+  const mode = kind === 'poll' ? 'single' : (req.body.mode === undefined ? 'single' : req.body.mode);
   if (!['single', 'team'].includes(mode)) {
     res.status(400).json({ error: 'Ungültiger Spielmodus' });
     return null;
   }
-  const subjectId = Number(req.body.subjectId);
-  const subject = Number.isInteger(subjectId)
-    && await db.one('SELECT id FROM quiz.subjects WHERE id = $1', [subjectId]);
+  const subjectId = kind === 'poll' && !req.body.subjectId ? null : Number(req.body.subjectId);
+  const subject = subjectId === null || (Number.isInteger(subjectId)
+    && await db.one('SELECT id FROM quiz.subjects WHERE id = $1', [subjectId]));
   if (!subject) {
     res.status(400).json({ error: 'Bitte ein Fach auswählen' });
     return null;
   }
   try {
-    return { title, subjectId, mode, questions: validateQuestions(req.body.questions || []) };
+    return { title, subjectId, mode, kind, questions: validateQuestions(req.body.questions || [], kind) };
   } catch (msg) {
     res.status(400).json({ error: msg });
     return null;
@@ -91,7 +103,7 @@ async function readBody(req, res) {
 
 router.get('/', async (req, res) => {
   const quizzes = await db.query(`
-    SELECT q.id, q.title, q.updated_at, q.mode, s.name AS subject, s.icon AS subject_icon,
+    SELECT q.id, q.title, q.updated_at, q.mode, q.kind, s.name AS subject, s.icon AS subject_icon,
            u.username AS owner, (q.owner_id = $1) AS mine,
            (SELECT COUNT(*)::int FROM quiz.questions WHERE quiz_id = q.id) AS question_count,
            (SELECT COUNT(*)::int FROM quiz.quiz_collaborators WHERE quiz_id = q.id) AS collaborator_count
@@ -109,8 +121,8 @@ router.post('/', async (req, res) => {
   if (!body) return;
   const id = await db.tx(async (client) => {
     const { rows } = await client.query(
-      'INSERT INTO quiz.quizzes (owner_id, title, subject_id, mode, updated_by) VALUES ($1, $2, $3, $4, $1) RETURNING id',
-      [req.user.id, body.title, body.subjectId, body.mode],
+      'INSERT INTO quiz.quizzes (owner_id, title, subject_id, mode, kind, updated_by) VALUES ($1, $2, $3, $4, $5, $1) RETURNING id',
+      [req.user.id, body.title, body.subjectId, body.mode, body.kind],
     );
     await saveQuestions(client, rows[0].id, body.questions);
     return Number(rows[0].id);
@@ -141,12 +153,12 @@ const isId = (v) => /^\d+$/.test(String(v));
 const notifyQuiz = (quizId) => db.query('SELECT quiz.notify($1)', [`q${quizId}`]).catch(() => {});
 
 // Prüft eine einzelne Frage (gleiche Regeln wie beim Anlegen eines Quiz) und liefert sie bereinigt
-function cleanQuestion(input) {
+function cleanQuestion(input, kind = 'quiz') {
   try {
     const q = { ...input, answers: (Array.isArray(input.answers) ? input.answers : []).map((a) => String(a || '')) };
     // Leere Antwortfelder am Ende gelten als nicht vorhanden (Fragen mit 2–3 Antworten)
     while (q.answers.length > 2 && !q.answers[q.answers.length - 1].trim()) q.answers.pop();
-    return { ok: validateQuestions([q])[0] };
+    return { ok: validateQuestions([q], kind)[0] };
   } catch (msg) {
     return { error: String(msg).replace(/^Frage 1: /, '') };
   }
@@ -221,14 +233,14 @@ async function lockProblem(quizId, questionId, userId) {
 router.post('/:id/questions', async (req, res) => {
   const quiz = await loadQuiz(req.params.id);
   if (!quiz || !(await canEdit(quiz, req.user.id))) return res.status(404).json({ error: 'Quiz nicht gefunden' });
-  const { ok, error } = cleanQuestion(req.body);
+  const { ok, error } = cleanQuestion(req.body, quiz.kind);
   if (error) return res.status(400).json({ error });
   const created = await db.tx(async (client) => {
     await client.query('SELECT pg_advisory_xact_lock($1)', [quiz.id]);
     const { rows: [pos] } = await client.query('SELECT COALESCE(MAX(position) + 1, 0) AS next FROM quiz.questions WHERE quiz_id = $1', [quiz.id]);
     const { rows: [row] } = await client.query(`
-      INSERT INTO quiz.questions (quiz_id, position, text, answers, correct, time_limit)
-      VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, rev`, [quiz.id, pos.next, ok.text, JSON.stringify(ok.answers), ok.correct, ok.timeLimit]);
+      INSERT INTO quiz.questions (quiz_id, position, text, answers, correct, time_limit, multi, correct_mask)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, rev`, [quiz.id, pos.next, ok.text, JSON.stringify(ok.answers), ok.correct, ok.timeLimit, ok.multi, ok.correctMask]);
     await client.query(`
       INSERT INTO quiz.quiz_presence (quiz_id, user_id, question_id, seen_at) VALUES ($1, $2, $3, now())
       ON CONFLICT (quiz_id, user_id) DO UPDATE SET question_id = $3, seen_at = now()`, [quiz.id, req.user.id, row.id]);
@@ -246,11 +258,11 @@ router.put('/:id/questions/:qid', async (req, res) => {
   }
   const problem = await lockProblem(quiz.id, Number(req.params.qid), req.user.id);
   if (problem) return res.status(409).json({ ...problem, lock: true });
-  const { ok, error } = cleanQuestion(req.body);
+  const { ok, error } = cleanQuestion(req.body, quiz.kind);
   if (error) return res.status(400).json({ error });
   const row = await db.one(`
-    UPDATE quiz.questions SET text = $1, answers = $2, correct = $3, time_limit = $4, rev = rev + 1
-    WHERE id = $5 AND quiz_id = $6 RETURNING rev`, [ok.text, JSON.stringify(ok.answers), ok.correct, ok.timeLimit, req.params.qid, quiz.id]);
+    UPDATE quiz.questions SET text = $1, answers = $2, correct = $3, time_limit = $4, multi = $5, correct_mask = $6, rev = rev + 1
+    WHERE id = $7 AND quiz_id = $8 RETURNING rev`, [ok.text, JSON.stringify(ok.answers), ok.correct, ok.timeLimit, ok.multi, ok.correctMask, req.params.qid, quiz.id]);
   await db.query('UPDATE quiz.quizzes SET updated_at = now(), updated_by = $1 WHERE id = $2', [req.user.id, quiz.id]);
   await notifyQuiz(quiz.id);
   res.json({ rev: row.rev });
@@ -295,7 +307,7 @@ router.put('/:id/order', async (req, res) => {
 router.patch('/:id/meta', async (req, res) => {
   const quiz = await loadQuiz(req.params.id);
   if (!quiz || quiz.owner_id !== req.user.id) return res.status(403).json({ error: 'Nur der Besitzer ändert Titel, Fach und Modus.' });
-  const body = await readBody({ body: { ...req.body, questions: [] } }, res);
+  const body = await readBody({ body: { ...req.body, kind: quiz.kind, questions: [] } }, res);
   if (!body) return;
   await db.query('UPDATE quiz.quizzes SET title = $1, subject_id = $2, mode = $3, updated_at = now(), updated_by = $4 WHERE id = $5',
     [body.title, body.subjectId, body.mode, req.user.id, quiz.id]);

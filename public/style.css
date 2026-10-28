@@ -656,3 +656,32 @@ body.lobby-lock .info-bar { margin-bottom: .5rem; }
 /* Automatik im Host-Kopf */
 .auto-timer { font-weight: 800; min-width: 5.5rem; text-align: right; }
 #auto.on { border-color: var(--ok); color: var(--ok); }
+
+.poll-dot { flex: none; width: 1.4rem; text-align: center; color: var(--primary); }
+
+/* Mehrfachauswahl und Umfragen auf dem Handy */
+.multi-hint { margin: .2rem 0 .8rem; padding: .5rem .8rem; border-radius: 12px; font-weight: 700; background: color-mix(in srgb, var(--primary) 12%, var(--card)); border: 1px solid color-mix(in srgb, var(--primary) 40%, var(--border)); }
+.multi-hint.plain { background: var(--bg); border-color: var(--border); font-weight: 600; color: var(--muted); }
+.answer.multi { text-align: left; }
+.answer.multi .box { font-size: 1.3em; margin-right: .35rem; }
+.answer.chosen { outline: 4px solid var(--text); outline-offset: 2px; }
+.submit-multi { width: 100%; margin-top: 1rem; padding: .9rem; font-size: 1.1rem; }
+.poll-row { display: grid; grid-template-columns: minmax(5rem, 9rem) 1fr 2.2rem; align-items: center; gap: .6rem; margin: .5rem 0; }
+.poll-row.mine .poll-label { font-weight: 800; }
+.poll-label { overflow-wrap: anywhere; }
+.poll-bar { height: 1.3rem; border-radius: 8px; background: var(--bg); overflow: hidden; }
+.poll-bar span { display: block; height: 100%; border-radius: 8px; background: var(--a1); transition: width .5s ease; }
+.poll-bar span.c0 { background: var(--a0); } .poll-bar span.c1 { background: var(--a1); } .poll-bar span.c2 { background: var(--a2); } .poll-bar span.c3 { background: var(--a3); }
+.poll-count { text-align: right; font-weight: 800; }
+
+/* Umfrage-Diagramme */
+.poll-chart .poll-q { margin: 0 0 .15rem; }
+.poll-chart .poll-meta { margin-bottom: .6rem; font-size: .9rem; }
+.poll-chart .poll-row { grid-template-columns: minmax(6rem, 14rem) 1fr 7rem; }
+.poll-chart .poll-row.top .poll-label { font-weight: 800; }
+.poll-chart.big .poll-row { margin: .8rem 0; }
+.poll-chart.big .poll-label { font-size: 1.25rem; }
+.poll-chart.big .poll-bar { height: 2.2rem; }
+.poll-chart.big .poll-count { font-size: 1.25rem; }
+.host-hint { text-align: center; font-size: 1.1rem; }
+@media (max-width: 640px) { .poll-chart .poll-row { grid-template-columns: 1fr 5.5rem; } .poll-chart .poll-bar { grid-column: 1 / -1; grid-row: 2; } }

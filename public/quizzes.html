@@ -42,10 +42,11 @@
             <span class="muted">${q.question_count} Fragen</span>
             ${q.subject ? `<span class="tag">${escapeHtml(q.subject)}</span>` : '<span class="tag">Kein Fach</span>'}
             ${q.mine ? (q.collaborator_count ? `<span class="tag">👥 mit ${q.collaborator_count} ${q.collaborator_count === 1 ? 'Freund' : 'Freunden'}</span>` : '') : `<span class="tag">🤝 von ${escapeHtml(q.owner)}</span>`}
-            <span class="tag">${q.mode === 'team' ? '👥 Team' : '👤 Einzel'}</span>
+            ${q.kind === 'poll' ? '<span class="tag">📊 Umfrage</span>' : `<span class="tag">${q.mode === 'team' ? '👥 Team' : '👤 Einzel'}</span>`}
           </div>
           <div class="recent-meta">
             <button class="primary" type="button" data-start="${q.id}" ${q.question_count ? '' : 'disabled'}>Starten</button>
+            ${q.kind === 'poll' ? `<a class="btn" href="/poll-results?quiz=${q.id}">📊 Ergebnisse</a>` : ''}
             <a class="btn" href="/edit?id=${q.id}">Bearbeiten</a>
             ${q.mine ? `<button class="danger" type="button" data-delete="${q.id}">Löschen</button>` : ''}
           </div>

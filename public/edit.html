@@ -25,14 +25,21 @@
     <div class="card">
       <label for="title">Titel</label>
       <input type="text" id="title" placeholder="z. B. Wahlsysteme im Vergleich">
-      <label for="subject">Fach</label>
-      <select id="subject"><option value="">Fach wählen …</option></select>
-      <label for="mode">Spielmodus</label>
-      <select id="mode">
-        <option value="single">Einzel – jeder spielt für sich</option>
-        <option value="team">Team – zwei Teams spielen gegeneinander</option>
+      <label for="kind">Art</label>
+      <select id="kind">
+        <option value="quiz">Quiz – mit Punkten und Rangliste</option>
+        <option value="poll">Umfrage – kein richtig oder falsch, am Ende ein Diagramm</option>
       </select>
-      <p class="muted" id="mode-hint" style="margin:.5rem 0 0"></p>
+      <label for="subject" id="subject-label">Fach</label>
+      <select id="subject"><option value="">Fach wählen …</option></select>
+      <div id="mode-box">
+        <label for="mode">Spielmodus</label>
+        <select id="mode">
+          <option value="single">Einzel – jeder spielt für sich</option>
+          <option value="team">Team – zwei Teams spielen gegeneinander</option>
+        </select>
+        <p class="muted" id="mode-hint" style="margin:.5rem 0 0"></p>
+      </div>
     </div>
     <div class="card" id="team-card" hidden>
       <h2 style="margin-bottom:.25rem">👥 Zusammen bearbeiten</h2>
@@ -59,6 +66,7 @@
     const id = new URLSearchParams(location.search).get('id');
     const live = Boolean(id);          // bestehendes Quiz: Live-Bearbeitung mit Freunden; neues Quiz: einmal speichern
     let me = null;
+    let kind = 'quiz';                 // 'quiz' oder 'poll' (Umfrage); wird beim Anlegen gewählt und danach nicht mehr geändert
     let isOwner = true;
     let questions = [];                // { key, id, rev, text, answers[4], correct, timeLimit, lockedBy }
     let openKey = null;                // Akkordeon: höchstens eine Frage ist aufgeklappt
@@ -70,8 +78,8 @@
     let metaTimer = null;
     let notice = '';
 
-    const blank = () => ({ key: `new-${++draftSeq}`, id: null, rev: 0, text: '', answers: ['', '', '', ''], correct: 0, timeLimit: 20, lockedBy: null });
-    const fromServer = (q) => ({ key: String(q.id), id: q.id, rev: q.rev, text: q.text, answers: [...q.answers, '', '', ''].slice(0, 4), correct: q.correct, timeLimit: q.timeLimit, lockedBy: null });
+    const blank = () => ({ key: `new-${++draftSeq}`, id: null, rev: 0, text: '', answers: ['', '', '', ''], correct: 0, multi: false, correctSet: [], timeLimit: 20, lockedBy: null });
+    const fromServer = (q) => ({ key: String(q.id), id: q.id, rev: q.rev, text: q.text, answers: [...q.answers, '', '', ''].slice(0, 4), correct: q.correct, multi: Boolean(q.multi), correctSet: q.correctSet || [], timeLimit: q.timeLimit, lockedBy: null });
     const byKey = (key) => questions.find((q) => q.key === key);
     const openQ = () => byKey(openKey);
 
@@ -87,6 +95,18 @@
     }
     $('#mode').addEventListener('change', updateModeHint);
 
+    // Art des Quiz: Umfragen haben keinen Spielmodus, kein richtig/falsch und brauchen kein Fach
+    function applyKind() {
+      $('#mode-box').hidden = kind === 'poll';
+      $('#subject-label').textContent = kind === 'poll' ? 'Fach (optional)' : 'Fach';
+      $('#subject').options[0].textContent = kind === 'poll' ? 'Kein Fach' : 'Fach wählen …';
+    }
+    $('#kind').addEventListener('change', () => {
+      kind = $('#kind').value;
+      applyKind();
+      render();
+    });
+
     // Titel einer zugeklappten Frage: der eingegebene Fragetext
     function questionTitle(q, i) {
       return q.text.trim() ? `${i + 1}. ${q.text.trim()}` : `Frage ${i + 1} (noch leer)`;
@@ -95,7 +115,7 @@
     // --- Darstellung: jede Karte wird nur neu gezeichnet, wenn sich ihr Inhalt ändert (sonst verliert man beim Tippen den Fokus) ---
     function cardSignature(q, i) {
       const open = q.key === openKey && !q.lockedBy;
-      return open ? `open|${i}|${questions.length}|${live}` : JSON.stringify([i, questions.length, q.text, q.lockedBy, q.key === openKey, live]);
+      return open ? `open|${i}|${questions.length}|${live}|${q.multi}|${kind}` : JSON.stringify([i, questions.length, q.text, q.lockedBy, q.key === openKey, live, q.multi, kind]);
     }
 
     function cardHtml(q, i) {
@@ -116,10 +136,13 @@
         </div>
         <div id="q-body-${q.key}" ${open ? '' : 'hidden'}>
           <textarea rows="2" data-field="text" placeholder="Fragetext">${escapeHtml(q.text)}</textarea>
-          <label>Antworten <span class="muted">(richtige Antwort anklicken)</span></label>
+          <label class="inline-check" style="margin:.6rem 0 0"><input type="checkbox" data-multi ${q.multi ? 'checked' : ''}> Mehrere Antworten gleichzeitig wählbar</label>
+          <label>Antworten <span class="muted">${kind === 'poll' ? '(es gibt kein richtig oder falsch)' : q.multi ? '(alle richtigen Antworten ankreuzen)' : '(richtige Antwort anklicken)'}</span></label>
           ${q.answers.map((a, j) => `
             <div class="answer-row">
-              <input type="radio" name="correct-${q.key}" data-correct="${j}" ${q.correct === j ? 'checked' : ''}>
+              ${kind === 'poll' ? '<span class="poll-dot" aria-hidden="true">●</span>'
+                : q.multi ? `<input type="checkbox" data-correct-multi="${j}" ${q.correctSet.includes(j) ? 'checked' : ''} aria-label="Antwort ${j + 1} ist richtig">`
+                : `<input type="radio" name="correct-${q.key}" data-correct="${j}" ${q.correct === j ? 'checked' : ''}>`}
               <input type="text" data-answer="${j}" value="${escapeHtml(a)}" placeholder="Antwort ${j + 1}">
             </div>`).join('')}
           <label>Zeit (Sekunden)</label>
@@ -162,11 +185,12 @@
       while (answers.length > 2 && !answers[answers.length - 1].trim()) answers.pop();
       if (!q.text.trim()) return 'Fragetext fehlt';
       if (answers.some((a) => !a.trim())) return 'Antwortfeld leer';
-      if (q.correct >= answers.length) return 'Richtige Antwort markieren';
+      if (kind === 'quiz' && !q.multi && q.correct >= answers.length) return 'Richtige Antwort markieren';
+      if (kind === 'quiz' && q.multi && !q.correctSet.some((x) => x < answers.length)) return 'Mindestens eine richtige Antwort ankreuzen';
       if (!(q.timeLimit >= 5 && q.timeLimit <= 120)) return 'Zeitlimit 5–120 Sekunden';
       return null;
     }
-    const payload = (q) => ({ text: q.text, answers: q.answers, correct: q.correct, timeLimit: q.timeLimit });
+    const payload = (q) => ({ text: q.text, answers: q.answers, correct: q.correct, multi: q.multi, correctSet: q.correctSet.filter((x) => x < q.answers.length), timeLimit: q.timeLimit });
 
     function scheduleSave() {
       if (!live) return;
@@ -271,6 +295,17 @@
       if (t.dataset.field === 'timeLimit') q.timeLimit = Number(t.value);
       if (t.dataset.answer !== undefined) q.answers[t.dataset.answer] = t.value;
       if (t.dataset.correct !== undefined) q.correct = Number(t.dataset.correct);
+      if (t.dataset.correctMulti !== undefined) {
+        const j = Number(t.dataset.correctMulti);
+        q.correctSet = t.checked ? [...new Set([...q.correctSet, j])].sort() : q.correctSet.filter((x) => x !== j);
+      }
+      if (t.dataset.multi !== undefined) {
+        // Zwischen Einzel- und Mehrfachauswahl wechseln: die bisherige Lösung bleibt erhalten
+        q.multi = t.checked;
+        if (q.multi && !q.correctSet.length) q.correctSet = [q.correct];
+        if (!q.multi) q.correct = q.correctSet.length ? q.correctSet[0] : q.correct;
+        render();
+      }
       scheduleSave();
     });
 
@@ -498,10 +533,10 @@
       const list = questions.map((q) => {
         const answers = [...q.answers];
         while (answers.length > 2 && !answers[answers.length - 1].trim()) answers.pop();
-        return { text: q.text, answers, correct: q.correct, timeLimit: q.timeLimit };
+        return { text: q.text, answers, correct: q.correct, multi: q.multi, correctSet: q.correctSet.filter((x) => x < answers.length), timeLimit: q.timeLimit };
       });
       try {
-        await api('/api/quizzes', { method: 'POST', body: { title: $('#title').value, subjectId: Number($('#subject').value) || null, mode: $('#mode').value, questions: list } });
+        await api('/api/quizzes', { method: 'POST', body: { title: $('#title').value, kind, subjectId: Number($('#subject').value) || null, mode: $('#mode').value, questions: list } });
         location.href = '/quizzes';
       } catch (err) {
         $('#error').textContent = err.message;
@@ -521,6 +556,9 @@
         $('#title').value = quiz.title;
         $('#subject').value = quiz.subject_id || '';
         $('#mode').value = quiz.mode || 'single';
+        kind = quiz.kind || 'quiz';
+        $('#kind').value = kind;
+        $('#kind').disabled = true;   // die Art lässt sich nach dem Anlegen nicht mehr ändern
         for (const el of [$('#title'), $('#subject'), $('#mode')]) el.disabled = !isOwner;
         if (!isOwner) $('#mode-hint').insertAdjacentHTML('afterend', '<p class="muted" style="margin:.25rem 0 0">Titel, Fach und Modus ändert nur der Besitzer.</p>');
         questions = quiz.questions.map(fromServer);
@@ -536,6 +574,7 @@
         $('#team-add').hidden = true;
         $('#team-info').textContent = 'Speichere das Quiz zuerst – danach kannst du Freunde zum gemeinsamen Bearbeiten einladen.';
       }
+      applyKind();
       updateModeHint();
       render();
     });

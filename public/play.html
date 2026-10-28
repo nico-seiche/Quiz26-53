@@ -101,16 +101,24 @@
         </div>`;
       } else if (s.state === 'question') {
         const answered = s.myAnswer !== null;
+        const poll = s.kind === 'poll';
+        const multi = s.question.multi;
+        // Auswahl bei Mehrfachauswahl: bleibt über das regelmäßige Neuladen erhalten, bis abgegeben wird
+        if (selectionFor !== s.questionIndex) { selection = new Set(); selectionFor = s.questionIndex; }
+        const picked = answered ? new Set(s.myAnswers) : selection;
         html = `
           <div class="row spread">
-            <span class="muted">Frage ${s.questionIndex + 1} / ${s.total}</span>
+            <span class="muted">${poll ? '📊 Umfrage · ' : ''}Frage ${s.questionIndex + 1} / ${s.total}</span>
             ${s.streak > 0 ? `<span class="streak-pill">🔥 ${s.streak} in Folge · +${s.nextBonus} Bonus</span>` : ''}
           </div>
           <h2>${escapeHtml(s.question.text)}</h2>
+          ${multi ? `<p class="multi-hint">☑️ ${poll ? 'Mehrere Antworten möglich – wähle alle, die für dich passen.' : 'Mehrere Antworten sind richtig – wähle alle richtigen!'}</p>`
+            : poll ? '<p class="multi-hint plain">Es gibt kein richtig oder falsch – wähle, was für dich passt.</p>' : ''}
           <div class="answers">${s.question.answers.map((a, i) => `
-            <button type="button" class="answer c${i} ${answered && s.myAnswer !== i ? 'dim' : ''} ${s.myAnswer === i ? 'chosen' : ''}"
-              data-choice="${i}" ${answered ? 'disabled' : ''}>${escapeHtml(a)}</button>`).join('')}
+            <button type="button" class="answer c${i} ${answered && !picked.has(i) ? 'dim' : ''} ${picked.has(i) ? 'chosen' : ''} ${multi ? 'multi' : ''}"
+              ${multi ? `data-toggle="${i}" aria-pressed="${picked.has(i)}"` : `data-choice="${i}"`} ${answered ? 'disabled' : ''}>${multi ? `<span class="box" aria-hidden="true">${picked.has(i) ? '☑' : '☐'}</span> ` : ''}${escapeHtml(a)}</button>`).join('')}
           </div>
+          ${multi && !answered ? `<button type="button" class="primary submit-multi" id="submit-multi" ${selection.size ? '' : 'disabled'}>Antwort abgeben${selection.size ? ` (${selection.size} gewählt)` : ''}</button>` : ''}
           <div class="timer-ring" id="ring" role="timer" aria-label="Verbleibende Zeit">
             <svg viewBox="0 0 100 100" aria-hidden="true">
               <circle class="track" cx="50" cy="50" r="45"></circle>
@@ -119,11 +127,28 @@
             <span id="timer"></span>
           </div>
           ${answered ? '<p class="center muted">Antwort abgegeben – warte auf die anderen …</p>' : ''}`;
+      } else if (s.state === 'reveal' && s.kind === 'poll') {
+        const max = Math.max(1, ...s.distribution);
+        html = `<div class="card">
+          <h2>${s.myAnswers.length ? 'Danke für deine Stimme! 🗳️' : 'Keine Antwort ⏱️'}</h2>
+          <p class="muted">So haben die anderen abgestimmt (${s.respondents} ${s.respondents === 1 ? 'Stimme' : 'Stimmen'}):</p>
+          ${s.question.answers.map((a, i) => `
+            <div class="poll-row ${s.myAnswers.includes(i) ? 'mine' : ''}">
+              <div class="poll-label">${s.myAnswers.includes(i) ? '✔ ' : ''}${escapeHtml(a)}</div>
+              <div class="poll-bar"><span class="c${i}" style="width:${(s.distribution[i] / max) * 100}%"></span></div>
+              <div class="poll-count">${s.distribution[i]}</div>
+            </div>`).join('')}
+        </div>`;
       } else if (s.state === 'reveal') {
-        const correct = s.myAnswer === s.question.correct;
+        const q = s.question;
+        const mine = new Set(s.myAnswers);
+        const rightSet = new Set(q.correctSet);
+        const full = mine.size === rightSet.size && [...mine].every((i) => rightSet.has(i));
+        const partial = !full && s.lastPoints > 0;
         html = `<div class="card center">
-          <h2>${s.myAnswer === null ? 'Keine Antwort ⏱️' : correct ? 'Richtig! ✅' : 'Leider falsch ❌'}</h2>
-          <p>Richtige Antwort: <strong>${escapeHtml(s.question.answers[s.question.correct])}</strong></p>
+          <h2>${s.myAnswer === null ? 'Keine Antwort ⏱️' : full ? 'Richtig! ✅' : partial ? 'Teilweise richtig 🟡' : 'Leider falsch ❌'}</h2>
+          <p>${rightSet.size > 1 ? 'Richtige Antworten' : 'Richtige Antwort'}: <strong>${q.correctSet.map((i) => escapeHtml(q.answers[i])).join(' · ')}</strong></p>
+          ${q.multi && s.myAnswer !== null ? `<p class="muted">Deine Auswahl: ${s.myAnswers.map((i) => `${rightSet.has(i) ? '✔' : '✘'} ${escapeHtml(q.answers[i])}`).join(' · ')}</p>` : ''}
           <p class="big">+${s.lastPoints} Punkte</p>
           ${s.lastBonus ? `<p><span class="streak-pill">🔥 ${s.streak} in Folge · inkl. +${s.lastBonus} Serien-Bonus</span></p>` : ''}
           <p class="muted">Platz ${s.rank} von ${s.playerCount}</p>
@@ -144,6 +169,9 @@
             </div>` : ''}
           <p class="muted">Schau auf den großen Bildschirm …</p>
         </div>`;
+      } else if (s.state === 'finished' && s.kind === 'poll') {
+        html = `<div class="card center"><h1>Danke fürs Mitmachen! 🙏</h1><p class="muted">Die Ergebnisse siehst du auf dem großen Bildschirm.</p>
+          ${s.guest ? '' : '<p><a class="btn" href="/dashboard">Zur Startseite</a></p>'}</div>`;
       } else if (s.state === 'finished') {
         const medal = ['🥇', '🥈', '🥉'][s.rank - 1];
         html = `<div class="card center">
@@ -226,6 +254,8 @@
     }
 
     // Reaktion in der Lobby: höchstens eine alle 0,7 s
+    let selection = new Set();     // gewählte Antworten bei Mehrfachauswahl (vor dem Abgeben)
+    let selectionFor = -1;
     let lastReact = 0;
     $('#view').addEventListener('click', async (e) => {
       const react = e.target.closest('[data-react]');
@@ -234,6 +264,20 @@
         lastReact = Date.now();
         react.classList.remove('sent'); void react.offsetWidth; react.classList.add('sent');
         api(`/api/games/${encodeURIComponent(joinedPin)}/react`, { method: 'POST', body: { emoji: react.dataset.react } }).catch(() => {});
+        return;
+      }
+      const toggle = e.target.closest('[data-toggle]');
+      if (toggle && !toggle.disabled) {
+        const i = Number(toggle.dataset.toggle);
+        if (selection.has(i)) selection.delete(i); else selection.add(i);
+        render();
+        return;
+      }
+      if (e.target.closest('#submit-multi') && selection.size) {
+        const choices = [...selection].sort();
+        document.querySelectorAll('[data-toggle], #submit-multi').forEach((b) => { b.disabled = true; });
+        try { live.apply(await api(`/api/games/${encodeURIComponent(joinedPin)}/answer`, { method: 'POST', body: { choices } })); }
+        catch (err) { live.refresh(); }
         return;
       }
       const choice = e.target.closest('[data-choice]');

@@ -1,4 +1,5 @@
 const express = require('express');
+const { isFullyCorrect } = require('./answers');
 const db = require('./db');
 const { requireAuth } = require('./auth');
 const { MIN_PLAYERS_FOR_SCORING } = require('./config');
@@ -66,7 +67,7 @@ function gameAchievements(game, player, rank, answers, history) {
   const keys = [];
   if (rank <= 3 && player.score > 0) keys.push('podium');
 
-  const correct = questions.map((q, i) => answers.get(i)?.choice === q.correct);
+  const correct = questions.map((q, i) => Boolean(answers.get(i)) && isFullyCorrect(q, answers.get(i)));
   if (questions.length >= 5 && correct.every(Boolean)) keys.push('perfect');
 
   let run = 0;
@@ -94,7 +95,7 @@ async function awardForGame(client, game, players) {
   const [{ count: subjectCount }] = await run('SELECT COUNT(*)::int AS count FROM quiz.subjects');
 
   const answerRows = await run(
-    'SELECT player_key, question_index, choice, points, bonus FROM quiz.game_answers WHERE game_pin = $1',
+    'SELECT player_key, question_index, choice, mask, points, bonus FROM quiz.game_answers WHERE game_pin = $1',
     [game.pin],
   );
   const answersByPlayer = new Map();
