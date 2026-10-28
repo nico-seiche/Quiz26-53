@@ -2,6 +2,15 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-03',
+    title: 'Neu: Lernsets gemeinsam bearbeiten',
+    items: [
+      ['👥', 'Freunde einladen', 'Im Lernset-Editor lädst du Freunde zum gemeinsamen Bearbeiten ein. Das Set erscheint dann auch bei ihnen unter „Lernen“.'],
+      ['⚡', 'Gleichzeitig arbeiten', 'Mehrere können zugleich Karten schreiben: Änderungen speichern sich automatisch und erscheinen bei allen nach wenigen Sekunden.'],
+      ['🔒', 'Eine Karte, eine Person', 'Wer eine Karte bearbeitet, sperrt sie kurz („Anna bearbeitet“). Alle anderen Karten bleiben frei.'],
+    ],
+  },
+  {
     id: '2026-11-02',
     title: 'Neu: Quiz läuft von selbst',
     items: [

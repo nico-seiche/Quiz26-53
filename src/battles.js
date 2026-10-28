@@ -174,7 +174,7 @@ router.post('/', async (req, res) => {
   if (Number(user.id) === req.user.id) return res.status(400).json({ error: 'Du kannst dich nicht selbst herausfordern.' });
   if (!(await areFriends(req.user.id, user.id))) return res.status(403).json({ error: `${user.username} ist noch nicht dein Freund.` });
   if (!isId(req.body.setId)) return res.status(400).json({ error: 'Lernset fehlt' });
-  const set = await db.one('SELECT id, title FROM quiz.study_sets WHERE id = $1 AND (owner_id = $2 OR is_public)', [req.body.setId, req.user.id]);
+  const set = await db.one('SELECT id, title FROM quiz.study_sets WHERE id = $1 AND (owner_id = $2 OR is_public OR EXISTS (SELECT 1 FROM quiz.study_set_collaborators c WHERE c.set_id = study_sets.id AND c.user_id = $2))', [req.body.setId, req.user.id]);
   if (!set) return res.status(404).json({ error: 'Lernset nicht gefunden' });
   const cards = await db.query('SELECT term, definition FROM quiz.study_cards WHERE set_id = $1', [set.id]);
   if (cards.filter((c) => buildRound(c)).length < MIN_ROUNDS) {

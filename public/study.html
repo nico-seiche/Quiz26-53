@@ -57,7 +57,7 @@
             <div class="recent-title">${escapeHtml(s.title)}</div>
             <span class="muted">${nf(s.card_count)} ${s.card_count === 1 ? 'Karte' : 'Karten'}</span>
             ${s.subject ? `<span class="tag">${escapeHtml(s.subject)}</span>` : ''}
-            ${s.mine ? (s.is_public ? '<span class="tag">🌍 Geteilt</span>' : '<span class="tag">🔒 Privat</span>') : `<span class="tag">von ${escapeHtml(s.owner)}</span>`}
+            ${s.isOwner ? (s.is_public ? '<span class="tag">🌍 Geteilt</span>' : '<span class="tag">🔒 Privat</span>') : s.mine ? `<span class="tag">🤝 von ${escapeHtml(s.owner)}</span>` : `<span class="tag">von ${escapeHtml(s.owner)}</span>`}
             <div class="set-meter" title="Gelernt = in mindestens Box 3 des Karteikasten-Systems">
               <div class="stat-bar"><span style="width:${learned}%"></span></div>
               <span class="muted">${nf(s.mastered_count)}/${nf(s.card_count)} gelernt${s.due_count ? ` · ${nf(s.due_count)} fällig` : ''}</span>
@@ -68,7 +68,7 @@
             ${s.card_count >= 3 ? `<button type="button" data-battle="${s.id}" data-title="${escapeHtml(s.title)}" title="Einen Freund zum Lückentext-Battle herausfordern">⚔️ Battle</button>` : ''}
             ${s.mine
               ? `<a class="btn" href="/study-edit?id=${s.id}">Bearbeiten</a>
-                 <button class="danger" type="button" data-delete="${s.id}">Löschen</button>`
+                 ${s.isOwner ? `<button class="danger" type="button" data-delete="${s.id}">Löschen</button>` : ''}`
               : `<button type="button" data-copy="${s.id}">Kopieren</button>`}
           </div>
         </div>`;

@@ -18,6 +18,7 @@
 <body>
   <header class="top">
     <a class="brand" href="/study">← Lernen</a>
+    <span class="muted save-state" id="state" aria-live="polite"></span>
     <button class="primary" type="button" id="save">Speichern</button>
   </header>
   <main>
@@ -27,7 +28,24 @@
       <label for="subject">Fach</label>
       <select id="subject"><option value="">Fach wählen …</option></select>
       <label class="inline-check"><input type="checkbox" id="public"> Für andere sichtbar machen (sie können es lernen und kopieren)</label>
+      <p class="muted" id="owner-hint" style="margin:.5rem 0 0" hidden>Titel, Fach und Sichtbarkeit ändert nur der Besitzer.</p>
     </div>
+
+    <div class="card" id="team-card" hidden>
+      <h2 style="margin-bottom:.25rem">👥 Zusammen bearbeiten</h2>
+      <p class="muted" id="team-info" style="margin-top:0"></p>
+      <div id="team-list" class="row"></div>
+      <div id="team-add" style="margin-top:.75rem">
+        <div class="row" style="flex-wrap:nowrap">
+          <input type="text" id="team-name" placeholder="Freund suchen …" autocomplete="off" autocapitalize="off" spellcheck="false">
+          <button type="button" id="team-invite">Einladen</button>
+        </div>
+        <div class="suggest-list team-suggest" id="team-suggest" hidden></div>
+        <p class="muted" id="team-nofriends" style="margin:.5rem 0 0" hidden>Du kannst nur Freunde einladen. <a href="/friends">Freunde hinzufügen →</a></p>
+      </div>
+      <p class="error" id="team-error" style="margin-bottom:0"></p>
+    </div>
+    <div class="card" id="presence-card" hidden><div class="row" id="presence"></div></div>
 
     <details class="card" id="import-box">
       <summary><strong>Texte einfügen</strong> <span class="muted">– mehrere Definitionen auf einmal aus deinem Skript</span></summary>
@@ -43,88 +61,398 @@
     <button type="button" id="add">+ Karte hinzufügen</button>
     <p class="error" id="error"></p>
   </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   <script src="/js/cloze.js"></script>
   <script src="/js/common.js"></script>
   <script>
     const id = new URLSearchParams(location.search).get('id');
-    let cards = [];
+    const live = Boolean(id);          // bestehendes Set: Live-Bearbeitung mit Freunden; neues Set: einmal speichern
+    let me = null;
+    let isOwner = true;
+    let cards = [];                    // { key, id, rev, term, definition, lockedBy }
+    let activeKey = null;              // Karte, in der ich gerade schreibe (und die ich sperre)
+    let presence = [];
+    let dirty = false;
+    let saving = null;
+    let saveTimer = null;
+    let metaTimer = null;
+    let draftSeq = 0;
 
+    const blank = () => ({ key: `new-${++draftSeq}`, id: null, rev: 0, term: '', definition: '', lockedBy: null });
+    const fromServer = (c) => ({ key: String(c.id), id: c.id, rev: c.rev, term: c.term, definition: c.definition, lockedBy: null });
+    const byKey = (k) => cards.find((c) => c.key === k);
+    const TRASH = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 10v7M14 10v7"/></svg>';
+
+    function setState(text, kind = '') { $('#state').textContent = text; $('#state').className = `muted save-state ${kind}`; }
+    function autosize(el) { el.style.height = 'auto'; el.style.height = `${el.scrollHeight + 2}px`; }
+
+    // --- Darstellung: Karten nur neu zeichnen, wenn sich ihr Inhalt ändert (sonst verliert man den Fokus beim Tippen) ---
+    function signature(c, i) {
+      return c.key === activeKey && !c.lockedBy ? `active|${i}` : JSON.stringify([i, c.term, c.definition, c.lockedBy]);
+    }
+    function cardHtml(c, i) {
+      const locked = Boolean(c.lockedBy);
+      return `
+        <div class="row">
+          <input type="text" data-field="term" maxlength="200" value="${escapeHtml(c.term)}" placeholder="Begriff, z. B. Abstrakte Gefahr" aria-label="Begriff ${i + 1}" ${locked ? 'disabled' : ''}>
+          ${locked ? `<span class="tag lock-tag">✏️ ${escapeHtml(c.lockedBy)} bearbeitet</span>` : ''}
+          <button type="button" class="danger icon-btn" data-action="remove" aria-label="Karte entfernen" title="Karte entfernen" ${locked ? 'disabled' : ''}>${TRASH}</button>
+        </div>
+        <textarea rows="3" data-field="definition" placeholder="Definition" aria-label="Definition ${i + 1}" ${locked ? 'disabled' : ''}>${escapeHtml(c.definition)}</textarea>`;
+    }
     function render() {
-      $('#cards').innerHTML = cards.map((c, i) => `
-        <div class="card card-edit" data-i="${i}">
-          <div class="row">
-            <input type="text" data-field="term" maxlength="200" value="${escapeHtml(c.term)}" placeholder="Begriff, z. B. Abstrakte Gefahr" aria-label="Begriff ${i + 1}">
-            <button type="button" class="danger icon-btn" data-action="remove" aria-label="Karte entfernen" title="Karte entfernen"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 10v7M14 10v7"/></svg></button>
-          </div>
-          <textarea rows="3" data-field="definition" placeholder="Definition" aria-label="Definition ${i + 1}">${escapeHtml(c.definition)}</textarea>
-        </div>`).join('') || '<div class="card muted">Noch keine Karten – füge unten eine hinzu oder nutze „Texte einfügen“.</div>';
-      autosizeAll();
+      const box = $('#cards');
+      const existing = new Map([...box.querySelectorAll(':scope > [data-key]')].map((el) => [el.dataset.key, el]));
+      const empty = box.querySelector('.empty-hint');
+      if (empty) empty.remove();
+      cards.forEach((c, i) => {
+        let el = existing.get(c.key);
+        const sig = signature(c, i);
+        if (!el) { el = document.createElement('div'); el.dataset.key = c.key; }
+        if (el.dataset.sig !== sig) {
+          const typing = el.contains(document.activeElement) && !c.lockedBy;   // niemals die Karte neu aufbauen, in der gerade getippt wird
+          el.dataset.sig = sig;
+          if (typing) { existing.delete(c.key); if (box.children[i] !== el) box.insertBefore(el, box.children[i] || null); return; }
+          el.className = `card card-edit ${c.lockedBy ? 'locked' : ''}`;
+          el.innerHTML = cardHtml(c, i);
+          const ta = el.querySelector('textarea');
+          if (ta) requestAnimationFrame(() => autosize(ta));
+        }
+        existing.delete(c.key);
+        if (box.children[i] !== el) box.insertBefore(el, box.children[i] || null);
+      });
+      existing.forEach((el) => el.remove());
+      if (!cards.length) box.insertAdjacentHTML('beforeend', '<div class="card muted empty-hint">Noch keine Karten – füge unten eine hinzu oder nutze „Texte einfügen“.</div>');
+    }
+    function renderPresence() {
+      const others = presence.filter((p) => !p.me);
+      $('#presence-card').hidden = !live || !others.length;
+      $('#presence').innerHTML = others.map((p) => {
+        const idx = cards.findIndex((c) => c.id === p.editing);
+        return `<span class="presence-chip">${avatarHtml(p.username, '1.6rem')}<span><strong>${profileLink(p.username, escapeHtml(p.username))}</strong> <span class="muted">${idx >= 0 ? `· Karte ${idx + 1}` : '· schaut zu'}</span></span></span>`;
+      }).join('');
     }
 
-    // Definitionsfelder wachsen mit dem Text, damit man alles sieht
-    function autosize(el) { el.style.height = 'auto'; el.style.height = `${el.scrollHeight + 2}px`; }
-    const autosizeAll = () => document.querySelectorAll('textarea[data-field=definition]').forEach(autosize);
+    // --- Speichern einer Karte (Live-Modus) ---
+    const problem = (c) => (!c.term.trim() ? 'Begriff fehlt' : !c.definition.trim() ? 'Definition fehlt' : null);
+    function scheduleSave() {
+      if (!live) return;
+      dirty = true;
+      setState('Ungespeicherte Änderungen …');
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(flush, 700);
+    }
+    async function flush() {
+      clearTimeout(saveTimer);
+      if (saving) await saving;
+      const c = byKey(activeKey);
+      if (!live || !dirty || !c || c.lockedBy) { dirty = false; return true; }
+      const bad = problem(c);
+      if (bad) { setState(`Noch nicht gespeichert: ${bad}`, 'warn'); return false; }
+      dirty = false;
+      setState('Speichert …');
+      saving = (async () => {
+        try {
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              if (c.id) c.rev = (await api(`/api/study/${id}/cards/${c.id}`, { method: 'PUT', body: { term: c.term, definition: c.definition } })).rev;
+              else {
+                const r = await api(`/api/study/${id}/cards`, { method: 'POST', body: { term: c.term, definition: c.definition } });
+                const el = $('#cards').querySelector(`[data-key="${c.key}"]`);
+                c.id = r.id; c.rev = r.rev; c.key = String(r.id); activeKey = c.key;
+                if (el) el.dataset.key = c.key;
+              }
+              setState('✓ Gespeichert', 'ok');
+              return true;
+            } catch (err) {
+              if (err.data && err.data.lost && c.id && attempt === 0) { await tick(c.id); continue; }
+              if (err.data && err.data.by) { lostLock(c, err.data.by); return false; }
+              dirty = true;
+              setState(`Nicht gespeichert: ${err.message}`, 'warn');
+              return false;
+            }
+          }
+        } finally { saving = null; }
+      })();
+      return saving;
+    }
+    function lostLock(c, by) {
+      $('#error').textContent = `${by} bearbeitet Karte ${cards.indexOf(c) + 1} gerade – deine letzten Änderungen daran wurden nicht gespeichert.`;
+      dirty = false; activeKey = null;
+      tick(null);
+    }
 
+    // Karte betreten/verlassen = Sperre anfordern/freigeben
+    async function enter(c) {
+      if (activeKey === c.key) return true;
+      if (activeKey && !(await leave())) return false;
+      activeKey = c.key;   // sofort setzen, damit die Karte beim Aktualisieren nicht neu gezeichnet wird (sonst verliert man den Fokus)
+      if (live && c.id) {
+        const st = await tick(c.id);
+        if (st && st.denied) { activeKey = null; $('#error').textContent = `${st.denied.by} bearbeitet diese Karte gerade.`; render(); return false; }
+      }
+      $('#error').textContent = '';
+      return true;
+    }
+    async function leave() {
+      const c = byKey(activeKey);
+      if (!c) { activeKey = null; return true; }
+      if (live && dirty && !(await flush())) {
+        // Unvollständig: bestehende Karte auf den gespeicherten Stand zurücksetzen, leeren Entwurf verwerfen
+        if (c.id) { const st = await tick(undefined); const sc = st && st.cards.find((x) => x.id === c.id); if (sc) Object.assign(c, fromServer(sc), { key: c.key }); setState('Karte zurückgesetzt – Begriff und Definition dürfen nicht leer sein.', 'warn'); dirty = false; }
+        else if (!c.term.trim() && !c.definition.trim()) { cards.splice(cards.indexOf(c), 1); dirty = false; }
+        else return true;   // halb ausgefüllter Entwurf bleibt lokal stehen
+      }
+      if (live && !c.id && !c.term.trim() && !c.definition.trim()) cards.splice(cards.indexOf(c), 1);
+      activeKey = null;
+      if (live) await tick(null);
+      render();
+      return true;
+    }
+
+    $('#cards').addEventListener('focusin', async (e) => {
+      const el = e.target.closest('[data-key]');
+      const c = el && byKey(el.dataset.key);
+      if (!c || c.lockedBy) return;
+      if (!(await enter(c)) && document.activeElement) document.activeElement.blur();
+    });
+    $('#cards').addEventListener('focusout', (e) => {
+      const el = e.target.closest('[data-key]');
+      if (!el || el.contains(e.relatedTarget)) return;
+      setTimeout(() => { if (!document.activeElement || !el.contains(document.activeElement)) { if (activeKey === el.dataset.key) leave(); } }, 120);
+    });
     $('#cards').addEventListener('input', (e) => {
+      const el = e.target.closest('[data-key]');
+      const c = el && byKey(el.dataset.key);
+      if (!c || c.lockedBy) return;
       if (e.target.tagName === 'TEXTAREA') autosize(e.target);
-      const field = e.target.dataset.field;
-      if (field) cards[Number(e.target.closest('[data-i]').dataset.i)][field] = e.target.value;
+      if (e.target.dataset.field) { c[e.target.dataset.field] = e.target.value; scheduleSave(); }
     });
-    $('#cards').addEventListener('click', (e) => {
-      if (!e.target.closest('[data-action=remove]')) return;
-      const i = Number(e.target.closest('[data-i]').dataset.i);
-      cards.splice(i, 1);
+    $('#cards').addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-action=remove]');
+      if (!btn) return;
+      const c = byKey(btn.closest('[data-key]').dataset.key);
+      if (live && c.id) {
+        try { await api(`/api/study/${id}/cards/${c.id}`, { method: 'DELETE' }); } catch (err) { $('#error').textContent = err.message; return; }
+      }
+      if (activeKey === c.key) { activeKey = null; dirty = false; }
+      cards.splice(cards.indexOf(c), 1);
       render();
+      if (live) tick(null);
     });
-    $('#add').onclick = () => {
-      cards.push({ term: '', definition: '' });
+    $('#add').onclick = async () => {
+      if (activeKey && !(await leave())) return;
+      const c = blank();
+      cards.push(c);
+      activeKey = c.key;
+      if (live) await tick(null);
       render();
-      const inputs = document.querySelectorAll('[data-field=term]');
-      inputs[inputs.length - 1].focus();
+      const el = $('#cards').querySelector(`[data-key="${c.key}"] [data-field=term]`);
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      el.focus({ preventScroll: true });
     };
 
-    $('#do-import').onclick = () => {
+    // Texte einfügen
+    $('#do-import').onclick = async () => {
       const parsed = Cloze.parseCards($('#import').value).filter((c) => c.term);
       if (!parsed.length) { $('#import-info').textContent = 'Nichts erkannt – pro Karte eine Zeile „Begriff - Definition“.'; return; }
-      const incomplete = parsed.filter((c) => !c.definition).length;
-      cards = cards.filter((c) => c.term || c.definition).concat(parsed);
-      render();
+      const complete = parsed.filter((c) => c.definition);
+      const incomplete = parsed.length - complete.length;
+      if (live) {
+        try {
+          if (activeKey) await leave();
+          await api(`/api/study/${id}/cards/bulk`, { method: 'POST', body: { cards: complete } });
+          await tick(null);
+        } catch (err) { $('#import-info').textContent = err.message; return; }
+      } else {
+        cards = cards.filter((c) => c.term || c.definition).concat(parsed.map((c) => ({ ...blank(), term: c.term, definition: c.definition })));
+        render();
+      }
       $('#import').value = '';
-      $('#import-info').textContent = `${parsed.length} ${parsed.length === 1 ? 'Karte' : 'Karten'} hinzugefügt – bitte unten kurz prüfen.${incomplete ? ` ${incomplete} ohne Definition.` : ''}`;
+      $('#import-info').textContent = `${complete.length} ${complete.length === 1 ? 'Karte' : 'Karten'} hinzugefügt – bitte unten kurz prüfen.${incomplete ? ` ${incomplete} ohne Definition wurden übersprungen.` : ''}`;
     };
 
+    // --- Live: Lebenszeichen senden und Stand der anderen holen ---
+    let ticking = null;
+    async function tick(editing) {
+      // editing: Karten-ID anfordern, null = freigeben, undefined = unverändert
+      if (!live) return null;
+      if (ticking) await ticking;
+      const c = byKey(activeKey);
+      const want = editing !== undefined ? editing : (c && c.id ? c.id : null);
+      ticking = (async () => {
+        try {
+          const state = await api(`/api/study/${id}/live`, { method: 'POST', body: { editing: want } });
+          applyLive(state);
+          return state;
+        } catch (err) { setState('Keine Verbindung – Änderungen werden nachgeholt …', 'warn'); return null; }
+        finally { ticking = null; }
+      })();
+      return ticking;
+    }
+    function applyLive(state) {
+      presence = state.presence;
+      const focused = ['title', 'subject', 'public'].includes(document.activeElement && document.activeElement.id);
+      if (!isOwner || !focused) {
+        if (!metaTimer && state.meta.title !== $('#title').value) $('#title').value = state.meta.title;
+        $('#subject').value = state.meta.subjectId || '';
+        $('#public').checked = state.meta.isPublic;
+      }
+      const mine = byKey(activeKey);
+      if (state.denied && mine && mine.id === state.denied.card) { $('#error').textContent = `${state.denied.by} bearbeitet diese Karte gerade.`; activeKey = null; dirty = false; }
+      const local = new Map(cards.map((c) => [c.id, c]));
+      const next = state.cards.map((sc) => {
+        const l = local.get(sc.id);
+        if (l && l.key === activeKey && !state.denied && (dirty || saving)) return l;   // meine laufende Eingabe nicht überschreiben
+        if (l && l.rev === sc.rev && l.key !== activeKey) return l;
+        if (l && l.key === activeKey && !state.denied) return Object.assign(l, fromServer(sc), { key: l.key });
+        return fromServer(sc);
+      });
+      cards = next.concat(cards.filter((c) => !c.id));   // Entwürfe bleiben am Ende
+      const lockers = new Map(state.presence.filter((p) => !p.me && p.editing).map((p) => [p.editing, p.username]));
+      for (const c of cards) c.lockedBy = c.id ? (lockers.get(c.id) || null) : null;
+      if (activeKey && !byKey(activeKey)) activeKey = null;
+      render();
+      renderPresence();
+      if (!dirty && !saving && $('#state').textContent.startsWith('Keine Verbindung')) setState('');
+    }
+    function startLive() {
+      setInterval(() => tick(undefined), 2500);
+      api('/api/config').then((cfg) => {
+        if (!cfg.supabaseUrl || !cfg.supabaseKey || !window.supabase) return;
+        window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey).channel(`game:s${id}`).on('broadcast', { event: 'update' }, () => tick(undefined)).subscribe();
+      }).catch(() => {});
+      window.addEventListener('pagehide', () => navigator.sendBeacon(`/api/study/${id}/live`, new Blob([JSON.stringify({ leave: true })], { type: 'application/json' })));
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(undefined); });
+    }
+
+    // --- Titel, Fach, Sichtbarkeit: nur der Besitzer ---
+    function metaChanged() {
+      if (!live || !isOwner) return;
+      clearTimeout(metaTimer);
+      setState('Ungespeicherte Änderungen …');
+      metaTimer = setTimeout(async () => {
+        metaTimer = null;
+        try {
+          await api(`/api/study/${id}/meta`, { method: 'PATCH', body: { title: $('#title').value, subjectId: Number($('#subject').value) || null, isPublic: $('#public').checked } });
+          setState('✓ Gespeichert', 'ok');
+        } catch (err) { setState(`Nicht gespeichert: ${err.message}`, 'warn'); }
+      }, 700);
+    }
+    $('#title').addEventListener('input', metaChanged);
+    $('#subject').addEventListener('change', metaChanged);
+    $('#public').addEventListener('change', metaChanged);
+
+    // --- Zusammenarbeit ---
+    let team = null;
+    function showTeam(quiz) {
+      team = quiz;
+      $('#team-card').hidden = false;
+      $('#team-add').hidden = !quiz.isOwner;
+      $('#team-info').textContent = quiz.isOwner
+        ? 'Lade Freunde ein: Sie können Karten bearbeiten und mit dem Lernset lernen, löschen können nur du.'
+        : `Dieses Lernset gehört ${quiz.owner}. Du kannst Karten bearbeiten.`;
+      const chips = [`<span class="tag">👑 ${profileLink(quiz.owner, escapeHtml(quiz.owner))}${quiz.isOwner ? ' (du)' : ''}</span>`]
+        .concat(quiz.collaborators.map((name) => {
+          const removable = quiz.isOwner || name.toLowerCase() === me.username.toLowerCase();
+          return `<span class="tag">${profileLink(name, escapeHtml(name))}${name.toLowerCase() === me.username.toLowerCase() ? ' (du)' : ''}${removable
+            ? ` <button type="button" class="chip-x" data-remove="${escapeHtml(name)}" aria-label="${quiz.isOwner ? 'Entfernen' : 'Verlassen'}" title="${quiz.isOwner ? 'Entfernen' : 'Lernset verlassen'}">✕</button>` : ''}</span>`;
+        }));
+      $('#team-list').innerHTML = chips.join('');
+    }
+    async function teamAction(fn) {
+      $('#team-error').textContent = '';
+      try { await fn(); } catch (err) { $('#team-error').textContent = err.message; }
+    }
+    $('#team-invite').onclick = () => teamAction(async () => {
+      const username = $('#team-name').value.trim();
+      if (!username) return;
+      const { username: name } = await api(`/api/study/${id}/collaborators`, { method: 'POST', body: { username } });
+      if (!team.collaborators.some((n) => n.toLowerCase() === name.toLowerCase())) team.collaborators.push(name);
+      $('#team-name').value = '';
+      $('#team-suggest').hidden = true;
+      showTeam(team);
+    });
+    // Vorschläge aus der Freundesliste (Name oder #ID), schon eingeladene ausgeblendet
+    let friends = null;
+    async function loadFriends() {
+      if (friends) return friends;
+      try { friends = (await api('/api/friends')).friends; } catch { friends = []; }
+      $('#team-nofriends').hidden = friends.length > 0;
+      return friends;
+    }
+    async function suggest() {
+      const list = await loadFriends();
+      const q = $('#team-name').value.trim().toLowerCase().replace(/^#/, '');
+      const taken = new Set((team ? team.collaborators : []).map((n) => n.toLowerCase()));
+      const hits = list.filter((f) => !taken.has(f.username.toLowerCase())
+        && (!q || f.username.toLowerCase().includes(q) || f.code.slice(1).startsWith(q))).slice(0, 6);
+      $('#team-suggest').innerHTML = hits.map((f) => `
+        <div class="friend-row">${avatarHtml(f.username, '2rem')}
+          <div class="friend-name"><strong>${escapeHtml(f.username)}</strong> <span class="muted">${escapeHtml(f.code)}</span></div>
+          <button type="button" class="primary" data-pick="${escapeHtml(f.username)}">Einladen</button></div>`).join('');
+      $('#team-suggest').hidden = !hits.length;
+    }
+    $('#team-name').addEventListener('input', suggest);
+    $('#team-name').addEventListener('focus', suggest);
+    $('#team-suggest').addEventListener('click', (e) => {
+      if (!e.target.dataset.pick) return;
+      $('#team-name').value = e.target.dataset.pick;
+      $('#team-invite').click();
+    });
+    document.addEventListener('click', (e) => { if (!e.target.closest('#team-add')) $('#team-suggest').hidden = true; });
+    $('#team-name').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); $('#team-invite').click(); } };
+    $('#team-list').onclick = (e) => {
+      const name = e.target.dataset.remove;
+      if (!name) return;
+      const self = name.toLowerCase() === me.username.toLowerCase();
+      if (!confirm(self ? 'Dieses Lernset verlassen? Du kannst es dann nicht mehr bearbeiten.' : `${name} entfernen?`)) return;
+      teamAction(async () => {
+        await api(`/api/study/${id}/collaborators/${encodeURIComponent(name)}`, { method: 'DELETE' });
+        if (self) { location.href = '/study'; return; }
+        team.collaborators = team.collaborators.filter((n) => n !== name);
+        showTeam(team);
+      });
+    };
+
+    // Speichern: neues Set einmal anlegen, bestehendes nur abschließen
     $('#save').onclick = async () => {
       $('#error').textContent = '';
-      const body = {
-        title: $('#title').value, subjectId: Number($('#subject').value), isPublic: $('#public').checked,
-        cards: cards.filter((c) => c.term.trim() || c.definition.trim()),
-      };
-      try {
-        if (id) await api(`/api/study/${id}`, { method: 'PUT', body });
-        else await api('/api/study', { method: 'POST', body });
+      if (live) {
+        if (metaTimer) { clearTimeout(metaTimer); metaTimer = null; metaChanged(); await new Promise((r) => setTimeout(r, 900)); }
+        if (activeKey && !(await leave())) return;
         location.href = '/study';
-      } catch (err) {
-        $('#error').textContent = err.message;
+        return;
       }
+      const body = { title: $('#title').value, subjectId: Number($('#subject').value), isPublic: $('#public').checked,
+        cards: cards.filter((c) => c.term.trim() || c.definition.trim()).map((c) => ({ term: c.term, definition: c.definition })) };
+      try { await api('/api/study', { method: 'POST', body }); location.href = '/study'; }
+      catch (err) { $('#error').textContent = err.message; }
     };
 
     (async () => {
-      await requireLogin();
+      me = await requireLogin();
       const subjects = await api('/api/subjects');
       $('#subject').innerHTML += subjects.map((s) => `<option value="${s.id}">${s.icon} ${escapeHtml(s.name)}</option>`).join('');
-      if (id) {
+      if (live) {
         try {
           const set = await api(`/api/study/${id}`);
           if (!set.canEdit) { location.href = '/study'; return; }
-          $('#title').value = set.title;
-          $('#subject').value = set.subjectId || '';
-          $('#public').checked = set.isPublic;
-          cards = set.cards.map((c) => ({ id: c.id, term: c.term, definition: c.definition }));
-        } catch (err) {
-          $('#error').textContent = err.message;
-        }
+          isOwner = set.isOwner;
+          $('#title').value = set.title; $('#subject').value = set.subjectId || ''; $('#public').checked = set.isPublic;
+          for (const el of [$('#title'), $('#subject'), $('#public')]) el.disabled = !isOwner;
+          $('#owner-hint').hidden = isOwner;
+          cards = set.cards.map(fromServer);
+          $('#save').textContent = 'Fertig';
+          showTeam(set);
+          startLive();
+          tick(undefined);
+        } catch (err) { $('#error').textContent = err.message; }
       } else {
-        cards = [{ term: '', definition: '' }];
+        cards = [blank()];
+        $('#team-card').hidden = false;
+        $('#team-add').hidden = true;
+        $('#team-info').textContent = 'Speichere das Lernset zuerst – danach kannst du Freunde zum gemeinsamen Bearbeiten einladen.';
       }
       render();
     })();
