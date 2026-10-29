@@ -59,7 +59,7 @@
     .abs p { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
     a.ref { color: var(--link); font-weight: 800; text-decoration: none; border-bottom: 1.5px dotted currentColor; cursor: pointer; }
     a.ref:hover { background: var(--bg); }
-    .par-nav { display: flex; justify-content: space-between; gap: .6rem; margin-top: 1.4rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+    .par-nav { display: flex; justify-content: space-between; gap: .6rem; margin-bottom: 1rem; }
     .par-nav button { flex: 1 1 0; text-align: left; display: flex; flex-direction: column; gap: .1rem; padding: .6rem .8rem; min-width: 0; }
     .par-nav button:last-child { text-align: right; }
     .par-nav .small { font-size: .78rem; font-weight: 600; opacity: .7; }
@@ -262,14 +262,14 @@
       const next = pars[i + 1];
       box.innerHTML = `
         <button type="button" class="law-back" id="back">‹ Inhalt</button>
-        <div class="law-crumb">${escapeHtml(law.short)} › ${escapeHtml(crumbOf(current.num))}</div>
-        <div class="par-head"><span class="par-num">§ ${current.num}</span><h2 class="par-title">${highlight(escapeHtml(current.title))}</h2></div>
-        ${current.text.map(absatzHtml).join('')}
-        ${current.notes.length ? `<details class="notes"><summary>Änderungshistorie (${current.notes.length})</summary>${current.notes.map((n) => `<p>${escapeHtml(n)}</p>`).join('')}</details>` : ''}
         <div class="par-nav">
           <button type="button" data-num="${prev ? prev.num : ''}" ${prev ? '' : 'disabled'}><span class="small">‹ Vorher</span><span class="tt">${prev ? `§ ${prev.num} ${escapeHtml(prev.title)}` : '–'}</span></button>
           <button type="button" data-num="${next ? next.num : ''}" ${next ? '' : 'disabled'}><span class="small">Weiter ›</span><span class="tt">${next ? `§ ${next.num} ${escapeHtml(next.title)}` : '–'}</span></button>
-        </div>`;
+        </div>
+        <div class="law-crumb">${escapeHtml(law.short)} › ${escapeHtml(crumbOf(current.num))}</div>
+        <div class="par-head"><span class="par-num">§ ${current.num}</span><h2 class="par-title">${highlight(escapeHtml(current.title))}</h2></div>
+        ${current.text.map(absatzHtml).join('')}
+        ${current.notes.length ? `<details class="notes"><summary>Änderungshistorie (${current.notes.length})</summary>${current.notes.map((n) => `<p>${escapeHtml(n)}</p>`).join('')}</details>` : ''}`;
     }
 
     function show(num, { push = true, scroll = true } = {}) {
