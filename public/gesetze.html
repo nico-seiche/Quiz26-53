@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <script>try{var d=document.documentElement,t=localStorage.getItem("theme"),m=localStorage.getItem("motion");if(t)d.dataset.theme=t;if(m==="off"||(m==="auto"&&matchMedia("(prefers-reduced-motion: reduce)").matches))d.classList.add("reduce-motion")}catch(e){}</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#5b4de8">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Quiz">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png?v=2">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2">
+  <title>Quiz – §-Sammlung</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    main.law-main { max-width: 1150px; }
+    .law-top { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .law-top h1 { margin: 0; font-size: 1.5rem; }
+    #error:empty { display: none; }
+    .law-tabs { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .law-tab { padding: .45rem .9rem; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: var(--text); font-weight: 800; cursor: pointer; }
+    .law-tab[aria-pressed="true"] { background: var(--primary-grad); color: #fff; border-color: transparent; box-shadow: var(--glow); }
+
+    .law-layout { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+    .law-side { position: sticky; top: 4.5rem; max-height: calc(100vh - 11rem); display: flex; flex-direction: column; padding: .9rem; }
+    .law-side input { margin-bottom: .6rem; }
+    .toc { overflow-y: auto; margin: 0 -.3rem; padding: 0 .3rem; flex: 1; overscroll-behavior: contain; }
+    .toc-group { width: 100%; display: flex; align-items: center; gap: .4rem; text-align: left; padding: .5rem .5rem; margin-top: .35rem; border: 0; border-radius: 10px; background: var(--bg); color: var(--text); font-weight: 800; font-size: .88rem; cursor: pointer; box-shadow: none; }
+    .toc-group .chev { transition: transform .15s; flex: none; }
+    .toc-group[aria-expanded="true"] .chev { transform: rotate(90deg); }
+    .toc-sub { padding: .5rem .5rem .1rem; font-size: .78rem; font-weight: 800; color: var(--muted); text-transform: none; }
+    .toc-sub.l2 { padding-left: .5rem; color: var(--text); }
+    .toc-sub.l3 { padding-left: .9rem; }
+    .toc-sub.l4 { padding-left: 1.3rem; font-weight: 600; }
+    .toc-par { display: flex; gap: .5rem; width: 100%; text-align: left; padding: .38rem .5rem; border: 0; border-radius: 9px; background: transparent; color: var(--text); font-size: .9rem; font-weight: 500; cursor: pointer; box-shadow: none; line-height: 1.3; }
+    .toc-par:hover { background: var(--bg); }
+    .toc-par .n { flex: none; min-width: 3rem; font-weight: 800; color: var(--link); font-variant-numeric: tabular-nums; }
+    .toc-par[aria-current="true"] { background: var(--primary-grad); color: #fff; }
+    .toc-par[aria-current="true"] .n { color: #fff; }
+    .toc-hit { display: block; width: 100%; text-align: left; padding: .55rem .6rem; margin-bottom: .3rem; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--text); font-weight: 500; cursor: pointer; box-shadow: none; }
+    .toc-hit:hover { border-color: var(--primary); }
+    .toc-hit .t { font-weight: 800; }
+    .toc-hit .snip { display: block; margin-top: .15rem; font-size: .82rem; color: var(--muted); line-height: 1.35; }
+    mark { background: #fde68a; color: #1b1d3a; border-radius: 3px; padding: 0 .1em; }
+
+    .law-read { padding: 1.4rem 1.5rem; min-height: 22rem; min-width: 0; overflow-wrap: anywhere; }
+    .law-back { display: none; margin-bottom: .8rem; }
+    .law-crumb { font-size: .82rem; color: var(--muted); margin-bottom: .6rem; line-height: 1.4; }
+    .par-head { display: flex; align-items: baseline; gap: .7rem; flex-wrap: wrap; margin-bottom: 1.1rem; }
+    .par-num { font-size: 2rem; font-weight: 900; background: var(--primary-grad); -webkit-background-clip: text; background-clip: text; color: transparent; letter-spacing: -.02em; }
+    .par-title { margin: 0; font-size: 1.35rem; line-height: 1.25; }
+    .abs { display: grid; grid-template-columns: 2.4rem minmax(0, 1fr); gap: .3rem; margin: 0 0 .85rem; line-height: 1.65; font-size: 1.04rem; }
+    .abs .an { font-weight: 800; color: var(--link); font-variant-numeric: tabular-nums; }
+    .abs.plain { grid-template-columns: 1fr; }
+    .abs.item { margin-left: 2.4rem; margin-top: -.35rem; }
+    .abs.item .an { color: var(--muted); }
+    .abs p { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
+    a.ref { color: var(--link); font-weight: 800; text-decoration: none; border-bottom: 1.5px dotted currentColor; cursor: pointer; }
+    a.ref:hover { background: var(--bg); }
+    .par-nav { display: flex; justify-content: space-between; gap: .6rem; margin-top: 1.4rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+    .par-nav button { flex: 1 1 0; text-align: left; display: flex; flex-direction: column; gap: .1rem; padding: .6rem .8rem; min-width: 0; }
+    .par-nav button:last-child { text-align: right; }
+    .par-nav .small { font-size: .78rem; font-weight: 600; opacity: .7; }
+    .par-nav .tt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    details.notes { margin-top: 1.1rem; font-size: .85rem; color: var(--muted); }
+    details.notes summary { cursor: pointer; font-weight: 800; }
+    details.notes p { margin: .4rem 0 0; }
+    .law-intro h2 { margin-top: 0; }
+    .law-intro .muted { font-size: .9rem; line-height: 1.5; }
+    .law-intro dl { margin: 1rem 0 0; display: grid; grid-template-columns: auto 1fr; gap: .3rem .9rem; font-size: .92rem; }
+    .law-intro dt { font-weight: 800; }
+    .law-intro dd { margin: 0; overflow-wrap: anywhere; }
+    .law-keys { margin-top: 1rem; font-size: .85rem; color: var(--muted); }
+    kbd { padding: .05rem .35rem; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); font-size: .8rem; }
+
+    @media (max-width: 860px) {
+      main.law-main { padding-left: .75rem; padding-right: .75rem; }
+      .law-layout { grid-template-columns: minmax(0, 1fr); }
+      .law-side { position: static; max-height: none; }
+      .toc { overflow: visible; }
+      .law-layout.reading .law-side { display: none; }
+      .law-layout:not(.reading) .law-read { display: none; }
+      .law-back { display: inline-flex; }
+      .law-read { padding: 1.1rem 1rem; }
+      .law-keys { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/profile">← Profil</a>
+    <strong>§-Sammlung</strong>
+    <span id="me"></span>
+  </header>
+  <main class="law-main">
+    <div class="law-top">
+      <h1>⚖️ §-Sammlung</h1>
+      <span class="tag">🧪 Experiment</span>
+    </div>
+    <p class="error" id="error"></p>
+    <div class="law-tabs" id="tabs" role="group" aria-label="Gesetz auswählen"></div>
+    <div class="law-layout" id="layout" hidden>
+      <aside class="card law-side">
+        <input type="text" id="search" inputmode="search" enterkeyhint="search" placeholder="§ oder Stichwort suchen …" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Suchen">
+        <div class="toc" id="toc"></div>
+      </aside>
+      <section class="card law-read" id="read" aria-live="polite"></section>
+    </div>
+  </main>
+  <script src="/js/changelog.js"></script>
+  <script src="/js/common.js"></script>
+  <script>
+    let laws = [];
+    let law = null;            // geladenes Gesetz
+    let pars = [];             // nur die Paragraphen, in Reihenfolge
+    let byNum = new Map();
+    let current = null;        // aktueller Paragraph
+    let query = '';
+    const openGroups = new Set();
+    const cache = new Map();
+
+    const store = {
+      get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+      set(k, v) { try { localStorage.setItem(k, v); } catch { /* egal */ } },
+    };
+
+    // --- Text → HTML ---------------------------------------------------------
+    // „§ 8“, „§§ 47 bis 49“: Verweise innerhalb des Gesetzes werden anklickbar, solange nicht ein anderes Gesetz folgt („§ 1 Ordnungsbehördengesetz“).
+    const NUM = String.raw`\d+[a-z]?(?![a-zäöüß])`;
+    const REF = new RegExp(String.raw`(§§?\s*)(${NUM})((?:\s*(?:,|und|bis|oder|sowie|–)\s*${NUM})*)`, 'g');
+    const OTHER_LAW = /^(?:\s*(?:Abs\.|Absatz|Satz|S\.|Nr\.|Nummer|Buchstabe|Halbsatz|Alt\.)|\s*\d+[a-z]?\)?|\s*[a-z]\)|\s*,|\s+und|\s+bis|\s+oder)*\s+(?:des |der |dem |den )?(?!PolG\b|Abs\.|Absatz|Satz|S\.|Nr\.|Nummer|Buchstabe|Halbsatz|Alt\.)[A-ZÄÖÜ]/;
+    function link(num) {
+      const n = num.replace(/\s+/g, '');
+      return byNum.has(n) ? `<a class="ref" data-go="${n}" href="#${law.slug}/${n}">${num}</a>` : num;
+    }
+    function textHtml(raw) {
+      const esc = escapeHtml(raw);
+      let out = '';
+      let last = 0;
+      for (const m of esc.matchAll(REF)) {
+        const tail = esc.slice(m.index + m[0].length);
+        out += esc.slice(last, m.index);
+        last = m.index + m[0].length;
+        if (OTHER_LAW.test(tail)) { out += m[0]; continue; }
+        out += m[1] + link(m[2]) + m[3].replace(/\d+[a-z]?(?![a-zäöüß])/g, (x) => link(x));
+      }
+      out += esc.slice(last);
+      return highlight(out);
+    }
+    function highlight(html) {
+      const terms = query.split(/\s+/).filter((t) => t.length > 1 && !/^\d+[a-z]?$/i.test(t));
+      if (!terms.length) return html;
+      const re = new RegExp(`(${terms.map((t) => escapeHtml(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?![^<]*>)`, 'gi');
+      return html.replace(re, '<mark>$1</mark>');
+    }
+
+    // Absätze: „(1) …“, Aufzählungen „1. …“ / „a) …“, sonst Fließtext
+    function absatzHtml(line) {
+      const abs = line.match(/^(\(\d+[a-z]?\))\s+([\s\S]*)$/);
+      if (abs) return `<div class="abs"><span class="an">${abs[1]}</span><p>${textHtml(abs[2])}</p></div>`;
+      const item = line.match(/^(\d+[a-z]?\.|[a-z]{1,2}\))\s+([\s\S]*)$/);
+      if (item) return `<div class="abs item"><span class="an">${escapeHtml(item[1])}</span><p>${textHtml(item[2])}</p></div>`;
+      return `<div class="abs plain"><p>${textHtml(line)}</p></div>`;
+    }
+
+    // --- Gliederung ----------------------------------------------------------
+    function tocHtml() {
+      let html = '';
+      let group = null;      // aktueller Abschnitt (Ebene 1)
+      let open = true;
+      for (const item of law.items) {
+        if (item.type === 'head' && item.level === 1) {
+          group = `${item.label}`;
+          open = openGroups.has(group);
+          html += `<button type="button" class="toc-group" data-group="${escapeHtml(group)}" aria-expanded="${open}"><span class="chev" aria-hidden="true">▸</span><span>${escapeHtml(item.label)} · ${escapeHtml(item.title)}</span></button>`;
+        } else if (!open) {
+          continue;
+        } else if (item.type === 'head') {
+          html += `<div class="toc-sub l${item.level}">${escapeHtml([item.label, item.title].filter(Boolean).join(' · '))}</div>`;
+        } else {
+          html += `<button type="button" class="toc-par" data-num="${item.num}" ${current && current.num === item.num ? 'aria-current="true"' : ''}><span class="n">§ ${item.num}</span><span>${escapeHtml(item.title)}</span></button>`;
+        }
+      }
+      return html;
+    }
+
+    function groupOf(num) {
+      let group = null;
+      for (const item of law.items) {
+        if (item.type === 'head' && item.level === 1) group = item.label;
+        if (item.type === 'par' && item.num === num) return group;
+      }
+      return null;
+    }
+
+    // --- Suche ---------------------------------------------------------------
+    const norm = (s) => s.toLowerCase();
+    function searchHtml(q) {
+      const nq = norm(q.trim());
+      const numQ = nq.replace(/^§+\s*/, '').replace(/\s+/g, '');
+      const terms = nq.split(/\s+/).filter(Boolean);
+      const hits = [];
+      for (const p of pars) {
+        const title = norm(p.title);
+        const body = norm(p.text.join(' '));
+        let score = 0;
+        if (p.num === numQ) score = 1000;
+        else if (/^\d+[a-z]?$/.test(numQ) && p.num.startsWith(numQ) && /^§?\s*\d/.test(nq)) score = 500;
+        else if (terms.every((t) => title.includes(t))) score = 300;
+        else if (terms.every((t) => (title + ' ' + body).includes(t))) score = 100;
+        if (score) hits.push({ p, score, body });
+      }
+      hits.sort((a, b) => b.score - a.score || pars.indexOf(a.p) - pars.indexOf(b.p));
+      if (!hits.length) return '<p class="muted">Nichts gefunden.</p>';
+      const t0 = terms.find((t) => t.length > 1 && !/^§/.test(t));
+      return `<p class="muted" style="margin:.2rem 0 .5rem">${hits.length} Treffer</p>` + hits.slice(0, 40).map(({ p, body }) => {
+        let snip = '';
+        const i = t0 ? body.indexOf(t0) : -1;
+        if (i >= 0 && !norm(p.title).includes(t0)) {
+          const text = p.text.join(' ');
+          snip = `<span class="snip">…${highlight(escapeHtml(text.slice(Math.max(0, i - 50), i + 90)))}…</span>`;
+        }
+        return `<button type="button" class="toc-hit" data-num="${p.num}"><span class="t">§ ${p.num} ${highlight(escapeHtml(p.title))}</span>${snip}</button>`;
+      }).join('');
+    }
+
+    // --- Anzeige -------------------------------------------------------------
+    function renderToc() {
+      $('#toc').innerHTML = query.trim() ? searchHtml(query) : tocHtml();
+    }
+
+    function crumbOf(num) {
+      const trail = [];
+      for (const item of law.items) {
+        if (item.type === 'head') { trail.length = Math.min(trail.length, item.level - 1); trail[item.level - 1] = [item.label, item.title].filter(Boolean).join(' · '); }
+        if (item.type === 'par' && item.num === num) break;
+      }
+      return trail.filter(Boolean).join(' › ');
+    }
+
+    function intro() {
+      return `<div class="law-intro">
+        <h2>${escapeHtml(law.short)}</h2>
+        <p class="muted">${escapeHtml(law.title)}</p>
+        <dl>
+          <dt>Fassung</dt><dd>gültig ab ${escapeHtml(law.validFrom || '–')}</dd>
+          <dt>Umfang</dt><dd>${pars.length} Paragraphen</dd>
+          ${law.citation ? `<dt>Vollzitat</dt><dd>${escapeHtml(law.citation)}</dd>` : ''}
+          <dt>Quelle</dt><dd><a href="${escapeHtml(law.source)}" target="_blank" rel="noopener">recht.nrw.de</a> (amtlich)</dd>
+        </dl>
+        <p class="law-keys">Tipp: <kbd>/</kbd> sucht, <kbd>←</kbd> <kbd>→</kbd> blättern. Verweise wie „§ 8“ im Text sind anklickbar.</p>
+      </div>`;
+    }
+
+    function renderRead() {
+      const box = $('#read');
+      if (!current) { box.innerHTML = `<button type="button" class="law-back" id="back">‹ Inhalt</button>${intro()}`; return; }
+      const i = pars.indexOf(current);
+      const prev = pars[i - 1];
+      const next = pars[i + 1];
+      box.innerHTML = `
+        <button type="button" class="law-back" id="back">‹ Inhalt</button>
+        <div class="law-crumb">${escapeHtml(law.short)} › ${escapeHtml(crumbOf(current.num))}</div>
+        <div class="par-head"><span class="par-num">§ ${current.num}</span><h2 class="par-title">${highlight(escapeHtml(current.title))}</h2></div>
+        ${current.text.map(absatzHtml).join('')}
+        ${current.notes.length ? `<details class="notes"><summary>Änderungshistorie (${current.notes.length})</summary>${current.notes.map((n) => `<p>${escapeHtml(n)}</p>`).join('')}</details>` : ''}
+        <div class="par-nav">
+          <button type="button" data-num="${prev ? prev.num : ''}" ${prev ? '' : 'disabled'}><span class="small">‹ Vorher</span><span class="tt">${prev ? `§ ${prev.num} ${escapeHtml(prev.title)}` : '–'}</span></button>
+          <button type="button" data-num="${next ? next.num : ''}" ${next ? '' : 'disabled'}><span class="small">Weiter ›</span><span class="tt">${next ? `§ ${next.num} ${escapeHtml(next.title)}` : '–'}</span></button>
+        </div>`;
+    }
+
+    function show(num, { push = true, scroll = true } = {}) {
+      const p = byNum.get(num);
+      if (!p) return;
+      current = p;
+      store.set(`law:${law.slug}`, num);
+      const g = groupOf(num);
+      if (g) openGroups.add(g);
+      if (push && location.hash !== `#${law.slug}/${num}`) history.replaceState(null, '', `#${law.slug}/${num}`);
+      $('#layout').classList.add('reading');
+      renderRead();
+      renderToc();
+      if (scroll) window.scrollTo({ top: 0 });
+      const cur = $('#toc [aria-current]');
+      if (cur && !query.trim()) cur.scrollIntoView({ block: 'nearest' });
+    }
+
+    function showToc() {
+      $('#layout').classList.remove('reading');
+      renderToc();
+      const cur = $('#toc [aria-current]');
+      if (cur) cur.scrollIntoView({ block: 'center' });
+    }
+
+    async function openLaw(slug, num) {
+      $('#error').textContent = '';
+      if (!cache.has(slug)) cache.set(slug, await api(`/api/gesetze/${slug}`));
+      law = cache.get(slug);
+      pars = law.items.filter((i) => i.type === 'par');
+      byNum = new Map(pars.map((p) => [p.num, p]));
+      current = null;
+      query = '';
+      $('#search').value = '';
+      store.set('law:last', slug);
+      document.querySelectorAll('.law-tab').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.slug === slug)));
+      $('#layout').hidden = false;
+      $('#layout').classList.remove('reading');
+      renderToc();
+      renderRead();
+      if (num && byNum.has(num)) show(num, { scroll: false });
+      history.replaceState(null, '', num && byNum.has(num) ? `#${slug}/${num}` : `#${slug}`);
+    }
+
+    // --- Ereignisse ----------------------------------------------------------
+    document.addEventListener('click', (e) => {
+      if (!law) return;
+      const group = e.target.closest('.toc-group');
+      if (group) {
+        const key = group.dataset.group;
+        if (openGroups.has(key)) openGroups.delete(key); else openGroups.add(key);
+        renderToc();
+        return;
+      }
+      const ref = e.target.closest('a.ref');
+      if (ref) { e.preventDefault(); query = ''; $('#search').value = ''; show(ref.dataset.go); return; }
+      const hit = e.target.closest('[data-num]');
+      if (hit && hit.dataset.num) { show(hit.dataset.num); return; }
+      if (e.target.closest('#back')) showToc();
+    });
+
+    $('#search').addEventListener('input', (e) => {
+      query = e.target.value;
+      renderToc();
+      if (current) renderRead();
+    });
+    $('#search').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { const first = $('#toc .toc-hit'); if (first) show(first.dataset.num); e.target.blur(); }
+      if (e.key === 'Escape') { e.target.value = ''; query = ''; renderToc(); e.target.blur(); }
+    });
+    document.addEventListener('keydown', (e) => {
+      if (!law || e.metaKey || e.ctrlKey || e.altKey) return;
+      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+      if (e.key === '/' && !typing) { e.preventDefault(); $('#search').focus(); return; }
+      if (typing || !current) return;
+      const i = pars.indexOf(current);
+      if (e.key === 'ArrowLeft' && pars[i - 1]) show(pars[i - 1].num);
+      if (e.key === 'ArrowRight' && pars[i + 1]) show(pars[i + 1].num);
+    });
+    window.addEventListener('hashchange', () => {
+      const [slug, num] = location.hash.slice(1).split('/');
+      if (slug && law && slug === law.slug) { if (num && byNum.has(num) && (!current || current.num !== num)) show(num, { push: false }); }
+      else if (slug && laws.some((l) => l.slug === slug)) openLaw(slug, num);
+    });
+
+    requireLogin().then(async (me) => {
+      mountNav('profile', me);
+      noAutoFocus($('#search'));
+      try {
+        laws = await api('/api/gesetze');
+        $('#tabs').innerHTML = laws.map((l) => `<button type="button" class="law-tab" data-slug="${l.slug}" aria-pressed="false" title="${escapeHtml(l.title)}">${escapeHtml(l.short)}</button>`).join('');
+        $('#tabs').addEventListener('click', (e) => { const b = e.target.closest('.law-tab'); if (b) openLaw(b.dataset.slug).catch((err) => { $('#error').textContent = err.message; }); });
+        const [hs, hn] = location.hash.slice(1).split('/');
+        const slug = laws.some((l) => l.slug === hs) ? hs : (laws.some((l) => l.slug === store.get('law:last')) ? store.get('law:last') : laws[0].slug);
+        await openLaw(slug, hn && hs === slug ? hn : null);
+      } catch (err) {
+        $('#error').textContent = err.message;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -200,3 +200,10 @@ Aktuell einfache Wertung: richtige Antwort = 500–1000 Punkte, je schneller des
 - **Mehrfachauswahl:** Im Editor kann jede Frage „Mehrere Antworten gleichzeitig wählbar“ sein (`questions.multi`, richtige Antworten als Bitmaske in `correct_mask`). Spieler schalten Antworten um und geben mit einem Button ab; Antworten werden als Bitmaske in `game_answers.mask` gespeichert (`choice` = kleinster gewählter Index). Punkte: Anteil `(richtige − falsche) / Anzahl richtiger` (mindestens 0) mal die Geschwindigkeitspunkte; Serie, Bonus und Erfolge nur bei komplett richtiger Antwort. Hilfsfunktionen in `src/answers.js`.
 - **Umfragen:** `quizzes.kind = 'poll'`. Keine richtige Antwort, keine Punkte, keine Rangliste, kein Eintrag in Erfolgen oder Ergebnissen. Nach jeder Frage zeigt der Host ein Balkendiagramm, am Ende alle Diagramme (`public/js/poll.js`). Das Ergebnis wird in `poll_runs` gespeichert und ist für Besitzer und Mitbearbeiter unter `/poll-results?quiz=<id>` abrufbar (`/api/polls`).
 - Migration: `supabase/migrations/021_multi_poll.sql`.
+
+## §-Sammlung (Experiment, nur für den Nutzer „Nico“)
+
+- Erreichbar über einen Link im Profil (`/gesetze`). Die API (`/api/gesetze`, `src/gesetze.js`) antwortet allen anderen mit 403; der Link erscheint nur, wenn die API zugänglich ist.
+- Gesetzestexte liegen als JSON in `src/gesetze/<slug>.json` (Gliederung, Paragraphen, Absätze, Änderungshistorie) und werden mit `scripts/import-recht-nrw.js` aus der amtlichen Fassung auf recht.nrw.de erzeugt, z. B. `node scripts/import-recht-nrw.js <url> polg-nrw "PolG NRW" "Polizeigesetz des Landes Nordrhein-Westfalen"`. Neues Gesetz = JSON erzeugen und in `LAWS` (`src/gesetze.js`) eintragen.
+- Oberfläche: Inhaltsverzeichnis mit Abschnitten, Suche (§-Nummer, Titel, Volltext), Verweise wie „§ 8“ im Text sind anklickbar (Verweise auf andere Gesetze nicht), Blättern mit ← →, Deep-Links `/gesetze#polg-nrw/37a`.
+- Aktuell enthalten: PolG NRW (gültig ab 13.12.2025).
