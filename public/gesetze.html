@@ -56,6 +56,8 @@
     .abs.plain { grid-template-columns: 1fr; }
     .abs.item { margin-left: 2.4rem; margin-top: -.35rem; }
     .abs.item .an { color: var(--muted); }
+    .abs.item.d2 { margin-left: 4.2rem; grid-template-columns: 2rem minmax(0, 1fr); }
+    .abs.item.d3 { margin-left: 6rem; grid-template-columns: 2rem minmax(0, 1fr); }
     .abs p { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
     a.ref { color: var(--link); font-weight: 800; text-decoration: none; border-bottom: 1.5px dotted currentColor; cursor: pointer; }
     a.ref:hover { background: var(--bg); }
@@ -130,20 +132,23 @@
     // „§ 8“, „§§ 47 bis 49“: Verweise innerhalb des Gesetzes werden anklickbar, solange nicht ein anderes Gesetz folgt („§ 1 Ordnungsbehördengesetz“).
     const NUM = String.raw`\d+[a-z]?(?![a-zäöüß])`;
     const REF = new RegExp(String.raw`(§§?\s*)(${NUM})((?:\s*(?:,|und|bis|oder|sowie|–)\s*${NUM})*)`, 'g');
-    const OTHER_LAW = /^(?:\s*(?:Abs\.|Absatz|Satz|S\.|Nr\.|Nummer|Buchstabe|Halbsatz|Alt\.)|\s*\d+[a-z]?\)?|\s*[a-z]\)|\s*,|\s+und|\s+bis|\s+oder)*\s+(?:des |der |dem |den )?(?!PolG\b|Abs\.|Absatz|Satz|S\.|Nr\.|Nummer|Buchstabe|Halbsatz|Alt\.)[A-ZÄÖÜ]/;
+    const OTHER_LAW_HEAD = String.raw`^(?:\s*(?:Abs\.|Absatz|Satz|S\.|Nr\.|Nummer|Buchstabe|Halbsatz|Alt\.)|\s*\d+[a-z]?\)?|\s*[a-z]\)|\s*,|\s+und|\s+bis|\s+oder)*\s+(?:des |der |dem |den )?`;
+    let otherLaw = null;
+    const buildOtherLaw = () => { otherLaw = new RegExp(OTHER_LAW_HEAD + `(?!${law.short.split(' ')[0]}\\b|Abs\\.|Absatz|Satz|S\\.|Nr\\.|Nummer|Buchstabe|Halbsatz|Alt\\.)[A-ZÄÖÜ]`); };
     function link(num) {
       const n = num.replace(/\s+/g, '');
       return byNum.has(n) ? `<a class="ref" data-go="${n}" href="#${law.slug}/${n}">${num}</a>` : num;
     }
-    function textHtml(raw) {
+    function textHtml(raw, noLink) {
       const esc = escapeHtml(raw);
+      if (noLink) return highlight(esc);
       let out = '';
       let last = 0;
       for (const m of esc.matchAll(REF)) {
         const tail = esc.slice(m.index + m[0].length);
         out += esc.slice(last, m.index);
         last = m.index + m[0].length;
-        if (OTHER_LAW.test(tail)) { out += m[0]; continue; }
+        if (otherLaw.test(tail)) { out += m[0]; continue; }
         out += m[1] + link(m[2]) + m[3].replace(/\d+[a-z]?(?![a-zäöüß])/g, (x) => link(x));
       }
       out += esc.slice(last);
@@ -157,12 +162,28 @@
     }
 
     // Absätze: „(1) …“, Aufzählungen „1. …“ / „a) …“, sonst Fließtext
-    function absatzHtml(line) {
+    function absatzHtml(raw, noLink) {
+      const depth = raw.length - raw.replace(/^\t+/, '').length;
+      const line = raw.slice(depth);
       const abs = line.match(/^(\(\d+[a-z]?\))\s+([\s\S]*)$/);
-      if (abs) return `<div class="abs"><span class="an">${abs[1]}</span><p>${textHtml(abs[2])}</p></div>`;
-      const item = line.match(/^(\d+[a-z]?\.|[a-z]{1,2}\))\s+([\s\S]*)$/);
-      if (item) return `<div class="abs item"><span class="an">${escapeHtml(item[1])}</span><p>${textHtml(item[2])}</p></div>`;
-      return `<div class="abs plain"><p>${textHtml(line)}</p></div>`;
+      if (abs) return `<div class="abs"><span class="an">${abs[1]}</span><p>${textHtml(abs[2], noLink)}</p></div>`;
+      const item = line.match(/^(\d+[a-z]?\.|[a-z]{1,2}\)|[a-z]{2}\)|[ivx]+\))\s+([\s\S]*)$/);
+      if (item) return `<div class="abs item d${Math.max(depth, 1)}"><span class="an">${escapeHtml(item[1])}</span><p>${textHtml(item[2], noLink)}</p></div>`;
+      return `<div class="abs plain${depth ? ` d${depth}` : ''}"><p>${textHtml(line, noLink)}</p></div>`;
+    }
+
+    // Unter einer Aufzählung wie „aus dem Strafgesetzbuch:“ (mit Doppelpunkt) beziehen sich die §-Angaben auf das andere Gesetz → nicht verlinken
+    const EXTERNAL_HEAD = /\b(?:aus|nach|gemäß|im|des|der|dem)\s+(?:dem\s+|der\s+)?[A-ZÄÖÜ][\wäöüß-]*(?:gesetz(?:es|buch(?:es)?)?|buch|ordnung|verordnung)\b[^:]*:$/;
+    function linesHtml(lines) {
+      let extDepth = -1;     // Einrückung der Zeile, unter der alles extern ist
+      return lines.map((raw) => {
+        const depth = raw.length - raw.replace(/^\t+/, '').length;
+        if (extDepth >= 0 && depth <= extDepth) extDepth = -1;
+        const external = extDepth < 0 && depth > 0 && (EXTERNAL_HEAD.test(raw.trim()) || /^(?:\S+\s+)?aus (?:dem|der) [A-ZÄÖÜ]/.test(raw.trim()));
+        const html = absatzHtml(raw, extDepth >= 0 || external);
+        if (external) extDepth = depth;
+        return html;
+      }).join('');
     }
 
     // --- Gliederung ----------------------------------------------------------
@@ -245,10 +266,11 @@
         <h2>${escapeHtml(law.short)}</h2>
         <p class="muted">${escapeHtml(law.title)}</p>
         <dl>
-          <dt>Fassung</dt><dd>gültig ab ${escapeHtml(law.validFrom || '–')}</dd>
+          <dt>Fassung</dt><dd>${escapeHtml(law.version || `gültig ab ${law.validFrom || '–'}`)}</dd>
+          ${(law.hints || []).map((h) => `<dt>Hinweis</dt><dd>${escapeHtml(h)}</dd>`).join('')}
           <dt>Umfang</dt><dd>${pars.length} Paragraphen</dd>
           ${law.citation ? `<dt>Vollzitat</dt><dd>${escapeHtml(law.citation)}</dd>` : ''}
-          <dt>Quelle</dt><dd><a href="${escapeHtml(law.source)}" target="_blank" rel="noopener">recht.nrw.de</a> (amtlich)</dd>
+          <dt>Quelle</dt><dd><a href="${escapeHtml(law.source)}" target="_blank" rel="noopener">${escapeHtml(new URL(law.source).hostname.replace(/^www\./, ''))}</a> (amtlich)</dd>
         </dl>
         <p class="law-keys">Tipp: <kbd>/</kbd> sucht, <kbd>←</kbd> <kbd>→</kbd> blättern. Verweise wie „§ 8“ im Text sind anklickbar.</p>
       </div>`;
@@ -268,7 +290,7 @@
         </div>
         <div class="law-crumb">${escapeHtml(law.short)} › ${escapeHtml(crumbOf(current.num))}</div>
         <div class="par-head"><span class="par-num">§ ${current.num}</span><h2 class="par-title">${highlight(escapeHtml(current.title))}</h2></div>
-        ${current.text.map(absatzHtml).join('')}
+        ${linesHtml(current.text)}
         ${current.notes.length ? `<details class="notes"><summary>Änderungshistorie (${current.notes.length})</summary>${current.notes.map((n) => `<p>${escapeHtml(n)}</p>`).join('')}</details>` : ''}`;
     }
 
@@ -300,6 +322,7 @@
       if (!cache.has(slug)) cache.set(slug, await api(`/api/gesetze/${slug}`));
       law = cache.get(slug);
       pars = law.items.filter((i) => i.type === 'par');
+      buildOtherLaw();
       byNum = new Map(pars.map((p) => [p.num, p]));
       current = null;
       query = '';

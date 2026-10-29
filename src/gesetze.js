@@ -2,8 +2,8 @@ const express = require('express');
 const { requireAuth } = require('./auth');
 
 // Experimentell: die §-Sammlung ist vorerst nur für den Nutzer „Nico“ freigeschaltet.
-// Weitere Gesetze: mit scripts/import-recht-nrw.js erzeugen und hier eintragen.
-const LAWS = [require('./gesetze/polg-nrw.json')];
+// Weitere Gesetze: mit scripts/import-recht-nrw.js (Landesrecht NRW) oder scripts/import-gii.js (Bundesrecht) erzeugen und hier eintragen.
+const LAWS = [require('./gesetze/polg-nrw.json'), require('./gesetze/stpo.json')];
 
 const router = express.Router();
 router.use(requireAuth, (req, res, next) => {

@@ -206,4 +206,5 @@ Aktuell einfache Wertung: richtige Antwort = 500–1000 Punkte, je schneller des
 - Erreichbar über einen Link im Profil (`/gesetze`). Die API (`/api/gesetze`, `src/gesetze.js`) antwortet allen anderen mit 403; der Link erscheint nur, wenn die API zugänglich ist.
 - Gesetzestexte liegen als JSON in `src/gesetze/<slug>.json` (Gliederung, Paragraphen, Absätze, Änderungshistorie) und werden mit `scripts/import-recht-nrw.js` aus der amtlichen Fassung auf recht.nrw.de erzeugt, z. B. `node scripts/import-recht-nrw.js <url> polg-nrw "PolG NRW" "Polizeigesetz des Landes Nordrhein-Westfalen"`. Neues Gesetz = JSON erzeugen und in `LAWS` (`src/gesetze.js`) eintragen.
 - Oberfläche: Inhaltsverzeichnis mit Abschnitten, Suche (§-Nummer, Titel, Volltext), Verweise wie „§ 8“ im Text sind anklickbar (Verweise auf andere Gesetze nicht), Blättern mit ← →, Deep-Links `/gesetze#polg-nrw/37a`.
-- Aktuell enthalten: PolG NRW (gültig ab 13.12.2025).
+- Bundesgesetze kommen aus der amtlichen XML-Fassung von gesetze-im-internet.de: `node scripts/import-gii.js stpo StPO`. Unter Aufzählungen wie „aus dem Strafgesetzbuch:“ werden §-Angaben nicht verlinkt, weil sie sich auf ein anderes Gesetz beziehen.
+- Aktuell enthalten: PolG NRW (gültig ab 13.12.2025) und StPO (Stand 27.10.2026).
