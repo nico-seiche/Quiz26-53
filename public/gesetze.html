@@ -15,6 +15,9 @@
   <title>Quiz – §-Sammlung</title>
   <link rel="stylesheet" href="/style.css">
   <style>
+    :root { --tile-border: #b9c2fb; }   /* heller Rahmen im Lightmode */
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --tile-border: var(--link); } }
+    :root[data-theme="dark"] { --tile-border: var(--link); }
     main.law-main { max-width: 1150px; }
     .law-top { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: 1rem; }
     .law-top h1 { margin: 0; font-size: 1.5rem; }
@@ -55,13 +58,13 @@
     .num-row { display: grid; grid-template-columns: 3.8rem minmax(0, 1fr); gap: .5rem; align-items: center; margin-bottom: .55rem; }
     .num-tiles { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: .55rem; }
     .num-row-label { font-size: .8rem; font-weight: 800; color: var(--muted); }
-    .num-tile { width: 100%; aspect-ratio: 1 / .8; display: grid; place-items: center; padding: 0; border: 2px solid var(--link); border-radius: 14px; background: var(--card); color: var(--text); font-weight: 800; font-size: 1.5rem; font-variant-numeric: tabular-nums; cursor: pointer; box-shadow: none; transition: transform .12s, background .12s; }
+    .num-tile { width: 100%; aspect-ratio: 1 / .8; display: grid; place-items: center; padding: 0; border: 2px solid var(--tile-border); border-radius: 14px; background: var(--card); color: var(--text); font-weight: 800; font-size: 1.5rem; font-variant-numeric: tabular-nums; cursor: pointer; box-shadow: none; transition: transform .12s, background .12s; }
     .num-tile:hover { background: var(--primary-grad); color: #fff; border-color: transparent; transform: translateY(-2px); }
     .num-tile[aria-current="true"] { background: var(--primary-grad); color: #fff; border-color: transparent; box-shadow: var(--glow); }
     .num-tile.empty { border: 1.5px dashed var(--border); background: transparent; color: var(--muted); font-weight: 600; opacity: .45; cursor: default; }
     .num-tile.empty:hover { transform: none; background: transparent; color: var(--muted); }
     .related { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin: -.4rem 0 1.1rem; font-size: .85rem; color: var(--muted); }
-    .related button { padding: .2rem .65rem; border: 1px solid var(--link); border-radius: 999px; background: var(--card); color: var(--link); font-size: .85rem; font-weight: 800; cursor: pointer; box-shadow: none; }
+    .related button { padding: .2rem .65rem; border: 1px solid var(--tile-border); border-radius: 999px; background: var(--card); color: var(--link); font-size: .85rem; font-weight: 800; cursor: pointer; box-shadow: none; }
     .related button:hover, .related button[aria-current="true"] { background: var(--primary-grad); color: #fff; border-color: transparent; }
     .law-crumb { font-size: .82rem; color: var(--muted); margin-bottom: .6rem; line-height: 1.4; }
     .par-head { display: flex; align-items: baseline; gap: .7rem; flex-wrap: wrap; margin-bottom: 1.1rem; }
