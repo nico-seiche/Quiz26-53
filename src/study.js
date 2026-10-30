@@ -49,7 +49,7 @@ const COLLAB = (setCol, userParam) => `EXISTS (SELECT 1 FROM quiz.study_set_coll
 async function loadSet(id, userId) {
   if (!isId(id)) return null;
   const set = await db.one(`
-    SELECT st.id, st.owner_id, st.title, st.subject_id, st.is_public, u.username AS owner,
+    SELECT st.id, st.owner_id, st.title, st.subject_id, st.is_public, st.updated_at, u.username AS owner,
            s.name AS subject, s.icon AS subject_icon,
            (st.owner_id = $2 OR ${COLLAB('st.id', '$2')}) AS can_edit
     FROM quiz.study_sets st
@@ -82,7 +82,17 @@ router.get('/', async (req, res) => {
   `, [req.user.id, MASTERED_BOX]);
   // mine = darf ich bearbeiten (Besitzer oder Mitarbeiter), isOwner = gehört mir
   const sets = rows.map((r) => ({ ...r, id: Number(r.id), isOwner: Number(r.owner_id) === req.user.id, mine: r.can_edit }));
-  res.json({ mine: sets.filter((s) => s.mine), shared: sets.filter((s) => !s.mine) });
+  // Eigene Kopien fremder Sets: das Original ist ausgeblendet, solange die Kopie aktuell ist; sonst „Update verfügbar“
+  const copies = new Map((await db.query(
+    'SELECT DISTINCT ON (copied_from) copied_from, id, synced_to FROM quiz.study_sets WHERE owner_id = $1 AND copied_from IS NOT NULL ORDER BY copied_from, created_at DESC',
+    [req.user.id])).map((c) => [Number(c.copied_from), c]));
+  const shared = [];
+  for (const st of sets.filter((x) => !x.mine)) {
+    const copy = copies.get(st.id);
+    if (!copy) { shared.push(st); continue; }
+    if (copy.synced_to && new Date(st.updated_at) > new Date(copy.synced_to)) shared.push({ ...st, copyId: Number(copy.id) });
+  }
+  res.json({ mine: sets.filter((s) => s.mine), shared });
 });
 
 async function saveCards(client, setId, cards) {
@@ -369,16 +379,66 @@ router.post('/:id/copy', async (req, res) => {
   if (!set) return res.status(404).json({ error: 'Lernset nicht gefunden' });
   const id = await db.tx(async (client) => {
     const { rows } = await client.query(
-      'INSERT INTO quiz.study_sets (owner_id, title, subject_id, is_public) VALUES ($1, $2, $3, false) RETURNING id',
-      [req.user.id, set.title, set.subject_id],
+      'INSERT INTO quiz.study_sets (owner_id, title, subject_id, is_public, copied_from, synced_to) VALUES ($1, $2, $3, false, $4, $5) RETURNING id',
+      [req.user.id, set.title, set.subject_id, set.id, set.updated_at],
     );
     await client.query(`
-      INSERT INTO quiz.study_cards (set_id, position, term, definition)
-      SELECT $1, position, term, definition FROM quiz.study_cards WHERE set_id = $2
+      INSERT INTO quiz.study_cards (set_id, position, term, definition, source_card_id)
+      SELECT $1, position, term, definition, id FROM quiz.study_cards WHERE set_id = $2
     `, [rows[0].id, set.id]);
     return Number(rows[0].id);
   });
   res.json({ id });
+});
+
+// Kopie mit dem (geänderten) Original abgleichen: neue Karten kommen dazu, geänderte werden übernommen, im Original
+// gelöschte entfallen; eigene zusätzliche Karten der Kopie bleiben. Lernfortschritt bleibt bei übernommenen Karten erhalten.
+router.post('/:id/sync', async (req, res) => {
+  if (!isId(req.params.id)) return res.status(404).json({ error: 'Lernset nicht gefunden' });
+  const copy = await db.one('SELECT id, copied_from FROM quiz.study_sets WHERE id = $1 AND owner_id = $2', [req.params.id, req.user.id]);
+  if (!copy || !copy.copied_from) return res.status(404).json({ error: 'Das ist keine Kopie eines anderen Lernsets' });
+  const original = await loadSet(copy.copied_from, req.user.id);
+  if (!original) return res.status(404).json({ error: 'Das Original gibt es nicht mehr oder ist nicht mehr geteilt' });
+  const result = await db.tx(async (client) => {
+    await client.query('SELECT pg_advisory_xact_lock($1)', [copy.id]);
+    const { rows: src } = await client.query('SELECT id, term, definition FROM quiz.study_cards WHERE set_id = $1 ORDER BY position, id', [original.id]);
+    const { rows: mine } = await client.query('SELECT id, term, definition, source_card_id FROM quiz.study_cards WHERE set_id = $1', [copy.id]);
+    const bySource = new Map(mine.filter((m) => m.source_card_id).map((m) => [Number(m.source_card_id), m]));
+    const srcIds = new Set(src.map((x) => Number(x.id)));
+    const own = mine.filter((m) => !m.source_card_id).length;
+    if (src.length + own > MAX_CARDS) return { error: `Höchstens ${MAX_CARDS} Karten pro Set` };
+    let added = 0; let updated = 0; let removed = 0;
+    for (const m of mine) {
+      if (m.source_card_id && !srcIds.has(Number(m.source_card_id))) {
+        await client.query('DELETE FROM quiz.study_cards WHERE id = $1', [m.id]);
+        removed++;
+      }
+    }
+    for (const [i, o] of src.entries()) {
+      const m = bySource.get(Number(o.id));
+      if (m) {
+        if (m.term !== o.term || m.definition !== o.definition) {
+          await client.query('UPDATE quiz.study_cards SET term = $1, definition = $2, rev = rev + 1 WHERE id = $3', [o.term, o.definition, m.id]);
+          updated++;
+        }
+        await client.query('UPDATE quiz.study_cards SET position = $1 WHERE id = $2', [i, m.id]);
+      } else {
+        await client.query('INSERT INTO quiz.study_cards (set_id, position, term, definition, source_card_id) VALUES ($1, $2, $3, $4, $5)', [copy.id, i, o.term, o.definition, o.id]);
+        added++;
+      }
+    }
+    // eigene Zusatzkarten hinter die übernommenen sortieren
+    await client.query(`
+      UPDATE quiz.study_cards c SET position = src.n + r.rn - 1
+      FROM (SELECT id, ROW_NUMBER() OVER (ORDER BY position, id) AS rn FROM quiz.study_cards WHERE set_id = $1 AND source_card_id IS NULL) r,
+           (SELECT $2::int AS n) src
+      WHERE c.id = r.id`, [copy.id, src.length]);
+    await client.query('UPDATE quiz.study_sets SET synced_to = $2, updated_at = now() WHERE id = $1', [copy.id, original.updated_at]);
+    return { added, updated, removed };
+  });
+  if (result.error) return res.status(400).json({ error: result.error });
+  await notifySet(copy.id);
+  res.json(result);
 });
 
 // Ergebnis einer Wiederholung: gewusst → eine Box höher, nicht gewusst → zurück in Box 0

@@ -217,3 +217,7 @@ Die Bestenliste (und der Platz im Profil) zählt nur Spiele ab dem Stichtag `lea
 ## Einstellungen
 
 `/settings` (Link im Profil): Profilbild, Passwort (`PATCH /api/auth/password`: altes Passwort + neues zweimal, andere Geräte werden abgemeldet; Mail-Verknüpfung/„Passwort vergessen“ ist bewusst noch nicht gebaut), Nutzername (`PATCH /api/auth/username`, gleiche Regeln wie bei der Registrierung, Punkte/Freunde/Quiz hängen an der Nutzer-ID und bleiben erhalten), Animationen, Freunde-ID. Neue Einstellungen kommen als weitere Karten dazu. Die §-Sammlung ist über `quiz.app_settings` (`gesetze_user_ids`, kommagetrennte Nutzer-IDs) freigeschaltet, damit eine Namensänderung sie nicht sperrt.
+
+## Lernsets kopieren und aktualisieren
+
+Beim Kopieren merkt sich die Kopie ihr Original (`study_sets.copied_from`, `synced_to`; Karten tragen `source_card_id`). Das Original verschwindet aus „Von anderen geteilt“, solange die Kopie aktuell ist. Wird es danach geändert, erscheint es mit „Update verfügbar“ und dem Knopf „Kopie aktualisieren“ (`POST /api/study/:id/sync`): neue Karten kommen dazu, geänderte werden übernommen, im Original gelöschte entfallen, eigene Zusatzkarten und der Lernfortschritt bleiben. Kopien, die vor Migration 023 entstanden sind, kennen ihr Original nicht und bleiben unverändert sichtbar.

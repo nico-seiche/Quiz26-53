@@ -67,6 +67,7 @@
             <div class="recent-title">${escapeHtml(s.title)}</div>
             <span class="muted">${nf(s.card_count)} ${s.card_count === 1 ? 'Karte' : 'Karten'}</span>
             ${s.subject ? `<span class="tag">${escapeHtml(s.subject)}</span>` : ''}
+            ${s.copyId ? '<span class="tag">🔄 Update verfügbar</span>' : ''}
             ${s.isOwner ? (s.is_public ? '<span class="tag">🌍 Geteilt</span>' : '<span class="tag">🔒 Privat</span>') : s.mine ? `<span class="tag">🤝 von ${escapeHtml(s.owner)}</span>` : `<span class="tag">von ${escapeHtml(s.owner)}</span>`}
             <div class="set-meter" title="Gelernt = in mindestens Box 3 des Karteikasten-Systems">
               <div class="stat-bar"><span style="width:${learned}%"></span></div>
@@ -78,7 +79,9 @@
             ${s.mine
               ? `<a class="btn" href="/study-edit?id=${s.id}">Bearbeiten</a>
                  ${s.isOwner ? `<button class="danger" type="button" data-delete="${s.id}">Löschen</button>` : ''}`
-              : `<button type="button" data-copy="${s.id}">Kopieren</button>`}
+              : s.copyId
+                ? `<a class="btn" href="/learn?id=${s.copyId}">Meine Kopie</a><button type="button" class="primary" data-sync="${s.copyId}" data-title="${escapeHtml(s.title)}">🔄 Kopie aktualisieren</button>`
+                : `<button type="button" data-copy="${s.id}">Kopieren</button>`}
           </div>
         </div>`;
     }
@@ -90,7 +93,7 @@
         : `<div class="card muted"><strong>Noch kein Lernset.</strong><br>Lege Begriffe mit ihren Definitionen an
            und lerne sie als Karteikarten, Lückentext oder aus dem Kopf. Du kannst Definitionen aus deinem Skript einfach einfügen.</div>`;
       $('#shared').innerHTML = shared.length ? shared.map(rowHtml).join('')
-        : '<div class="card muted">Noch hat niemand ein Lernset geteilt.</div>';
+        : '<div class="card muted">Keine weiteren geteilten Lernsets – was du schon kopiert hast, findest du oben bei „Meine Lernsets“.</div>';
     }
 
     // --- Battle: Übersicht und Herausfordern ---
@@ -162,9 +165,15 @@
     document.querySelector('main').onclick = async (e) => {
       const del = e.target.dataset.delete;
       const copy = e.target.dataset.copy;
+      const sync = e.target.dataset.sync;
       try {
         if (del && confirm('Lernset wirklich löschen? Dein Lernfortschritt dazu geht verloren.')) {
           await api(`/api/study/${del}`, { method: 'DELETE' });
+          load();
+        } else if (sync) {
+          if (!confirm(`Deine Kopie von „${e.target.dataset.title}“ mit den neuen Inhalten abgleichen?\n\nNeue Karten kommen dazu, geänderte Karten werden übernommen (dein Lernfortschritt bleibt), im Original gelöschte Karten entfallen. Eigene zusätzliche Karten bleiben.`)) return;
+          const r = await api(`/api/study/${sync}/sync`, { method: 'POST' });
+          alert(`Aktualisiert: ${r.added} neu, ${r.updated} geändert, ${r.removed} entfernt.`);
           load();
         } else if (copy) {
           const { id } = await api(`/api/study/${copy}/copy`, { method: 'POST' });
