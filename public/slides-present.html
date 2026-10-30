@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <script>try{var d=document.documentElement,t=localStorage.getItem("theme"),m=localStorage.getItem("motion");if(t)d.dataset.theme=t;if(m==="off"||(m==="auto"&&matchMedia("(prefers-reduced-motion: reduce)").matches))d.classList.add("reduce-motion")}catch(e){}</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#5b4de8">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Quiz">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png?v=2">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2">
+  <title>Quiz – Präsentation</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="present-body">
+  <div id="stage" aria-live="polite"></div>
+  <div id="notes" hidden></div>
+  <div id="bar" class="bar">
+    <button type="button" id="prev" aria-label="Vorherige Folie">‹</button>
+    <span id="pos"></span>
+    <button type="button" id="next" aria-label="Nächste Folie">›</button>
+    <span class="sep"></span>
+    <button type="button" id="notes-btn" title="Notizen (N)">📝</button>
+    <button type="button" id="full" title="Vollbild (F)">⛶</button>
+    <button type="button" id="close" title="Beenden (Esc)">✕</button>
+  </div>
+  <p id="error" class="error" style="position:fixed;top:1rem;left:1rem;color:#fff"></p>
+  <div id="print-root"></div>
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+    body.present-body { background: #000; color: #fff; }
+    #stage { position: fixed; inset: 0; display: grid; place-items: center; cursor: none; }
+    #stage.show-cursor { cursor: default; }
+    .layer { position: absolute; left: 50%; top: 50%; transition: opacity .35s ease, transform .35s ease; will-change: opacity, transform; }
+    .layer.out-left { transform: translate(-150%, -50%) !important; }
+    .bar { position: fixed; left: 50%; bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; align-items: center; gap: .3rem; padding: .35rem .5rem; border-radius: 999px; background: rgba(20, 22, 40, .78); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); color: #fff; transition: opacity .3s; z-index: 5; }
+    .bar.idle { opacity: 0; pointer-events: none; }
+    .bar button { background: transparent; border: 0; color: #fff; box-shadow: none; padding: .35rem .75rem; font-size: 1.15rem; border-radius: 999px; cursor: pointer; min-width: 2.4rem; }
+    .bar button:hover { background: rgba(255, 255, 255, .15); }
+    .bar #pos { font-weight: 800; font-variant-numeric: tabular-nums; padding: 0 .4rem; }
+    .bar .sep { width: 1px; height: 1.4rem; background: rgba(255, 255, 255, .3); margin: 0 .2rem; }
+    #notes { position: fixed; left: 50%; bottom: 5rem; transform: translateX(-50%); width: min(90vw, 760px); max-height: 30vh; overflow: auto; padding: .9rem 1.1rem; border-radius: 14px; background: rgba(20, 22, 40, .88); color: #fff; font-size: 1.05rem; line-height: 1.5; white-space: pre-wrap; z-index: 4; }
+    #print-root { display: none; }
+    @page { size: 1280px 720px; margin: 0; }
+    @media print {
+      html, body { height: auto; overflow: visible; background: #fff; }
+      #stage, #bar, #notes, #error { display: none !important; }
+      #print-root { display: block; }
+      .print-page { width: 1280px; height: 720px; overflow: hidden; page-break-after: always; break-after: page; position: relative; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+  <script src="/js/common.js"></script>
+  <script src="/js/slides-render.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const id = params.get('id');
+    let deck = null;
+    let idx = 0;
+    let busy = false;
+    let layer = null;
+
+    const slides = () => deck.data.slides;
+    const fitScale = () => Math.min(innerWidth / SlideRender.W, innerHeight / SlideRender.H);
+
+    function build(slide) {
+      const el = document.createElement('div');
+      el.className = 'layer';
+      const sl = SlideRender.slideEl(slide);
+      el.style.width = `${SlideRender.W}px`;
+      el.style.height = `${SlideRender.H}px`;
+      el.appendChild(sl);
+      place(el);
+      return el;
+    }
+    function place(el) { el.dataset.scale = fitScale(); el.style.transform = `translate(-50%, -50%) scale(${fitScale()})`; }
+
+    function updateUi() {
+      $('#pos').textContent = `${idx + 1} / ${slides().length}`;
+      $('#prev').disabled = idx === 0;
+      $('#next').disabled = idx === slides().length - 1;
+      const notes = slides()[idx].notes || '';
+      $('#notes').textContent = notes || 'Keine Notizen zu dieser Folie.';
+      history.replaceState(null, '', `?id=${id}&n=${idx + 1}`);
+    }
+
+    function go(to) {
+      if (busy || to < 0 || to >= slides().length || to === idx) return;
+      const forward = to > idx;
+      const slide = slides()[to];
+      const type = slide.transition || 'fade';
+      const next = build(slide);
+      const old = layer;
+      idx = to;
+      updateUi();
+      if (type === 'none' || !old || matchMedia('(prefers-reduced-motion: reduce)').matches && localStorage.getItem('motion') !== 'on') {
+        $('#stage').replaceChildren(next); layer = next; return;
+      }
+      busy = true;
+      const finalT = next.style.transform;
+      next.style.opacity = '0';
+      if (type === 'slide') next.style.transform = `translate(${forward ? '50%' : '-150%'}, -50%) scale(${next.dataset.scale})`;
+      $('#stage').appendChild(next);
+      next.getBoundingClientRect();           // Startzustand festhalten, dann animieren
+      next.style.opacity = '1';
+      next.style.transform = finalT;
+      if (old) {
+        old.style.opacity = '0';
+        if (type === 'slide') old.style.transform = `translate(${forward ? '-150%' : '50%'}, -50%) scale(${old.dataset.scale})`;
+      }
+      setTimeout(() => { if (old) old.remove(); layer = next; busy = false; }, 380);
+    }
+
+    function show(to) {
+      idx = Math.max(0, Math.min(slides().length - 1, to));
+      layer = build(slides()[idx]);
+      $('#stage').replaceChildren(layer);
+      updateUi();
+    }
+
+    // --- Bedienung ---
+    const exit = () => { location.href = `/slides-edit?id=${id}`; };
+    const toggleFull = () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.().catch(() => {}); };
+    document.addEventListener('keydown', (e) => {
+      if (!deck || e.metaKey || e.ctrlKey || e.altKey) return;
+      const k = e.key;
+      if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'].includes(k)) { e.preventDefault(); go(idx + 1); }
+      else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'].includes(k)) { e.preventDefault(); go(idx - 1); }
+      else if (k === 'Home') go(0);
+      else if (k === 'End') go(slides().length - 1);
+      else if (k === 'f' || k === 'F') toggleFull();
+      else if (k === 'n' || k === 'N') $('#notes').hidden = !$('#notes').hidden;
+      else if (k === 'b' || k === 'B' || k === '.') $('#stage').style.visibility = $('#stage').style.visibility === 'hidden' ? 'visible' : 'hidden';
+      else if (k === 'Escape' && !document.fullscreenElement) exit();
+    });
+    $('#stage').addEventListener('click', (e) => { go(e.clientX < innerWidth / 3 ? idx - 1 : idx + 1); });
+    $('#prev').onclick = () => go(idx - 1);
+    $('#next').onclick = () => go(idx + 1);
+    $('#full').onclick = toggleFull;
+    $('#close').onclick = exit;
+    $('#notes-btn').onclick = () => { $('#notes').hidden = !$('#notes').hidden; };
+    let sx = null;
+    addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; }, { passive: true });
+    addEventListener('touchend', (e) => {
+      if (sx === null) return;
+      const dx = e.changedTouches[0].clientX - sx;
+      sx = null;
+      if (Math.abs(dx) > 50) go(dx < 0 ? idx + 1 : idx - 1);
+    }, { passive: true });
+    // Leiste und Mauszeiger blenden sich nach kurzer Ruhe aus
+    let idle;
+    const wake = () => { $('#bar').classList.remove('idle'); $('#stage').classList.add('show-cursor'); clearTimeout(idle); idle = setTimeout(() => { $('#bar').classList.add('idle'); $('#stage').classList.remove('show-cursor'); }, 2500); };
+    ['mousemove', 'touchstart', 'keydown'].forEach((t) => addEventListener(t, wake, { passive: true }));
+    addEventListener('resize', () => { if (layer) place(layer); });
+
+    // --- PDF: alle Folien untereinander, der Browser druckt eine Folie pro Seite ---
+    async function printAll() {
+      const root = $('#print-root');
+      slides().forEach((s) => { const page = document.createElement('div'); page.className = 'print-page'; page.appendChild(SlideRender.slideEl(s)); root.appendChild(page); });
+      await Promise.all([...root.querySelectorAll('img')].map((img) => (img.complete ? null : new Promise((r) => { img.onload = r; img.onerror = r; }))));
+      setTimeout(() => print(), 300);
+    }
+
+    requireLogin().then(async () => {
+      try {
+        deck = await api(`/api/slides/${id}`);
+        document.title = `${deck.title} – Präsentation`;
+        if (params.get('print')) { $('#stage').hidden = true; $('#bar').hidden = true; $('#error').style.color = '#fff'; $('#error').textContent = 'Der Druckdialog öffnet sich – wähle dort „Als PDF speichern“. Danach kannst du diesen Tab schließen.'; return printAll(); }
+        show(Math.max(0, Number(params.get('n') || 1) - 1));
+        wake();
+      } catch (err) { $('#error').textContent = err.message; }
+    });
+  </script>
+</body>
+</html>

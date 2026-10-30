@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <script>try{var d=document.documentElement,t=localStorage.getItem("theme"),m=localStorage.getItem("motion");if(t)d.dataset.theme=t;if(m==="off"||(m==="auto"&&matchMedia("(prefers-reduced-motion: reduce)").matches))d.classList.add("reduce-motion")}catch(e){}</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#5b4de8">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Quiz">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png?v=2">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2">
+  <title>Quiz – Folien</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/profile">← Profil</a>
+    <strong>Folien</strong>
+    <span id="me"></span>
+  </header>
+  <main style="max-width:1000px">
+    <div class="row spread section-head">
+      <h1 style="margin:0">🖥️ Folien <span class="tag">🧪 Experiment</span></h1>
+      <button type="button" class="primary" id="new">+ Neue Präsentation</button>
+    </div>
+    <p class="muted">Erstelle Präsentationen für die Vorlesung: Folien mit Text, Formen und Bildern, Präsentationsmodus und PDF-Export.</p>
+    <p class="error" id="error"></p>
+    <div class="deck-grid" id="decks"></div>
+  </main>
+  <style>
+    .deck-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+    .deck-card { padding: .8rem; margin: 0; display: flex; flex-direction: column; gap: .6rem; }
+    .deck-thumb { border-radius: 10px; overflow: hidden; border: 1px solid var(--border); background: #fff; aspect-ratio: 16 / 9; display: block; width: 100%; padding: 0; cursor: pointer; box-shadow: none; }
+    .deck-title { font-weight: 800; overflow-wrap: anywhere; }
+    .deck-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+    .deck-actions button, .deck-actions a { padding: .4rem .7rem; font-size: .9rem; }
+  </style>
+  <script src="/js/changelog.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/slides-render.js"></script>
+  <script>
+    const fmt = (d) => new Date(d).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' });
+
+    async function load() {
+      const decks = await api('/api/slides');
+      const box = $('#decks');
+      if (!decks.length) { box.innerHTML = '<div class="card muted">Noch keine Präsentation – lege mit „Neue Präsentation“ deine erste an.</div>'; return; }
+      box.innerHTML = decks.map((d) => `
+        <div class="card deck-card" data-id="${d.id}">
+          <button type="button" class="deck-thumb" data-open="${d.id}" aria-label="${escapeHtml(d.title)} öffnen"></button>
+          <div><div class="deck-title">${escapeHtml(d.title)}</div><span class="muted">${d.slides} ${d.slides === 1 ? 'Folie' : 'Folien'} · ${fmt(d.updatedAt)}</span></div>
+          <div class="deck-actions">
+            <a class="btn primary" href="/slides-present?id=${d.id}">▶ Präsentieren</a>
+            <a class="btn" href="/slides-edit?id=${d.id}">Bearbeiten</a>
+            <button type="button" data-dup="${d.id}">Duplizieren</button>
+            <button type="button" class="danger" data-del="${d.id}" data-title="${escapeHtml(d.title)}">Löschen</button>
+          </div>
+        </div>`).join('');
+      decks.forEach((d) => {
+        const thumb = box.querySelector(`[data-open="${d.id}"]`);
+        if (thumb && d.first) SlideRender.mount(thumb, d.first, thumb.clientWidth || 260);
+      });
+    }
+
+    $('#new').onclick = async () => {
+      try { const { id } = await api('/api/slides', { method: 'POST', body: { title: 'Neue Präsentation' } }); location.href = `/slides-edit?id=${id}`; }
+      catch (err) { $('#error').textContent = err.message; }
+    };
+    $('#decks').onclick = async (e) => {
+      const t = e.target.closest('button');
+      if (!t) return;
+      try {
+        if (t.dataset.open) location.href = `/slides-edit?id=${t.dataset.open}`;
+        else if (t.dataset.dup) { await api(`/api/slides/${t.dataset.dup}/duplicate`, { method: 'POST' }); load(); }
+        else if (t.dataset.del && confirm(`„${t.dataset.title}“ wirklich löschen?`)) { await api(`/api/slides/${t.dataset.del}`, { method: 'DELETE' }); load(); }
+      } catch (err) { $('#error').textContent = err.message; }
+    };
+
+    requireLogin().then((me) => {
+      mountNav('profile', me);
+      load().catch((err) => { $('#error').textContent = err.message; });
+    });
+  </script>
+</body>
+</html>

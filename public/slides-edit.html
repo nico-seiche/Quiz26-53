@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <script>try{var d=document.documentElement,t=localStorage.getItem("theme"),m=localStorage.getItem("motion");if(t)d.dataset.theme=t;if(m==="off"||(m==="auto"&&matchMedia("(prefers-reduced-motion: reduce)").matches))d.classList.add("reduce-motion")}catch(e){}</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#5b4de8">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Quiz">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png?v=2">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2">
+  <title>Quiz – Folien bearbeiten</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    html, body { height: 100%; }
+    body.ed-body { display: flex; flex-direction: column; overflow: hidden; }
+    .ed-top { display: flex; align-items: center; gap: .6rem; padding: .5rem .8rem; padding-top: calc(.5rem + env(safe-area-inset-top, 0px)); background: var(--card); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .ed-top .back { font-weight: 800; color: var(--text); text-decoration: none; white-space: nowrap; }
+    .ed-top input.title { flex: 1 1 12rem; min-width: 8rem; font-weight: 800; font-size: 1.05rem; padding: .4rem .6rem; margin: 0; }
+    .ed-top button, .ed-top a.btn { padding: .45rem .8rem; font-size: .92rem; margin: 0; }
+    #state { font-size: .85rem; white-space: nowrap; }
+    .ed { flex: 1; min-height: 0; display: grid; grid-template-columns: 178px minmax(0, 1fr) 280px; }
+    .ed-slides { overflow-y: auto; padding: .6rem; background: var(--bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: .5rem; }
+    .thumb { position: relative; display: flex; gap: .3rem; align-items: flex-start; cursor: pointer; padding: .25rem; border-radius: 10px; border: 2px solid transparent; }
+    .thumb.current { border-color: var(--primary); background: var(--card); }
+    .thumb.drop-before { box-shadow: 0 -3px 0 var(--primary); }
+    .thumb .n { font-size: .75rem; font-weight: 800; color: var(--muted); min-width: 1rem; padding-top: .2rem; }
+    .thumb .pic { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: #fff; pointer-events: none; }
+    .add-slide { position: relative; }
+    .add-slide > button { width: 100%; }
+    .layout-menu { position: absolute; left: 0; top: calc(100% + .3rem); z-index: 20; width: 15rem; padding: .4rem; background: var(--card); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); display: grid; gap: .2rem; }
+    .layout-menu button { text-align: left; border: 0; box-shadow: none; background: transparent; padding: .5rem .6rem; font-weight: 700; }
+    .layout-menu button:hover { background: var(--bg); }
+    .ed-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+    .ed-tools { display: flex; flex-wrap: wrap; gap: .35rem; padding: .5rem .7rem; background: var(--card); border-bottom: 1px solid var(--border); align-items: center; }
+    .ed-tools button { padding: .4rem .7rem; font-size: .9rem; margin: 0; }
+    .ed-tools .sep { width: 1px; height: 1.5rem; background: var(--border); margin: 0 .2rem; }
+    .ed-stagewrap { flex: 1; min-height: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 70%, #8a90b8 30%); padding: 1rem; overflow: auto; }
+    #stagebox { position: relative; box-shadow: 0 10px 40px rgba(20, 20, 60, .25); touch-action: none; user-select: none; -webkit-user-select: none; }
+    #stagebox .sl-el { cursor: move; }
+    #overlay { position: absolute; inset: 0; pointer-events: none; }
+    .selbox { position: absolute; border: 2px solid #4f6cf5; box-sizing: border-box; pointer-events: none; }
+    .handle { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; background: #fff; border: 2px solid #4f6cf5; border-radius: 3px; pointer-events: auto; touch-action: none; }
+    .guide { position: absolute; background: #ff3b81; pointer-events: none; }
+    .editing { outline: 2px dashed #4f6cf5; cursor: text !important; }
+    .editing .sl-text { -webkit-user-select: text; user-select: text; }
+    .ed-props { overflow-y: auto; padding: .8rem; background: var(--card); border-left: 1px solid var(--border); }
+    .ed-props h3 { margin: 1rem 0 .4rem; font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+    .ed-props h3:first-child { margin-top: 0; }
+    .ed-props label { font-size: .82rem; margin: .5rem 0 .2rem; }
+    .ed-props input[type="number"], .ed-props select, .ed-props textarea { margin: 0; padding: .4rem .5rem; font-size: .92rem; }
+    .ed-props input[type="color"] { padding: 0; width: 2.4rem; height: 2.1rem; border-radius: 8px; border: 1px solid var(--border); background: none; cursor: pointer; margin: 0; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; }
+    .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: .35rem; }
+    .row-inline { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+    .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    .seg button { border: 0; border-radius: 0; box-shadow: none; padding: .35rem .6rem; min-width: 2.2rem; background: var(--card); margin: 0; }
+    .seg button[aria-pressed="true"] { background: var(--primary-grad); color: #fff; }
+    .ed-props .mini { padding: .3rem .55rem; font-size: .82rem; margin: 0; }
+    .swatches { display: flex; flex-wrap: wrap; gap: .35rem; }
+    .swatch { width: 2.1rem; height: 1.4rem; border-radius: 6px; border: 1px solid var(--border); padding: 0; box-shadow: none; cursor: pointer; margin: 0; }
+    .drop-hint { outline: 3px dashed var(--primary); outline-offset: -6px; }
+    @media (max-width: 1000px) {
+      body.ed-body { overflow: auto; height: auto; }
+      .ed { grid-template-columns: 1fr; grid-template-rows: auto auto auto; }
+      .ed-slides { flex-direction: row; overflow-x: auto; border-right: 0; border-top: 1px solid var(--border); order: 2; }
+      .ed-main { order: 1; min-height: 70vh; }
+      .ed-props { order: 3; border-left: 0; border-top: 1px solid var(--border); }
+      .thumb { flex: none; }
+    }
+  </style>
+</head>
+<body class="ed-body">
+  <div class="ed-top">
+    <a class="back" href="/slides">← Folien</a>
+    <input class="title" id="title" maxlength="120" aria-label="Titel der Präsentation" placeholder="Titel der Präsentation">
+    <span class="muted" id="state" aria-live="polite"></span>
+    <button type="button" id="pdf" title="Als PDF speichern (über den Druckdialog)">PDF</button>
+    <button type="button" class="primary" id="present">▶ Präsentieren</button>
+  </div>
+  <div class="ed">
+    <aside class="ed-slides" id="slides" aria-label="Folien"></aside>
+    <section class="ed-main">
+      <div class="ed-tools" id="tools">
+        <button type="button" data-add="text">🔤 Text</button>
+        <button type="button" data-add="rect">▭ Rechteck</button>
+        <button type="button" data-add="ellipse">◯ Kreis</button>
+        <button type="button" data-add="triangle">△ Dreieck</button>
+        <button type="button" data-add="image">🖼️ Bild</button>
+        <span class="sep"></span>
+        <button type="button" id="undo" title="Rückgängig (Strg+Z)">↶</button>
+        <button type="button" id="redo" title="Wiederholen (Strg+Y)">↷</button>
+      </div>
+      <div class="ed-stagewrap" id="stagewrap">
+        <div id="stagebox"><div id="stagehost"></div><div id="overlay"></div></div>
+      </div>
+    </section>
+    <aside class="ed-props" id="props" aria-label="Eigenschaften"></aside>
+  </div>
+  <input type="file" id="file" accept="image/*" hidden>
+  <script src="/js/changelog.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/slides-render.js"></script>
+  <script>
+    const W = SlideRender.W;
+    const H = SlideRender.H;
+    const id = new URLSearchParams(location.search).get('id');
+    let deck = null;        // { id, title, data, rev }
+    let cur = 0;            // aktuelle Folie
+    let selId = null;       // markiertes Element
+    let zoom = 1;
+    let editing = null;     // Element-ID im Textmodus
+    const hist = [];
+    const future = [];
+    let histKey = null;
+    let histAt = 0;
+
+    const uid = (p = 'e') => p + Math.random().toString(36).slice(2, 8);
+    const slide = () => deck.data.slides[cur];
+    const elOf = (eid) => slide().elements.find((e) => e.id === eid);
+    const sel = () => (selId ? elOf(selId) : null);
+    const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+    const isTextual = (e) => e && (e.type === 'text' || e.type === 'shape');
+
+    // ---------------- Speichern ----------------
+    let saveTimer = null;
+    let saving = false;
+    let pending = false;
+    let conflict = false;
+    function setState(text, cls) { const s = $('#state'); s.textContent = text; s.style.color = cls === 'warn' ? 'var(--danger)' : cls === 'ok' ? 'var(--ok)' : ''; }
+    function dirty() {
+      pending = true;
+      if (conflict) return;
+      setState('Ungespeichert …');
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(save, 900);
+    }
+    async function save() {
+      clearTimeout(saveTimer);
+      if (saving || !pending || conflict) return;
+      saving = true;
+      pending = false;
+      try {
+        const r = await api(`/api/slides/${id}`, { method: 'PUT', body: { title: deck.title, data: deck.data, rev: deck.rev } });
+        deck.rev = r.rev;
+        setState(pending ? 'Ungespeichert …' : '✓ Gespeichert', pending ? '' : 'ok');
+      } catch (err) {
+        pending = true;
+        if (/woanders/.test(err.message)) { conflict = true; setState('Woanders geändert – bitte neu laden', 'warn'); } else setState(`Nicht gespeichert: ${err.message}`, 'warn');
+      } finally {
+        saving = false;
+        if (pending && !conflict) saveTimer = setTimeout(save, 1500);
+      }
+    }
+    addEventListener('beforeunload', (e) => { if (pending || saving) { e.preventDefault(); e.returnValue = ''; } });
+
+    // ---------------- Verlauf (Rückgängig) ----------------
+    const snap = () => JSON.stringify({ d: deck.data, cur });
+    function pushHist(key) {
+      const now = Date.now();
+      if (key && key === histKey && now - histAt < 1200) { histAt = now; return; }   // viele kleine Änderungen derselben Art = ein Schritt
+      histKey = key || null; histAt = now;
+      hist.push(snap());
+      if (hist.length > 100) hist.shift();
+      future.length = 0;
+      updateHistButtons();
+    }
+    function restore(s) {
+      const o = JSON.parse(s);
+      deck.data = o.d;
+      cur = Math.min(o.cur, deck.data.slides.length - 1);
+      if (!elOf(selId)) selId = null;
+      endEdit(true);
+      renderAll();
+      dirty();
+    }
+    function undo() { if (!hist.length) return; future.push(snap()); restore(hist.pop()); histKey = null; updateHistButtons(); }
+    function redo() { if (!future.length) return; hist.push(snap()); restore(future.pop()); histKey = null; updateHistButtons(); }
+    function updateHistButtons() { $('#undo').disabled = !hist.length; $('#redo').disabled = !future.length; }
+
+    // ---------------- Folienleiste ----------------
+    function renderSlides() {
+      const box = $('#slides');
+      box.innerHTML = '';
+      deck.data.slides.forEach((s, i) => {
+        const t = document.createElement('div');
+        t.className = `thumb${i === cur ? ' current' : ''}`;
+        t.draggable = true;
+        t.dataset.i = i;
+        t.innerHTML = `<span class="n">${i + 1}</span><div class="pic"></div>`;
+        box.appendChild(t);
+        SlideRender.mount(t.querySelector('.pic'), s, 130);
+      });
+      const add = document.createElement('div');
+      add.className = 'add-slide';
+      add.innerHTML = `<button type="button" id="add-slide">＋ Folie</button>
+        <div class="layout-menu" id="layout-menu" hidden>
+          <button type="button" data-layout="titleContent">Titel &amp; Inhalt</button>
+          <button type="button" data-layout="title">Titelfolie</button>
+          <button type="button" data-layout="two">Zwei Spalten</button>
+          <button type="button" data-layout="titleOnly">Nur Titel</button>
+          <button type="button" data-layout="blank">Leer</button>
+        </div>`;
+      box.appendChild(add);
+    }
+    function refreshThumb(i = cur) {
+      const t = $('#slides').querySelector(`.thumb[data-i="${i}"] .pic`);
+      if (t) SlideRender.mount(t, deck.data.slides[i], 130);
+    }
+
+    // Layouts für neue Folien (Farben „auto“ passen sich dem Hintergrund an)
+    function layoutElements(name) {
+      const T = (x, y, w, h, text, o = {}) => ({ type: 'text', id: uid(), x, y, w, h, text, size: 32, color: 'auto', font: 'sans', align: 'left', valign: 'top', list: 'none', opacity: 1, fill: 'none', ...o });
+      if (name === 'title') return [T(140, 240, 1000, 130, 'Titel', { size: 72, bold: true, align: 'center', valign: 'middle' }), T(240, 390, 800, 70, 'Untertitel', { align: 'center', color: '#667085' })];
+      if (name === 'titleContent') return [T(80, 50, 1120, 100, 'Titel', { size: 52, bold: true, valign: 'middle' }), T(80, 180, 1120, 480, 'Erster Punkt\nZweiter Punkt\nDritter Punkt', { size: 36, list: 'bullet' })];
+      if (name === 'two') return [T(80, 50, 1120, 100, 'Titel', { size: 52, bold: true, valign: 'middle' }), T(80, 180, 540, 480, 'Linke Spalte', { size: 32, list: 'bullet' }), T(660, 180, 540, 480, 'Rechte Spalte', { size: 32, list: 'bullet' })];
+      if (name === 'titleOnly') return [T(80, 50, 1120, 100, 'Titel', { size: 52, bold: true, valign: 'middle' })];
+      return [];
+    }
+    function addSlide(layout) {
+      pushHist();
+      const prev = slide();
+      const s = { id: uid('s'), bg: JSON.parse(JSON.stringify(prev.bg)), notes: '', transition: prev.transition || 'fade', elements: layoutElements(layout) };
+      deck.data.slides.splice(cur + 1, 0, s);
+      cur += 1; selId = null;
+      renderAll(); dirty();
+    }
+    function moveSlide(from, to) {
+      if (from === to || to < 0 || to > deck.data.slides.length) return;
+      pushHist();
+      const [s] = deck.data.slides.splice(from, 1);
+      const at = to > from ? to - 1 : to;
+      deck.data.slides.splice(at, 0, s);
+      cur = at;
+      renderAll(); dirty();
+    }
+    function duplicateSlide() {
+      pushHist();
+      const copy = JSON.parse(JSON.stringify(slide()));
+      copy.id = uid('s'); copy.elements.forEach((e) => { e.id = uid(); });
+      deck.data.slides.splice(cur + 1, 0, copy);
+      cur += 1; selId = null;
+      renderAll(); dirty();
+    }
+    function deleteSlide() {
+      if (deck.data.slides.length < 2) return;
+      pushHist();
+      deck.data.slides.splice(cur, 1);
+      cur = Math.min(cur, deck.data.slides.length - 1); selId = null;
+      renderAll(); dirty();
+    }
+
+    // ---------------- Bühne ----------------
+    function layoutStage() {
+      const wrap = $('#stagewrap');
+      const aw = wrap.clientWidth - 32;
+      const ah = wrap.clientHeight - 32;
+      zoom = clamp(Math.min(aw / W, ah / H), 0.15, 2);
+      if (!(zoom > 0)) zoom = 0.5;
+      $('#stagebox').style.width = `${W * zoom}px`;
+      $('#stagebox').style.height = `${H * zoom}px`;
+    }
+    function renderStage() {
+      layoutStage();
+      SlideRender.mount($('#stagehost'), slide(), W * zoom);
+      renderOverlay();
+    }
+    function renderOverlay() {
+      const ov = $('#overlay');
+      ov.innerHTML = '';
+      const e = sel();
+      if (!e) return;
+      const box = document.createElement('div');
+      box.className = 'selbox';
+      Object.assign(box.style, { left: `${e.x * zoom}px`, top: `${e.y * zoom}px`, width: `${e.w * zoom}px`, height: `${e.h * zoom}px` });
+      ov.appendChild(box);
+      if (editing) return;
+      [['nw', 0, 0], ['n', .5, 0], ['ne', 1, 0], ['e', 1, .5], ['se', 1, 1], ['s', .5, 1], ['sw', 0, 1], ['w', 0, .5]].forEach(([k, fx, fy]) => {
+        const h = document.createElement('div');
+        h.className = 'handle';
+        h.dataset.h = k;
+        h.style.left = `${(e.x + e.w * fx) * zoom}px`;
+        h.style.top = `${(e.y + e.h * fy) * zoom}px`;
+        h.style.cursor = `${k}-resize`;
+        ov.appendChild(h);
+      });
+    }
+    function drawGuides(gx, gy) {
+      document.querySelectorAll('.guide').forEach((g) => g.remove());
+      const ov = $('#overlay');
+      gx.forEach((x) => { const g = document.createElement('div'); g.className = 'guide'; Object.assign(g.style, { left: `${x * zoom}px`, top: 0, width: '1px', height: '100%' }); ov.appendChild(g); });
+      gy.forEach((y) => { const g = document.createElement('div'); g.className = 'guide'; Object.assign(g.style, { top: `${y * zoom}px`, left: 0, height: '1px', width: '100%' }); ov.appendChild(g); });
+    }
+    function renderAll() { renderSlides(); renderStage(); renderProps(); updateHistButtons(); }
+    function afterChange({ props = false, thumb = true } = {}) {
+      renderStage();
+      if (thumb) refreshThumb();
+      if (props) renderProps(); else syncProps();
+      dirty();
+    }
+
+    // ---------------- Elemente einfügen ----------------
+    function addElement(e, { edit = false } = {}) {
+      pushHist();
+      e.id = uid();
+      e.opacity = 1;
+      slide().elements.push(e);
+      selId = e.id;
+      afterChange({ props: true });
+      if (edit) setTimeout(() => startEdit(e.id), 30);
+    }
+    const textDefaults = { size: 32, color: 'auto', font: 'sans', align: 'left', valign: 'top', list: 'none', bold: false, italic: false, underline: false };
+    function addKind(kind) {
+      if (kind === 'text') addElement({ type: 'text', x: 340, y: 300, w: 600, h: 90, text: 'Text', fill: 'none', ...textDefaults, size: 40 }, { edit: true });
+      else if (kind === 'image') $('#file').click();
+      else {
+        const dark = SlideRender.isDark(slide());
+        addElement({ type: 'shape', kind, x: 440, y: 230, w: 400, h: 260, fill: dark ? '#7c9cff' : '#4f6cf5', stroke: 'none', strokeWidth: 0, radius: kind === 'rect' ? 24 : 0, text: '', ...textDefaults, color: '#ffffff', align: 'center', valign: 'middle', size: 36 });
+      }
+    }
+
+    // Bild verkleinern (längste Seite 1600 px) und hochladen
+    async function uploadImage(file) {
+      if (!file || !/^image\//.test(file.type)) return;
+      setState('Bild wird hochgeladen …');
+      try {
+        const bmp = await createImageBitmap(file).catch(() => null);
+        let blob = file;
+        let w; let h;
+        if (bmp) {
+          const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+          w = Math.round(bmp.width * k); h = Math.round(bmp.height * k);
+          const c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          c.getContext('2d').drawImage(bmp, 0, 0, w, h);
+          const keepPng = /png|gif|webp/.test(file.type);
+          blob = await new Promise((r) => c.toBlob(r, keepPng ? 'image/png' : 'image/jpeg', 0.88));
+          if (keepPng && blob.size > 1400000) blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.85));
+        } else { w = 800; h = 450; }
+        const res = await fetch(`/api/slides/${id}/assets`, { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error || 'Hochladen fehlgeschlagen');
+        const k = Math.min(1, 900 / w, 520 / h);
+        const iw = Math.round(w * k); const ih = Math.round(h * k);
+        addElement({ type: 'image', x: Math.round((W - iw) / 2), y: Math.round((H - ih) / 2), w: iw, h: ih, src: body.url, fit: 'contain', radius: 0 });
+        setState('');
+      } catch (err) { setState(err.message, 'warn'); }
+    }
+    $('#file').onchange = (e) => { uploadImage(e.target.files[0]); e.target.value = ''; };
+    addEventListener('paste', (e) => {
+      if (editing || /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
+      const f = [...(e.clipboardData?.files || [])].find((x) => /^image\//.test(x.type));
+      if (f) { e.preventDefault(); uploadImage(f); }
+    });
+    const stageWrap = $('#stagewrap');
+    stageWrap.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); stageWrap.classList.add('drop-hint'); } });
+    stageWrap.addEventListener('dragleave', () => stageWrap.classList.remove('drop-hint'));
+    stageWrap.addEventListener('drop', (e) => { stageWrap.classList.remove('drop-hint'); const f = e.dataTransfer?.files?.[0]; if (f) { e.preventDefault(); uploadImage(f); } });
+
+    // ---------------- Text bearbeiten ----------------
+    function startEdit(eid) {
+      const e = elOf(eid);
+      if (!isTextual(e)) return;
+      endEdit();
+      selId = eid;
+      editing = eid;
+      const dom = $('#stagehost').querySelector(`[data-id="${eid}"]`);
+      const box = dom && dom.querySelector('.sl-text');
+      if (!box) { editing = null; return; }
+      pushHist();
+      box.textContent = e.text === '​' ? '' : e.text;
+      box.style.whiteSpace = 'pre-wrap';
+      try { box.contentEditable = 'plaintext-only'; } catch { /* ältere Browser */ }
+      if (box.contentEditable !== 'plaintext-only') box.contentEditable = 'true';
+      dom.classList.add('editing');
+      box.style.overflow = 'auto';
+      box.focus();
+      const range = document.createRange();
+      range.selectNodeContents(box);
+      range.collapse(false);
+      const sel2 = getSelection(); sel2.removeAllRanges(); sel2.addRange(range);
+      box.oninput = () => { e.text = box.innerText.replace(/​/g, '').replace(/\n$/, ''); refreshThumb(); dirty(); };
+      box.onblur = () => endEdit();
+      box.onkeydown = (ev) => {
+        if (ev.key === 'Escape') { ev.preventDefault(); box.blur(); }
+        const mod = ev.metaKey || ev.ctrlKey;
+        if (mod && ['b', 'i', 'u'].includes(ev.key.toLowerCase())) { ev.preventDefault(); toggleProp({ b: 'bold', i: 'italic', u: 'underline' }[ev.key.toLowerCase()], true); }
+        ev.stopPropagation();
+      };
+      renderOverlay();
+    }
+    function endEdit(silent) {
+      if (!editing) return;
+      const eid = editing;
+      editing = null;
+      const dom = $('#stagehost').querySelector(`[data-id="${eid}"] .sl-text`);
+      if (dom) { dom.onblur = null; dom.oninput = null; dom.onkeydown = null; }
+      if (!silent) { renderStage(); refreshThumb(); renderProps(); }
+    }
+
+    // ---------------- Zeigen / Ziehen / Skalieren ----------------
+    let drag = null;
+    let lastDown = null;
+    const host = $('#stagebox');
+    function pt(ev) { const r = host.getBoundingClientRect(); return { x: (ev.clientX - r.left) / zoom, y: (ev.clientY - r.top) / zoom }; }
+
+    host.addEventListener('pointerdown', (ev) => {
+      if (editing && ev.target.closest('.editing')) return;
+      const handle = ev.target.closest('.handle');
+      lastDown = null;
+      if (handle) {
+        const e = sel();
+        drag = { mode: 'resize', h: handle.dataset.h, start: pt(ev), orig: { x: e.x, y: e.y, w: e.w, h: e.h }, moved: false };
+        host.setPointerCapture(ev.pointerId);
+        ev.preventDefault();
+        return;
+      }
+      const dom = ev.target.closest('.sl-el');
+      if (editing) endEdit();
+      if (!dom) { selId = null; renderOverlay(); renderProps(); return; }
+      const e = elOf(dom.dataset.id);
+      if (!e) return;
+      if (selId !== e.id) { selId = e.id; renderProps(); }
+      renderOverlay();
+      drag = { mode: 'move', start: pt(ev), orig: { x: e.x, y: e.y }, moved: false };
+      lastDown = drag; lastDown.id = e.id;
+      host.setPointerCapture(ev.pointerId);
+      ev.preventDefault();
+    });
+
+    // Einrasten an Folienrändern, -mitte und anderen Elementen
+    function snapMove(e, nx, ny) {
+      const T = 6 / zoom;
+      const xs = [0, W / 2, W];
+      const ys = [0, H / 2, H];
+      slide().elements.forEach((o) => { if (o.id !== e.id) { xs.push(o.x, o.x + o.w / 2, o.x + o.w); ys.push(o.y, o.y + o.h / 2, o.y + o.h); } });
+      const gx = []; const gy = [];
+      let bestX = T + 1; let bestY = T + 1; let ax = nx; let ay = ny;
+      [0, e.w / 2, e.w].forEach((off) => xs.forEach((c) => { const d = c - (nx + off); if (Math.abs(d) < Math.abs(bestX) && Math.abs(d) <= T) { bestX = d; ax = nx + d; } }));
+      [0, e.h / 2, e.h].forEach((off) => ys.forEach((c) => { const d = c - (ny + off); if (Math.abs(d) < Math.abs(bestY) && Math.abs(d) <= T) { bestY = d; ay = ny + d; } }));
+      if (bestX <= T) [0, e.w / 2, e.w].forEach((off) => { if (xs.some((c) => Math.abs(c - (ax + off)) < 0.5)) gx.push(ax + off); });
+      if (bestY <= T) [0, e.h / 2, e.h].forEach((off) => { if (ys.some((c) => Math.abs(c - (ay + off)) < 0.5)) gy.push(ay + off); });
+      return { x: ax, y: ay, gx, gy };
+    }
+
+    host.addEventListener('pointermove', (ev) => {
+      if (!drag) return;
+      const e = sel();
+      if (!e) return;
+      const p = pt(ev);
+      const dx = p.x - drag.start.x;
+      const dy = p.y - drag.start.y;
+      if (!drag.moved) { if (Math.abs(dx) + Math.abs(dy) < 3 / zoom) return; drag.moved = true; pushHist(); }
+      if (drag.mode === 'move') {
+        let nx = drag.orig.x + dx; let ny = drag.orig.y + dy;
+        if (ev.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) ny = drag.orig.y; else nx = drag.orig.x; }
+        const s = ev.altKey ? { x: nx, y: ny, gx: [], gy: [] } : snapMove(e, nx, ny);
+        e.x = Math.round(s.x); e.y = Math.round(s.y);
+        applyLive(e);
+        drawGuides(s.gx, s.gy);
+      } else {
+        const o = drag.orig;
+        let { x, y, w, h } = o;
+        const k = drag.h;
+        if (k.includes('e')) w = o.w + dx;
+        if (k.includes('s')) h = o.h + dy;
+        if (k.includes('w')) { w = o.w - dx; x = o.x + dx; }
+        if (k.includes('n')) { h = o.h - dy; y = o.y + dy; }
+        const keep = e.type === 'image' ? !ev.shiftKey : ev.shiftKey;
+        if (keep && k.length === 2) {
+          const ratio = o.w / o.h;
+          if (Math.abs(w - o.w) / o.w > Math.abs(h - o.h) / o.h) h = w / ratio; else w = h * ratio;
+          if (k.includes('w')) x = o.x + o.w - w;
+          if (k.includes('n')) y = o.y + o.h - h;
+        }
+        if (w < 20) { if (k.includes('w')) x -= 20 - w; w = 20; }
+        if (h < 20) { if (k.includes('n')) y -= 20 - h; h = 20; }
+        Object.assign(e, { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) });
+        applyLive(e);
+      }
+    });
+    function applyLive(e) {
+      // schnell: nur das Element neu zeichnen statt der ganzen Folie
+      const dom = $('#stagehost').querySelector(`[data-id="${e.id}"]`);
+      if (dom) { const fresh = SlideRender.elementEl(e, slide()); dom.replaceWith(fresh); }
+      renderOverlay();
+      syncProps();
+    }
+    const endDrag = () => {
+      if (!drag) return;
+      const moved = drag.moved;
+      drag = null;
+      document.querySelectorAll('.guide').forEach((g) => g.remove());
+      if (moved) { refreshThumb(); dirty(); }
+    };
+    host.addEventListener('pointerup', endDrag);
+    host.addEventListener('pointercancel', endDrag);
+    // Doppeltippen/Doppelklick startet die Texteingabe (selbst erkannt: dblclick ist mit Pointer-Capture und auf iPads unzuverlässig)
+    let lastTap = { id: null, t: 0 };
+    host.addEventListener('pointerup', (ev) => {
+      if (!lastDown || lastDown.moved) { lastTap = { id: null, t: 0 }; return; }
+      const now = Date.now();
+      if (lastTap.id === lastDown.id && now - lastTap.t < 450) { lastTap = { id: null, t: 0 }; startEdit(lastDown.id); return; }
+      lastTap = { id: lastDown.id, t: now };
+    });
+
+    // ---------------- Eigenschaften ----------------
+    const COLORS = ['#ffffff', '#f3f4f8', '#14172e', '#1b1d3a', '#4f6cf5', '#7c4dff', '#e11d48', '#d97706', '#16a34a', '#0ea5e9'];
+    const GRADIENTS = [
+      { from: '#4f6cf5', to: '#7c4dff', angle: 135 }, { from: '#1fd1c3', to: '#4f8cff', angle: 135 },
+      { from: '#f97316', to: '#e11d48', angle: 135 }, { from: '#14172e', to: '#3b2a7a', angle: 160 },
+    ];
+    const seg = (name, items, value) => `<div class="seg" role="group">${items.map(([v, label, title]) => `<button type="button" data-set="${name}" data-value="${v}" aria-pressed="${value === v}" title="${title || ''}">${label}</button>`).join('')}</div>`;
+    const colorHex = (c, e) => { const v = SlideRender.resolve(c, slide(), '#000000'); return /^#[0-9a-f]{6}$/i.test(v) ? v : '#000000'; };
+    const num = (name, v, extra = '') => `<input type="number" data-num="${name}" value="${Math.round(v)}" ${extra}>`;
+
+    function renderProps() {
+      if (editing) return;
+      const box = $('#props');
+      const e = sel();
+      if (!e) {
+        const s = slide();
+        const bg = s.bg;
+        box.innerHTML = `
+          <h3>Folie ${cur + 1} von ${deck.data.slides.length}</h3>
+          <label>Hintergrund</label>
+          <div class="row-inline"><input type="color" data-bg="color" value="${typeof bg === 'string' ? bg : bg.from}" aria-label="Hintergrundfarbe">
+            <button type="button" class="mini" data-bg-all>Auf alle Folien</button></div>
+          <div class="swatches" style="margin-top:.5rem">${COLORS.map((c) => `<button type="button" class="swatch" style="background:${c}" data-bg-set="${c}" aria-label="${c}"></button>`).join('')}
+            ${GRADIENTS.map((g, i) => `<button type="button" class="swatch" style="background:linear-gradient(${g.angle}deg,${g.from},${g.to})" data-bg-grad="${i}" aria-label="Farbverlauf ${i + 1}"></button>`).join('')}</div>
+          <label for="trans">Übergang zur Folie</label>
+          <select id="trans" data-slide-prop="transition"><option value="fade">Überblenden</option><option value="slide">Schieben</option><option value="none">Keiner</option></select>
+          <label for="notes">Notizen (nur für dich, im Präsentationsmodus mit N)</label>
+          <textarea id="notes" rows="5" data-slide-prop="notes" placeholder="Was willst du zu dieser Folie sagen?"></textarea>
+          <h3>Folie</h3>
+          <div class="row-inline">
+            <button type="button" class="mini" data-slide-op="up" ${cur === 0 ? 'disabled' : ''}>↑ Nach oben</button>
+            <button type="button" class="mini" data-slide-op="down" ${cur === deck.data.slides.length - 1 ? 'disabled' : ''}>↓ Nach unten</button>
+            <button type="button" class="mini" data-slide-op="dup">Duplizieren</button>
+            <button type="button" class="mini danger" data-slide-op="del" ${deck.data.slides.length < 2 ? 'disabled' : ''}>Löschen</button>
+          </div>`;
+        $('#trans').value = s.transition || 'fade';
+        $('#notes').value = s.notes || '';
+        return;
+      }
+      const textual = isTextual(e);
+      let html = '';
+      html += `<h3>${{ text: 'Textfeld', shape: 'Form', image: 'Bild' }[e.type]}</h3>`;
+      if (textual) {
+        html += `
+          <label for="p-font">Schrift</label>
+          <div class="grid2"><select id="p-font" data-set-select="font"><option value="sans">Modern</option><option value="serif">Serif</option><option value="display">Display</option><option value="mono">Mono</option></select>
+            ${num('size', e.size, 'min="8" max="240" aria-label="Schriftgröße"')}</div>
+          <div class="row-inline" style="margin-top:.5rem">
+            <div class="seg"><button type="button" data-toggle="bold" aria-pressed="${!!e.bold}" title="Fett (Strg+B)"><b>B</b></button><button type="button" data-toggle="italic" aria-pressed="${!!e.italic}" title="Kursiv (Strg+I)"><i>I</i></button><button type="button" data-toggle="underline" aria-pressed="${!!e.underline}" title="Unterstrichen (Strg+U)"><u>U</u></button></div>
+            ${seg('align', [['left', '⯇', 'Linksbündig'], ['center', '≡', 'Zentriert'], ['right', '⯈', 'Rechtsbündig']], e.align)}</div>
+          <div class="row-inline" style="margin-top:.5rem">
+            ${seg('valign', [['top', '⤒', 'Oben'], ['middle', '↕', 'Mitte'], ['bottom', '⤓', 'Unten']], e.valign || (e.type === 'shape' ? 'middle' : 'top'))}
+            ${seg('list', [['none', '¶', 'Fließtext'], ['bullet', '•', 'Aufzählung'], ['number', '1.', 'Nummerierung']], e.list || 'none')}</div>
+          <label>Textfarbe</label>
+          <div class="row-inline"><input type="color" data-color="color" value="${colorHex(e.color)}" aria-label="Textfarbe"><button type="button" class="mini" data-color-auto="color" aria-pressed="${e.color === 'auto'}">Automatisch</button></div>`;
+      }
+      if (e.type === 'shape') {
+        html += `
+          <label for="p-kind">Form</label>
+          <select id="p-kind" data-set-select="kind"><option value="rect">Rechteck</option><option value="ellipse">Kreis / Ellipse</option><option value="triangle">Dreieck</option></select>
+          <label>Füllung</label>
+          <div class="row-inline"><input type="color" data-color="fill" value="${colorHex(e.fill)}" aria-label="Füllfarbe"><button type="button" class="mini" data-color-none="fill">Keine</button></div>
+          <label>Rahmen</label>
+          <div class="row-inline"><input type="color" data-color="stroke" value="${colorHex(e.stroke)}" aria-label="Rahmenfarbe">${num('strokeWidth', e.strokeWidth || 0, 'min="0" max="40" aria-label="Rahmenstärke" style="width:4.5rem"')}<button type="button" class="mini" data-color-none="stroke">Keiner</button></div>
+          ${e.kind === 'rect' ? `<label for="p-radius">Rundung</label><input id="p-radius" type="range" min="0" max="200" value="${e.radius || 0}" data-range="radius">` : ''}`;
+      }
+      if (e.type === 'text') {
+        html += `<label>Hintergrund des Felds</label><div class="row-inline"><input type="color" data-color="fill" value="${colorHex(e.fill === 'none' ? '#ffffff' : e.fill)}" aria-label="Hintergrundfarbe"><button type="button" class="mini" data-color-none="fill">Keiner</button></div>`;
+      }
+      if (e.type === 'image') {
+        html += `<label for="p-fit">Anpassung</label><select id="p-fit" data-set-select="fit"><option value="contain">Ganz zeigen</option><option value="cover">Füllen (zuschneiden)</option></select>
+          <label for="p-rad">Rundung</label><input id="p-rad" type="range" min="0" max="200" value="${e.radius || 0}" data-range="radius">`;
+      }
+      html += `<label for="p-op">Deckkraft</label><input id="p-op" type="range" min="0.1" max="1" step="0.05" value="${e.opacity ?? 1}" data-range="opacity">
+        <h3>Position &amp; Größe</h3>
+        <div class="grid2"><div><label>X</label>${num('x', e.x, 'aria-label="X"')}</div><div><label>Y</label>${num('y', e.y, 'aria-label="Y"')}</div>
+          <div><label>Breite</label>${num('w', e.w, 'min="20" aria-label="Breite"')}</div><div><label>Höhe</label>${num('h', e.h, 'min="20" aria-label="Höhe"')}</div></div>
+        <h3>Anordnen</h3>
+        <div class="row-inline"><button type="button" class="mini" data-arrange="front">Ganz nach vorn</button><button type="button" class="mini" data-arrange="forward">Vor</button><button type="button" class="mini" data-arrange="backward">Zurück</button><button type="button" class="mini" data-arrange="back">Ganz hinten</button></div>
+        <div class="row-inline" style="margin-top:.5rem"><button type="button" class="mini" data-align="left">⇤</button><button type="button" class="mini" data-align="hcenter">↔ Mitte</button><button type="button" class="mini" data-align="right">⇥</button><button type="button" class="mini" data-align="top">⤒</button><button type="button" class="mini" data-align="vcenter">↕ Mitte</button><button type="button" class="mini" data-align="bottom">⤓</button></div>
+        <div class="row-inline" style="margin-top:.8rem"><button type="button" class="mini" data-op="dup">Duplizieren</button><button type="button" class="mini danger" data-op="del">Löschen</button></div>`;
+      box.innerHTML = html;
+      box.querySelectorAll('[data-set-select]').forEach((s) => { s.value = e[s.dataset.setSelect] ?? s.value; });
+    }
+    // Nur Zahlenfelder nachziehen (z. B. beim Ziehen), ohne das Panel neu zu bauen
+    function syncProps() {
+      const e = sel();
+      if (!e) return;
+      document.querySelectorAll('#props [data-num]').forEach((i) => { if (document.activeElement !== i && e[i.dataset.num] !== undefined) i.value = Math.round(e[i.dataset.num]); });
+    }
+
+    function setProp(name, value, key) {
+      const e = sel();
+      if (!e) return;
+      pushHist(key || `p:${name}`);
+      e[name] = value;
+      afterChange({ props: ['kind', 'align', 'valign', 'list', 'font'].includes(name) });
+    }
+    function toggleProp(name) { const e = sel(); if (e) setProp(name, !e[name], null); if (editing) { /* Stil im Text sofort sichtbar */ const dom = $('#stagehost').querySelector(`[data-id="${selId}"] .sl-text`); if (dom) { const f = SlideRender.elementEl(sel(), slide()).querySelector('.sl-text'); Object.assign(dom.style, { fontWeight: f.style.fontWeight, fontStyle: f.style.fontStyle, textDecoration: f.style.textDecoration }); } } }
+
+    const props = $('#props');
+    props.addEventListener('input', (ev) => {
+      const t = ev.target;
+      const e = sel();
+      if (t.dataset.num && e) { const v = Number(t.value); if (Number.isFinite(v)) setProp(t.dataset.num, ['w', 'h'].includes(t.dataset.num) ? Math.max(20, v) : v); }
+      else if (t.dataset.color && e) setProp(t.dataset.color, t.value);
+      else if (t.dataset.range && e) setProp(t.dataset.range, Number(t.value));
+      else if (t.dataset.bg === 'color') { pushHist('bg'); slide().bg = t.value; afterChange(); }
+      else if (t.dataset.slideProp) { pushHist(`s:${t.dataset.slideProp}`); slide()[t.dataset.slideProp] = t.value; if (t.dataset.slideProp === 'notes') dirty(); else afterChange(); }
+    });
+    props.addEventListener('change', (ev) => {
+      const t = ev.target;
+      if (t.dataset.setSelect) setProp(t.dataset.setSelect, t.value);
+      else if (t.dataset.slideProp === 'transition') { pushHist(); slide().transition = t.value; dirty(); }
+    });
+    props.addEventListener('click', (ev) => {
+      const t = ev.target.closest('button');
+      if (!t) return;
+      const e = sel();
+      const d = t.dataset;
+      if (d.toggle) toggleProp(d.toggle);
+      else if (d.set) setProp(d.set, d.value);
+      else if (d.colorAuto) setProp(d.colorAuto, 'auto');
+      else if (d.colorNone) setProp(d.colorNone, 'none');
+      else if (d.bgSet !== undefined) { pushHist(); slide().bg = d.bgSet; afterChange({ props: true }); }
+      else if (d.bgGrad !== undefined) { pushHist(); slide().bg = { ...GRADIENTS[Number(d.bgGrad)] }; afterChange({ props: true }); }
+      else if (d.bgAll !== undefined) { pushHist(); deck.data.slides.forEach((s) => { s.bg = JSON.parse(JSON.stringify(slide().bg)); }); renderAll(); dirty(); }
+      else if (d.slideOp === 'up') moveSlide(cur, cur - 1);
+      else if (d.slideOp === 'down') moveSlide(cur, cur + 2);
+      else if (d.slideOp === 'dup') duplicateSlide();
+      else if (d.slideOp === 'del' && confirm('Diese Folie löschen?')) deleteSlide();
+      else if (d.arrange && e) arrange(d.arrange);
+      else if (d.align && e) alignTo(d.align);
+      else if (d.op === 'dup') duplicateElement();
+      else if (d.op === 'del') deleteElement();
+    });
+
+    function arrange(how) {
+      const list = slide().elements;
+      const i = list.findIndex((x) => x.id === selId);
+      if (i < 0) return;
+      pushHist();
+      const [e] = list.splice(i, 1);
+      const to = { front: list.length, back: 0, forward: Math.min(list.length, i + 1), backward: Math.max(0, i - 1) }[how];
+      list.splice(to, 0, e);
+      afterChange({ props: false });
+    }
+    function alignTo(how) {
+      const e = sel();
+      pushHist();
+      if (how === 'left') e.x = 0;
+      if (how === 'right') e.x = W - e.w;
+      if (how === 'hcenter') e.x = Math.round((W - e.w) / 2);
+      if (how === 'top') e.y = 0;
+      if (how === 'bottom') e.y = H - e.h;
+      if (how === 'vcenter') e.y = Math.round((H - e.h) / 2);
+      afterChange();
+    }
+    function duplicateElement() {
+      const e = sel();
+      if (!e) return;
+      pushHist();
+      const c = JSON.parse(JSON.stringify(e));
+      c.id = uid(); c.x += 24; c.y += 24;
+      slide().elements.push(c);
+      selId = c.id;
+      afterChange({ props: true });
+    }
+    function deleteElement() {
+      if (!selId) return;
+      pushHist();
+      slide().elements = slide().elements.filter((x) => x.id !== selId);
+      selId = null;
+      afterChange({ props: true });
+    }
+
+    // ---------------- Folienleiste: Klicks, Ziehen ----------------
+    $('#slides').addEventListener('click', (ev) => {
+      const add = ev.target.closest('#add-slide');
+      if (add) { const m = $('#layout-menu'); m.hidden = !m.hidden; return; }
+      const lay = ev.target.closest('[data-layout]');
+      if (lay) { addSlide(lay.dataset.layout); return; }
+      const t = ev.target.closest('.thumb');
+      if (t) { endEdit(); cur = Number(t.dataset.i); selId = null; renderAll(); }
+    });
+    document.addEventListener('click', (ev) => { const m = $('#layout-menu'); if (m && !m.hidden && !ev.target.closest('.add-slide')) m.hidden = true; });
+    let dragFrom = null;
+    $('#slides').addEventListener('dragstart', (ev) => { const t = ev.target.closest('.thumb'); if (!t) return; dragFrom = Number(t.dataset.i); ev.dataTransfer.effectAllowed = 'move'; ev.dataTransfer.setData('text/plain', String(dragFrom)); });
+    $('#slides').addEventListener('dragover', (ev) => {
+      if (dragFrom === null) return;
+      ev.preventDefault();
+      document.querySelectorAll('.thumb.drop-before').forEach((x) => x.classList.remove('drop-before'));
+      const t = ev.target.closest('.thumb');
+      if (t) t.classList.add('drop-before');
+    });
+    $('#slides').addEventListener('drop', (ev) => {
+      if (dragFrom === null) return;
+      ev.preventDefault();
+      const t = ev.target.closest('.thumb');
+      const to = t ? Number(t.dataset.i) : deck.data.slides.length;
+      const from = dragFrom;
+      dragFrom = null;
+      moveSlide(from, to);
+    });
+    $('#slides').addEventListener('dragend', () => { dragFrom = null; document.querySelectorAll('.thumb.drop-before').forEach((x) => x.classList.remove('drop-before')); });
+
+    // ---------------- Werkzeugleiste, Tastatur ----------------
+    $('#tools').addEventListener('click', (ev) => { const b = ev.target.closest('[data-add]'); if (b) addKind(b.dataset.add); });
+    $('#undo').onclick = undo;
+    $('#redo').onclick = redo;
+    $('#title').addEventListener('input', (e) => { deck.title = e.target.value; dirty(); });
+    $('#present').onclick = async () => { endEdit(); await flush(); location.href = `/slides-present?id=${id}&n=${cur + 1}`; };
+    $('#pdf').onclick = async () => { endEdit(); await flush(); window.open(`/slides-present?id=${id}&print=1`, '_blank'); };
+    async function flush() { for (let i = 0; i < 20 && (pending || saving); i++) { if (!saving) await save(); else await new Promise((r) => setTimeout(r, 150)); } }
+
+    document.addEventListener('keydown', (ev) => {
+      if (!deck || editing) return;
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
+      const mod = ev.metaKey || ev.ctrlKey;
+      const k = ev.key.toLowerCase();
+      const e = sel();
+      if (mod && k === 'z') { ev.preventDefault(); if (ev.shiftKey) redo(); else undo(); return; }
+      if (mod && k === 'y') { ev.preventDefault(); redo(); return; }
+      if (mod && k === 'd') { ev.preventDefault(); duplicateElement(); return; }
+      if (mod && k === 'c' && e) { try { localStorage.setItem('slides-clip', JSON.stringify(e)); } catch { /* egal */ } return; }
+      if (mod && k === 'v') {
+        let c = null; try { c = JSON.parse(localStorage.getItem('slides-clip')); } catch { /* egal */ }
+        if (c && c.type) { pushHist(); c.id = uid(); c.x += 24; c.y += 24; slide().elements.push(c); selId = c.id; afterChange({ props: true }); }
+        return;
+      }
+      if (!e) return;
+      if (ev.key === 'Delete' || ev.key === 'Backspace') { ev.preventDefault(); deleteElement(); }
+      else if (ev.key === 'Enter' && isTextual(e)) { ev.preventDefault(); startEdit(e.id); }
+      else if (ev.key === 'Escape') { selId = null; renderOverlay(); renderProps(); }
+      else if (ev.key.startsWith('Arrow')) {
+        ev.preventDefault();
+        const step = ev.shiftKey ? 20 : 2;
+        pushHist('nudge');
+        if (ev.key === 'ArrowLeft') e.x -= step;
+        if (ev.key === 'ArrowRight') e.x += step;
+        if (ev.key === 'ArrowUp') e.y -= step;
+        if (ev.key === 'ArrowDown') e.y += step;
+        afterChange();
+      }
+    });
+
+    new ResizeObserver(() => { if (deck && !editing) renderStage(); }).observe($('#stagewrap'));
+
+    requireLogin().then(async () => {
+      try {
+        deck = await api(`/api/slides/${id}`);
+        $('#title').value = deck.title;
+        document.title = `${deck.title} – Folien`;
+        renderAll();
+        setState('✓ Gespeichert', 'ok');
+      } catch (err) {
+        $('#props').innerHTML = `<p class="error">${escapeHtml(err.message)}</p>`;
+      }
+    });
+  </script>
+</body>
+</html>

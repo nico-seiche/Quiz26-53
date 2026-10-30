@@ -24,6 +24,7 @@
   <main>
     <a class="features-link" href="/features"><span>✨ Zu den Features</span><span aria-hidden="true">→</span></a>
     <a class="features-link" id="gesetze-link" href="/gesetze" hidden><span>⚖️ §-Sammlung <span class="tag" style="margin-left:.4rem">Experiment</span></span><span aria-hidden="true">→</span></a>
+    <a class="features-link" id="slides-link" href="/slides" hidden><span>🖥️ Folien <span class="tag" style="margin-left:.4rem">Experiment</span></span><span aria-hidden="true">→</span></a>
 
     <div class="card profile-card">
       <a class="avatar-edit" href="/settings" aria-label="Profilbild ändern"><span id="profile-avatar"></span><span class="cam" aria-hidden="true">📷</span></a>
@@ -173,7 +174,7 @@
   </script>
   <script>
     // Experiment: nur für freigeschaltete Nutzer (die API antwortet sonst mit 403)
-    api('/api/gesetze').then(() => { $('#gesetze-link').hidden = false; }).catch(() => {});
+    api('/api/gesetze').then(() => { $('#gesetze-link').hidden = false; $('#slides-link').hidden = false; }).catch(() => {});
   </script>
 </body>
 </html>

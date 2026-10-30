@@ -221,3 +221,13 @@ Die Bestenliste (und der Platz im Profil) zählt nur Spiele ab dem Stichtag `lea
 ## Lernsets kopieren und aktualisieren
 
 Beim Kopieren merkt sich die Kopie ihr Original (`study_sets.copied_from`, `synced_to`; Karten tragen `source_card_id`). Das Original verschwindet aus „Von anderen geteilt“, solange die Kopie aktuell ist. Wird es danach geändert, erscheint es mit „Update verfügbar“ und dem Knopf „Kopie aktualisieren“ (`POST /api/study/:id/sync`): neue Karten kommen dazu, geänderte werden übernommen, im Original gelöschte entfallen, eigene Zusatzkarten und der Lernfortschritt bleiben. Kopien, die vor Migration 023 entstanden sind, kennen ihr Original nicht und bleiben unverändert sichtbar.
+
+## Folien (Experiment, nur für freigeschaltete Nutzer)
+
+Präsentationen wie in PowerPoint: Link im Profil → `/slides` (Liste), `/slides-edit?id=` (Editor), `/slides-present?id=` (Präsentation; `&print=1` öffnet den Druckdialog für den PDF-Export).
+
+- **Daten:** `quiz.slide_decks` (ein JSON-Dokument je Präsentation, `rev` gegen unbemerktes Überschreiben) und `quiz.slide_assets` (Bilder als Bytes, werden vor dem Hochladen auf max. 1600 px verkleinert). Die API (`src/slides.js`, `/api/slides`) prüft das Dokument streng (Elementtypen, Farben, Schriftlisten, nur eigene Bild-URLs). Migration `024_slides.sql`.
+- **Folie:** 1280 × 720 Einheiten, Elemente `text`, `shape` (Rechteck, Kreis, Dreieck) und `image`. Textfarbe „auto“ passt sich dem Hintergrund an. Gezeichnet wird alles von `public/js/slides-render.js` (Editor, Vorschaubilder, Präsentation, PDF).
+- **Editor:** Folienleiste mit Ziehen zum Umsortieren, Layouts, Ziehen/Skalieren mit Einrasten (Mitte, Ränder, andere Elemente; Alt = ohne), Doppeltippen zum Texteingeben, Eigenschaften rechts, Rückgängig/Wiederholen, Strg+C/V/D, Pfeiltasten, Bilder per Knopf, Einfügen oder Drag & Drop, automatisches Speichern.
+- **Präsentation:** Pfeiltasten/Leertaste/Wischen, Übergänge (Überblenden, Schieben), `N` Notizen, `F` Vollbild, `B` schwarz, `Esc` beenden.
+- **Freischaltung:** `quiz.app_settings` → `experimental_user_ids` (kommagetrennte Nutzer-IDs; ersatzweise `gesetze_user_ids`, sonst der Name „Nico“).

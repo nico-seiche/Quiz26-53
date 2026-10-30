@@ -12,6 +12,7 @@ const avatars = require('./avatars');
 const users = require('./users');
 const polls = require('./polls');
 const gesetze = require('./gesetze');
+const slides = require('./slides');
 const db = require('./db');
 
 // Die API; lokal von server.js gestartet, auf Vercel als Serverless-Funktion (api/index.js)
@@ -19,7 +20,8 @@ const app = express();
 app.set('trust proxy', true);
 // Profilbild: rohes JPEG (kleiner als 150 kB), muss vor dem JSON-Parser stehen
 app.use('/api/me/avatar', express.raw({ type: 'image/jpeg', limit: '200kb' }));
-app.use(express.json());
+app.use('/api/slides', express.raw({ type: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'], limit: '2mb' }));
+app.use(express.json({ limit: '2mb' }));
 app.use(auth.loadUser);
 
 // Öffentliche Supabase-Daten für Realtime im Browser (der Publishable Key ist nicht geheim)
@@ -59,6 +61,7 @@ app.use('/api/avatar', avatars.imageRouter);
 app.use('/api/users', users.router);
 app.use('/api/polls', polls.router);
 app.use('/api/gesetze', gesetze.router);
+app.use('/api/slides', slides.router);
 app.use('/api/me/avatar', avatars.meRouter);
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Nicht gefunden' }));
