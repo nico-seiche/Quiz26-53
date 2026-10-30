@@ -46,7 +46,22 @@
     mark { background: #fde68a; color: #1b1d3a; border-radius: 3px; padding: 0 .1em; }
 
     .law-read { padding: 1.4rem 1.5rem; min-height: 22rem; min-width: 0; overflow-wrap: anywhere; }
-    .law-back { display: none; margin-bottom: .8rem; }
+    .law-views { display: flex; gap: .5rem; margin-bottom: .9rem; }
+    .law-views button { padding: .45rem .8rem; font-size: .9rem; }
+    .law-views button[aria-pressed="true"] { background: var(--bg); border-color: var(--primary); color: var(--link); }
+    .law-views .only-mobile { display: none; }
+    .grid-head { margin: .2rem 0 .2rem; font-size: 1.3rem; }
+    .num-grid { display: grid; grid-template-columns: 3.6rem repeat(10, minmax(0, 1fr)); gap: .4rem; align-items: start; }
+    .num-row-label { align-self: start; padding-top: .85rem; font-size: .78rem; font-weight: 800; color: var(--muted); }
+    .num-cell { display: flex; flex-direction: column; gap: .25rem; min-width: 0; }
+    .num-tile { width: 100%; aspect-ratio: 1 / .8; display: grid; place-items: center; padding: 0; border: 1.5px solid var(--link); border-radius: 10px; background: var(--card); color: var(--text); font-weight: 800; font-size: 1rem; font-variant-numeric: tabular-nums; cursor: pointer; box-shadow: none; transition: transform .12s, background .12s; }
+    .num-tile:hover { background: var(--primary-grad); color: #fff; border-color: transparent; transform: translateY(-2px); }
+    .num-tile[aria-current="true"] { background: var(--primary-grad); color: #fff; border-color: transparent; box-shadow: var(--glow); }
+    .num-tile.empty { border: 1.5px dashed var(--border); background: transparent; color: var(--muted); font-weight: 600; opacity: .45; cursor: default; }
+    .num-tile.empty:hover { transform: none; background: transparent; color: var(--muted); }
+    .num-sub { display: flex; flex-wrap: wrap; gap: .2rem; }
+    .num-sub button { padding: 0 .35rem; min-width: 1.4rem; height: 1.4rem; border: 1px solid var(--link); border-radius: 7px; background: var(--card); color: var(--link); font-size: .72rem; font-weight: 800; cursor: pointer; box-shadow: none; }
+    .num-sub button:hover, .num-sub button[aria-current="true"] { background: var(--primary-grad); color: #fff; border-color: transparent; }
     .law-crumb { font-size: .82rem; color: var(--muted); margin-bottom: .6rem; line-height: 1.4; }
     .par-head { display: flex; align-items: baseline; gap: .7rem; flex-wrap: wrap; margin-bottom: 1.1rem; }
     .par-num { font-size: 2rem; font-weight: 900; background: var(--primary-grad); -webkit-background-clip: text; background-clip: text; color: transparent; letter-spacing: -.02em; }
@@ -82,9 +97,12 @@
       .law-layout { grid-template-columns: minmax(0, 1fr); }
       .law-side { position: static; max-height: none; }
       .toc { overflow: visible; }
-      .law-layout.reading .law-side { display: none; }
-      .law-layout:not(.reading) .law-read { display: none; }
-      .law-back { display: inline-flex; }
+      .law-layout:not(.mobile-toc) .law-side { display: none; }
+      .law-layout.mobile-toc .law-read { display: none; }
+      .law-views .only-mobile { display: inline-flex; }
+      .num-grid { grid-template-columns: 2.4rem repeat(10, minmax(0, 1fr)); gap: .25rem; }
+      .num-tile { font-size: .72rem; border-radius: 7px; aspect-ratio: 1 / 1.1; border-width: 1px; }
+      .num-row-label { font-size: .64rem; padding-top: .6rem; }
       .law-read { padding: 1.1rem 1rem; }
       .law-keys { display: none; }
     }
@@ -119,6 +137,7 @@
     let pars = [];             // nur die Paragraphen, in Reihenfolge
     let byNum = new Map();
     let current = null;        // aktueller Paragraph
+    let pane = 'grid';         // rechts: 'grid' (Übersicht) oder 'read' (Paragraph)
     let query = '';
     const openGroups = new Set();
     const cache = new Map();
@@ -276,14 +295,55 @@
       </div>`;
     }
 
+    // Übersicht: je Zehnerblock eine Reihe (1–9, 10–19, 20–29 …); Buchstaben-Paragraphen (12a) hängen unter ihrer Zahl
+    function gridHtml() {
+      const slots = new Map();   // Zahl → { main, subs[] }
+      for (const p of pars) {
+        const m = p.num.match(/^(\d+)([a-z]*)$/);
+        if (!m) continue;
+        const n = Number(m[1]);
+        if (!slots.has(n)) slots.set(n, { main: null, subs: [] });
+        if (m[2]) slots.get(n).subs.push(p); else slots.get(n).main = p;
+      }
+      const nums = [...slots.keys()];
+      const first = Math.floor(Math.min(...nums) / 10);
+      const last = Math.floor(Math.max(...nums) / 10);
+      const cur = current ? current.num : null;
+      let html = '';
+      for (let row = first; row <= last; row++) {
+        html += `<div class="num-row-label">${row === 0 ? '1–9' : `${row * 10}–${row * 10 + 9}`}</div>`;
+        for (let col = 0; col < 10; col++) {
+          const n = row * 10 + col;
+          const slot = slots.get(n);
+          if (!slot) { html += `<div class="num-cell"><span class="num-tile empty" aria-hidden="true">${n === 0 ? '' : n}</span></div>`; continue; }
+          const main = slot.main
+            ? `<button type="button" class="num-tile" data-num="${slot.main.num}" title="§ ${slot.main.num} ${escapeHtml(slot.main.title)}" ${cur === slot.main.num ? 'aria-current="true"' : ''}>${n}</button>`
+            : `<span class="num-tile empty" aria-hidden="true">${n}</span>`;
+          const subs = slot.subs.length ? `<div class="num-sub">${slot.subs.map((x) => `<button type="button" data-num="${x.num}" title="§ ${x.num} ${escapeHtml(x.title)}" ${cur === x.num ? 'aria-current="true"' : ''}>${x.num.replace(/^\d+/, '')}</button>`).join('')}</div>` : '';
+          html += `<div class="num-cell">${main}${subs}</div>`;
+        }
+      }
+      return `<div class="num-grid">${html}</div>`;
+    }
+
+    function viewsHtml() {
+      return `<div class="law-views">
+        <button type="button" data-view="grid" aria-pressed="${pane === 'grid'}">▦ Übersicht</button>
+        <button type="button" data-view="toc" class="only-mobile">☰ Inhalt</button>
+      </div>`;
+    }
+
     function renderRead() {
       const box = $('#read');
-      if (!current) { box.innerHTML = `<button type="button" class="law-back" id="back">‹ Inhalt</button>${intro()}`; return; }
+      if (pane === 'grid' || !current) {
+        box.innerHTML = `${viewsHtml()}<h2 class="grid-head">${escapeHtml(law.short)} · ${pars.length} Paragraphen</h2><p class="muted" style="margin:0 0 .8rem">${escapeHtml(law.title)} – tippe auf eine Zahl.</p>${gridHtml()}<details class="notes" style="margin-top:1.2rem"><summary>Fassung &amp; Quelle</summary>${intro()}</details>`;
+        return;
+      }
       const i = pars.indexOf(current);
       const prev = pars[i - 1];
       const next = pars[i + 1];
       box.innerHTML = `
-        <button type="button" class="law-back" id="back">‹ Inhalt</button>
+        ${viewsHtml()}
         <div class="par-nav">
           <button type="button" data-num="${prev ? prev.num : ''}" ${prev ? '' : 'disabled'}><span class="small">‹ Vorher</span><span class="tt">${prev ? `§ ${prev.num} ${escapeHtml(prev.title)}` : '–'}</span></button>
           <button type="button" data-num="${next ? next.num : ''}" ${next ? '' : 'disabled'}><span class="small">Weiter ›</span><span class="tt">${next ? `§ ${next.num} ${escapeHtml(next.title)}` : '–'}</span></button>
@@ -302,7 +362,8 @@
       const g = groupOf(num);
       if (g) openGroups.add(g);
       if (push && location.hash !== `#${law.slug}/${num}`) history.replaceState(null, '', `#${law.slug}/${num}`);
-      $('#layout').classList.add('reading');
+      pane = 'read';
+      $('#layout').classList.remove('mobile-toc');
       renderRead();
       renderToc();
       if (scroll) window.scrollTo({ top: 0 });
@@ -310,11 +371,19 @@
       if (cur && !query.trim()) cur.scrollIntoView({ block: 'nearest' });
     }
 
-    function showToc() {
-      $('#layout').classList.remove('reading');
-      renderToc();
-      const cur = $('#toc [aria-current]');
-      if (cur) cur.scrollIntoView({ block: 'center' });
+    function showView(view) {
+      if (view === 'grid') {
+        pane = 'grid';
+        $('#layout').classList.remove('mobile-toc');
+        renderRead();
+        window.scrollTo({ top: 0 });
+        history.replaceState(null, '', `#${law.slug}`);
+      } else {
+        $('#layout').classList.add('mobile-toc');
+        renderToc();
+        const cur = $('#toc [aria-current]');
+        if (cur) cur.scrollIntoView({ block: 'center' });
+      }
     }
 
     async function openLaw(slug, num) {
@@ -325,12 +394,13 @@
       buildOtherLaw();
       byNum = new Map(pars.map((p) => [p.num, p]));
       current = null;
+      pane = 'grid';
       query = '';
       $('#search').value = '';
       store.set('law:last', slug);
       document.querySelectorAll('.law-tab').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.slug === slug)));
       $('#layout').hidden = false;
-      $('#layout').classList.remove('reading');
+      $('#layout').classList.remove('mobile-toc');
       renderToc();
       renderRead();
       if (num && byNum.has(num)) show(num, { scroll: false });
@@ -351,13 +421,14 @@
       if (ref) { e.preventDefault(); query = ''; $('#search').value = ''; show(ref.dataset.go); return; }
       const hit = e.target.closest('[data-num]');
       if (hit && hit.dataset.num) { show(hit.dataset.num); return; }
-      if (e.target.closest('#back')) showToc();
+      const view = e.target.closest('[data-view]');
+      if (view) showView(view.dataset.view);
     });
 
     $('#search').addEventListener('input', (e) => {
       query = e.target.value;
       renderToc();
-      if (current) renderRead();
+      if (current && pane === 'read') renderRead();
     });
     $('#search').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { const first = $('#toc .toc-hit'); if (first) show(first.dataset.num); e.target.blur(); }
@@ -367,7 +438,7 @@
       if (!law || e.metaKey || e.ctrlKey || e.altKey) return;
       const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
       if (e.key === '/' && !typing) { e.preventDefault(); $('#search').focus(); return; }
-      if (typing || !current) return;
+      if (typing || !current || pane !== 'read') return;
       const i = pars.indexOf(current);
       if (e.key === 'ArrowLeft' && pars[i - 1]) show(pars[i - 1].num);
       if (e.key === 'ArrowRight' && pars[i + 1]) show(pars[i + 1].num);
