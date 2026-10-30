@@ -730,3 +730,8 @@ body.lobby-lock .info-bar { margin-bottom: .5rem; }
 .pw-toggle:hover, .pw-toggle[aria-pressed="true"] { color: var(--primary); background: var(--bg); }
 input[type="password"]::-ms-reveal, input[type="password"]::-ms-clear { display: none; }   /* Edge bringt sonst ein zweites Auge mit */
 .caps-hint { margin: .3rem 0 0; font-size: .85rem; font-weight: 700; color: #b45309; }
+
+/* QR-Anmeldung */
+.qr-box { width: min(15rem, 70vw); margin: 0 auto; padding: .6rem; background: #fff; border-radius: 14px; border: 1px solid var(--border); }
+.qr-box svg { display: block; width: 100%; height: auto; }
+.link-btn { background: none; border: 0; box-shadow: none; padding: .3rem .5rem; color: var(--link); font-weight: 700; text-decoration: underline; cursor: pointer; }

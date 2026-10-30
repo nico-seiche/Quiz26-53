@@ -143,6 +143,60 @@ router.post('/login', async (req, res) => {
   res.json({ id: Number(user.id), username: user.username });
 });
 
+// ---------------- Anmelden per QR-Code ----------------
+// 1. Neues Gerät: POST /qr → code (steht im QR-Code) + secret (bleibt auf dem Gerät)
+// 2. Angemeldetes Gerät scannt: GET /qr/:code (Gerät anzeigen), POST /qr/:code/approve (bestätigen)
+// 3. Neues Gerät fragt mit POST /qr/poll { code, secret } nach und bekommt bei Bestätigung die Sitzung
+const QR_MINUTES = 3;
+const sha = (v) => crypto.createHash('sha256').update(String(v)).digest('hex');
+const validCode = (v) => typeof v === 'string' && /^[A-Za-z0-9_-]{20,64}$/.test(v);
+
+// „iPad · Safari“ aus dem User-Agent
+function deviceName(ua = '') {
+  const os = /iPad/.test(ua) ? 'iPad' : /iPhone/.test(ua) ? 'iPhone' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac OS X|Macintosh/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : 'Unbekanntes Gerät';
+  const browser = /Edg\//.test(ua) ? 'Edge' : /OPR\/|Opera/.test(ua) ? 'Opera' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\/|CriOS/.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Browser';
+  return `${os} · ${browser}`;
+}
+
+router.post('/qr', async (req, res) => {
+  await db.query("DELETE FROM quiz.qr_logins WHERE expires_at < now() - interval '10 minutes'");
+  const { n } = await db.one('SELECT COUNT(*)::int AS n FROM quiz.qr_logins WHERE expires_at > now()');
+  if (n > 2000) return res.status(503).json({ error: 'Gerade zu viele offene QR-Anmeldungen – bitte gleich noch einmal versuchen.' });
+  const code = crypto.randomBytes(18).toString('base64url');
+  const secret = crypto.randomBytes(24).toString('hex');
+  await db.query(`INSERT INTO quiz.qr_logins (code, secret_hash, device, expires_at) VALUES ($1, $2, $3, now() + make_interval(mins => $4))`,
+    [code, sha(secret), deviceName(req.headers['user-agent']), QR_MINUTES]);
+  res.json({ code, secret, seconds: QR_MINUTES * 60 });
+});
+
+router.post('/qr/poll', async (req, res) => {
+  const { code, secret } = req.body || {};
+  if (!validCode(code) || typeof secret !== 'string') return res.status(400).json({ error: 'Ungültige Anfrage' });
+  const row = await db.one('SELECT secret_hash, approved_user_id, expires_at > now() AS live FROM quiz.qr_logins WHERE code = $1', [code]);
+  if (!row || row.secret_hash !== sha(secret) || !row.live) return res.json({ status: 'expired' });
+  if (!row.approved_user_id) return res.json({ status: 'pending' });
+  // Einmalig einlösen: die Zeile wird gelöscht, nur wer sie löscht, bekommt die Sitzung
+  const taken = await db.one('DELETE FROM quiz.qr_logins WHERE code = $1 AND approved_user_id IS NOT NULL RETURNING approved_user_id', [code]);
+  if (!taken) return res.json({ status: 'expired' });
+  const user = await db.one('SELECT id, username FROM quiz.users WHERE id = $1', [taken.approved_user_id]);
+  setSessionCookie(req, res, await createSession(user.id));
+  res.json({ status: 'approved', user: { id: Number(user.id), username: user.username } });
+});
+
+router.get('/qr/:code', requireAuth, async (req, res) => {
+  if (!validCode(req.params.code)) return res.status(404).json({ error: 'Dieser QR-Code ist ungültig oder abgelaufen.' });
+  const row = await db.one('SELECT device, created_at, approved_user_id FROM quiz.qr_logins WHERE code = $1 AND expires_at > now()', [req.params.code]);
+  if (!row) return res.status(404).json({ error: 'Dieser QR-Code ist ungültig oder abgelaufen.' });
+  res.json({ device: row.device, createdAt: row.created_at, approved: Boolean(row.approved_user_id) });
+});
+
+router.post('/qr/:code/approve', requireAuth, async (req, res) => {
+  if (!validCode(req.params.code)) return res.status(404).json({ error: 'Dieser QR-Code ist ungültig oder abgelaufen.' });
+  const row = await db.one('UPDATE quiz.qr_logins SET approved_user_id = $2 WHERE code = $1 AND expires_at > now() AND approved_user_id IS NULL RETURNING device', [req.params.code, req.user.id]);
+  if (!row) return res.status(404).json({ error: 'Dieser QR-Code ist ungültig, abgelaufen oder schon bestätigt.' });
+  res.json({ ok: true, device: row.device });
+});
+
 router.post('/logout', async (req, res) => {
   const token = sessionToken(req);
   if (token) await db.query('DELETE FROM quiz.sessions WHERE token = $1', [token]);

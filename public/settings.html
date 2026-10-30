@@ -63,6 +63,13 @@
     </div>
 
     <div class="card">
+      <h2 style="margin-bottom:.4rem">📱 Anderes Gerät anmelden</h2>
+      <p class="muted" style="margin-top:0">Zeigt ein Tablet oder PC auf der Anmeldeseite einen QR-Code, scannst du ihn hier mit der Kamera – ohne Passwort einzutippen.</p>
+      <p class="error" id="scan-error"></p>
+      <button type="button" class="primary" id="scan-open">📷 QR-Code scannen</button>
+    </div>
+
+    <div class="card">
       <h2 style="margin-bottom:.4rem">🎬 Animationen</h2>
       <select id="motion" aria-label="Animationen">
         <option value="on">An (Standard)</option>
@@ -97,8 +104,21 @@
       </div>
     </div>
   </div>
+  <div class="changelog-backdrop" id="scan" hidden>
+    <div class="changelog card" role="dialog" aria-modal="true" aria-label="QR-Code scannen">
+      <button type="button" class="changelog-x" id="scan-close" aria-label="Schließen">✕</button>
+      <h2>QR-Code scannen</h2>
+      <div class="scan-view"><video id="scan-video" playsinline muted></video><div class="scan-frame" aria-hidden="true"></div></div>
+      <p class="muted center" id="scan-hint" style="margin:.6rem 0 0">Halte die Kamera auf den QR-Code auf dem anderen Gerät.</p>
+    </div>
+  </div>
   <script src="/js/changelog.js"></script>
   <script src="/js/common.js"></script>
+  <style>
+    .scan-view { position: relative; border-radius: 16px; overflow: hidden; background: #000; aspect-ratio: 1; }
+    .scan-view video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .scan-frame { position: absolute; inset: 18%; border: 3px solid #fff; border-radius: 18px; box-shadow: 0 0 0 999px rgba(0, 0, 0, .35); }
+  </style>
   <script>
     // --- Animationen: Gerät folgen, immer an oder aus ---
     (() => {
@@ -171,6 +191,53 @@
       try { await sendAvatar('DELETE'); location.reload(); } catch (err) { $('#avatar-error').textContent = err.message; }
     };
 
+
+    // --- Anderes Gerät per QR-Code anmelden: Kamera + jsQR ---
+    let scanStream = null;
+    let scanTimer = null;
+    function stopScan() {
+      clearTimeout(scanTimer); scanTimer = null;
+      if (scanStream) scanStream.getTracks().forEach((t) => t.stop());
+      scanStream = null;
+      $('#scan').hidden = true;
+    }
+    function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
+    $('#scan-open').onclick = async () => {
+      $('#scan-error').textContent = '';
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) throw new Error('Dieser Browser erlaubt keinen Kamerazugriff. Öffne den QR-Code stattdessen mit der Kamera-App.');
+        if (!window.jsQR) await loadScript('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js');
+        scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+        const video = $('#scan-video');
+        video.srcObject = scanStream;
+        await video.play();
+        $('#scan').hidden = false;
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const tick = () => {
+          if (!scanStream) return;
+          if (video.videoWidth) {
+            const k = Math.min(1, 640 / video.videoWidth);
+            canvas.width = Math.round(video.videoWidth * k); canvas.height = Math.round(video.videoHeight * k);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const hit = window.jsQR(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
+            if (hit && hit.data) {
+              try {
+                const u = new URL(hit.data);
+                if (u.origin === location.origin && u.pathname === '/qr' && u.searchParams.get('code')) { stopScan(); location.href = `/qr?code=${encodeURIComponent(u.searchParams.get('code'))}`; return; }
+                $('#scan-hint').textContent = 'Das ist kein QR-Code dieser App.';
+              } catch { $('#scan-hint').textContent = 'Das ist kein QR-Code dieser App.'; }
+            }
+          }
+          scanTimer = setTimeout(tick, 200);
+        };
+        tick();
+      } catch (err) {
+        stopScan();
+        $('#scan-error').textContent = err.name === 'NotAllowedError' ? 'Der Kamerazugriff ist blockiert. Erlaube die Kamera in den Einstellungen deines Geräts.' : (err.message || 'Die Kamera konnte nicht gestartet werden.');
+      }
+    };
+    $('#scan-close').onclick = stopScan;
 
     // --- Nutzername ändern ---
     requireLogin().then((me) => {

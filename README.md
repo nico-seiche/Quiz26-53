@@ -250,3 +250,7 @@ Alle Passwortfelder (Anmelden, Registrieren, Passwort ändern) haben ein Auge zu
 ## Anmeldung: Fehlersuche
 
 Beim Anmelden werden Leerzeichen am Rand und unterschiedlich zusammengesetzte Umlaute (NFC/NFD) im Passwort toleriert (`passwordVariants` in `src/auth.js`). Fehlermeldungen unterscheiden „Nutzername unbekannt“ und „Passwort falsch (Feststelltaste?)“. Nach dem Anmelden prüft die Seite, ob der Browser das Cookie behalten hat, und erklärt es sonst. Passwortfelder zeigen einen Hinweis, wenn die Feststelltaste an ist. Fehlgeschlagene Anmeldungen schreiben (ohne Passwort) Merkmale ins Log (`login fehlgeschlagen: …`).
+
+## Anmelden per QR-Code
+
+Auf der Anmeldeseite zeigt „Mit QR-Code vom Handy anmelden“ einen QR-Code (`POST /api/auth/qr`, 3 Minuten gültig, `quiz.qr_logins`, Migration 025). Ein angemeldetes Gerät bestätigt ihn: entweder in den Einstellungen („Anderes Gerät anmelden“, Kamera + jsQR) oder über die Seite `/qr?code=…` (z. B. die Kamera-App). Das neue Gerät holt die Sitzung mit seinem geheimen Wert ab (`/api/auth/qr/poll`), den nur es kennt; der Code allein reicht nicht, und die Anmeldung kann nur einmal eingelöst werden. Die Bestätigungsseite zeigt Gerät und Zeitpunkt und warnt davor, fremde Codes zu bestätigen.
