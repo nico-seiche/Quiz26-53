@@ -152,7 +152,13 @@
     // --- Text → HTML ---------------------------------------------------------
     // „§ 8“, „§§ 47 bis 49“: Verweise innerhalb des Gesetzes werden anklickbar, solange nicht ein anderes Gesetz folgt („§ 1 Ordnungsbehördengesetz“).
     const NUM = String.raw`\d+[a-z]?(?![a-zäöüß])`;
-    const REF = new RegExp(String.raw`(§§?\s*)(${NUM})((?:\s*(?:,|und|bis|oder|sowie|–)\s*${NUM})*)`, 'g');
+    const lt = (p) => p.title || p.lt || '';   // Listentitel; Artikel ohne Überschrift (GG) zeigen den Textanfang
+    const U = () => (law && law.unit) || '§';
+    let REF = null;
+    const buildRef = () => {
+      const lead = U() === '§' ? '§§?' : '(?:Artikel|Art\\.)';
+      REF = new RegExp(String.raw`(${lead}\s*)(${NUM})((?:\s*(?:,|und|bis|oder|sowie|–)\s*${NUM})*)`, 'g');
+    };
     const OTHER_LAW_HEAD = String.raw`^(?:\s*(?:Abs\.|Absatz|Satz|S\.|Nr\.|Nummer|Buchstabe|Halbsatz|Alt\.)|\s*\d+[a-z]?\)?|\s*[a-z]\)|\s*,|\s+und|\s+bis|\s+oder)*\s+(?:des |der |dem |den )?`;
     let otherLaw = null;
     const buildOtherLaw = () => { otherLaw = new RegExp(OTHER_LAW_HEAD + `(?!${law.short.split(' ')[0]}\\b|Abs\\.|Absatz|Satz|S\\.|Nr\\.|Nummer|Buchstabe|Halbsatz|Alt\\.)[A-ZÄÖÜ]`); };
@@ -216,7 +222,7 @@
         if (item.type === 'head' && item.level === 1) {
           group = `${item.label}`;
           open = openGroups.has(group);
-          html += `<button type="button" class="toc-group" data-group="${escapeHtml(group)}" aria-expanded="${open}"><span class="chev" aria-hidden="true">▸</span><span>${escapeHtml(item.label)} · ${escapeHtml(item.title)}</span></button>`;
+          html += `<button type="button" class="toc-group" data-group="${escapeHtml(group)}" aria-expanded="${open}"><span class="chev" aria-hidden="true">▸</span><span>${escapeHtml(item.label)} · ${escapeHtml(lt(item))}</span></button>`;
         } else if (!open) {
           continue;
         } else if (item.type === 'head') {
@@ -224,7 +230,7 @@
         } else if (isLettered(item)) {
           continue;
         } else {
-          html += `<button type="button" class="toc-par" data-num="${item.num}" ${current && current.num === item.num ? 'aria-current="true"' : ''}><span class="n">§ ${item.num}</span><span>${escapeHtml(item.title)}</span></button>`;
+          html += `<button type="button" class="toc-par" data-num="${item.num}" ${current && current.num === item.num ? 'aria-current="true"' : ''}><span class="n">${U()} ${item.num}</span><span>${escapeHtml(lt(item))}</span></button>`;
         }
       }
       return html;
@@ -243,7 +249,7 @@
     const norm = (s) => s.toLowerCase();
     function searchHtml(q) {
       const nq = norm(q.trim());
-      const numQ = nq.replace(/^§+\s*/, '').replace(/\s+/g, '');
+      const numQ = nq.replace(/^(?:§+|art(?:ikel|\.)?)\s*/, '').replace(/\s+/g, '');
       const terms = nq.split(/\s+/).filter(Boolean);
       const hits = [];
       for (const p of pars) {
@@ -251,7 +257,7 @@
         const body = norm(p.text.join(' '));
         let score = 0;
         if (p.num === numQ) score = 1000;
-        else if (/^\d+[a-z]?$/.test(numQ) && p.num.startsWith(numQ) && /^§?\s*\d/.test(nq)) score = 500;
+        else if (/^\d+[a-z]?$/.test(numQ) && p.num.startsWith(numQ) && /^(?:§|art)?\s*\d/.test(nq)) score = 500;
         else if (terms.every((t) => title.includes(t))) score = 300;
         else if (terms.every((t) => (title + ' ' + body).includes(t))) score = 100;
         if (score) hits.push({ p, score, body });
@@ -266,7 +272,7 @@
           const text = p.text.join(' ');
           snip = `<span class="snip">…${highlight(escapeHtml(text.slice(Math.max(0, i - 50), i + 90)))}…</span>`;
         }
-        return `<button type="button" class="toc-hit" data-num="${p.num}"><span class="t">§ ${p.num} ${highlight(escapeHtml(p.title))}</span>${snip}</button>`;
+        return `<button type="button" class="toc-hit" data-num="${p.num}"><span class="t">${U()} ${p.num} ${highlight(escapeHtml(lt(p)))}</span>${snip}</button>`;
       }).join('');
     }
 
@@ -291,7 +297,7 @@
         <dl>
           <dt>Fassung</dt><dd>${escapeHtml(law.version || `gültig ab ${law.validFrom || '–'}`)}</dd>
           ${(law.hints || []).map((h) => `<dt>Hinweis</dt><dd>${escapeHtml(h)}</dd>`).join('')}
-          <dt>Umfang</dt><dd>${pars.length} Paragraphen</dd>
+          <dt>Umfang</dt><dd>${pars.length} ${U() === "§" ? "Paragraphen" : "Artikel"}</dd>
           ${law.citation ? `<dt>Vollzitat</dt><dd>${escapeHtml(law.citation)}</dd>` : ''}
           <dt>Quelle</dt><dd><a href="${escapeHtml(law.source)}" target="_blank" rel="noopener">${escapeHtml(new URL(law.source).hostname.replace(/^www\./, ''))}</a> (amtlich)</dd>
         </dl>
@@ -321,7 +327,7 @@
           const slot = slots.get(n);
           const target = slot && (slot.main || slot.subs[0]);
           tiles += target
-            ? `<button type="button" class="num-tile" data-num="${target.num}" title="§ ${target.num} ${escapeHtml(target.title)}" ${cur === String(n) ? 'aria-current="true"' : ''}>${n}</button>`
+            ? `<button type="button" class="num-tile" data-num="${target.num}" title="${U()} ${target.num} ${escapeHtml(lt(target))}" ${cur === String(n) ? 'aria-current="true"' : ''}>${n}</button>`
             : `<span class="num-tile empty" aria-hidden="true">${n === 0 ? '' : n}</span>`;
         }
         html += `<div class="num-row"><div class="num-row-label">${row === 0 ? '1–9' : `${row * 10}–${row * 10 + 9}`}</div><div class="num-tiles">${tiles}</div></div>`;
@@ -334,7 +340,7 @@
       const base = baseOf(p.num);
       const group = pars.filter((x) => baseOf(x.num) === base);
       if (group.length < 2) return '';
-      return `<div class="related"><span>Dazu gehören:</span>${group.map((x) => `<button type="button" data-num="${x.num}" title="${escapeHtml(x.title)}" ${x.num === p.num ? 'aria-current="true"' : ''}>§ ${x.num}</button>`).join('')}</div>`;
+      return `<div class="related"><span>Dazu gehören:</span>${group.map((x) => `<button type="button" data-num="${x.num}" title="${escapeHtml(lt(x))}" ${x.num === p.num ? 'aria-current="true"' : ''}>${U()} ${x.num}</button>`).join('')}</div>`;
     }
 
     const isMobile = () => matchMedia('(max-width: 860px)').matches;
@@ -350,7 +356,7 @@
     function renderRead() {
       const box = $('#read');
       if (pane === 'grid' || !current) {
-        box.innerHTML = `${viewsHtml()}<h2 class="grid-head">${escapeHtml(law.short)} · ${pars.length} Paragraphen</h2><p class="muted" style="margin:0 0 .8rem">${escapeHtml(law.title)} – tippe auf eine Zahl.</p>${gridHtml()}<details class="notes" style="margin-top:1.2rem"><summary>Fassung &amp; Quelle</summary>${intro()}</details>`;
+        box.innerHTML = `${viewsHtml()}<h2 class="grid-head">${escapeHtml(law.short)} · ${pars.length} ${U() === "§" ? "Paragraphen" : "Artikel"}</h2><p class="muted" style="margin:0 0 .8rem">${escapeHtml(law.title)} – tippe auf eine Zahl.</p>${gridHtml()}<details class="notes" style="margin-top:1.2rem"><summary>Fassung &amp; Quelle</summary>${intro()}</details>`;
         return;
       }
       const i = pars.indexOf(current);
@@ -359,11 +365,11 @@
       box.innerHTML = `
         ${viewsHtml()}
         <div class="par-nav">
-          <button type="button" data-num="${prev ? prev.num : ''}" ${prev ? '' : 'disabled'}><span class="small">‹ Vorher</span><span class="tt">${prev ? `§ ${prev.num} ${escapeHtml(prev.title)}` : '–'}</span></button>
-          <button type="button" data-num="${next ? next.num : ''}" ${next ? '' : 'disabled'}><span class="small">Weiter ›</span><span class="tt">${next ? `§ ${next.num} ${escapeHtml(next.title)}` : '–'}</span></button>
+          <button type="button" data-num="${prev ? prev.num : ''}" ${prev ? '' : 'disabled'}><span class="small">‹ Vorher</span><span class="tt">${prev ? `${U()} ${prev.num} ${escapeHtml(lt(prev))}` : '–'}</span></button>
+          <button type="button" data-num="${next ? next.num : ''}" ${next ? '' : 'disabled'}><span class="small">Weiter ›</span><span class="tt">${next ? `${U()} ${next.num} ${escapeHtml(lt(next))}` : '–'}</span></button>
         </div>
         <div class="law-crumb">${escapeHtml(law.short)} › ${escapeHtml(crumbOf(current.num))}</div>
-        <div class="par-head"><span class="par-num">§ ${current.num}</span><h2 class="par-title">${highlight(escapeHtml(current.title))}</h2></div>
+        <div class="par-head"><span class="par-num">${U()} ${current.num}</span>${current.title ? `<h2 class="par-title">${highlight(escapeHtml(current.title))}</h2>` : ''}</div>
         ${relatedHtml(current)}
         ${linesHtml(current.text)}
         ${current.notes.length ? `<details class="notes"><summary>Änderungshistorie (${current.notes.length})</summary>${current.notes.map((n) => `<p>${escapeHtml(n)}</p>`).join('')}</details>` : ''}`;
@@ -409,6 +415,8 @@
       law = cache.get(slug);
       pars = law.items.filter((i) => i.type === 'par');
       buildOtherLaw();
+      buildRef();
+      for (const p of pars) if (!p.title && !p.lt) { const t = (p.text[0] || '').replace(/^\(\d+[a-z]?\)\s*/, ''); p.lt = t.length > 60 ? `${t.slice(0, 58).trim()}…` : t; }
       byNum = new Map(pars.map((p) => [p.num, p]));
       current = null;
       pane = 'grid';

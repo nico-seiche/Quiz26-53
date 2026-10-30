@@ -42,31 +42,48 @@ async function main() {
     } else if (cells.length >= 2) outline.push({ type: 'par', num: cells[0].replace(/^§\s*/, '').replace(/\s+/g, ''), title: cells[1] });
   }
 
-  // Paragraphen aus dem Haupttext
+  // Paragraphen (und – für Gesetze ohne Inhaltsübersicht-Tabelle – Überschriften) aus dem Haupttext, in Dokumentreihenfolge
   const pars = new Map();
-  for (const chunk of html.split('paragraph--type--article').slice(1)) {
+  const seq = [];
+  const chunks = html.split(/paragraph--type--(structure|article)/);
+  for (let c = 1; c < chunks.length; c += 2) {
+    const kind = chunks[c];
+    const chunk = chunks[c + 1];
+    if (kind === 'structure') {
+      const h = chunk.match(/<h([2-6])[^>]*>[\s\S]*?field--field_num">([^<]*)<[\s\S]*?field--field_headline">([^<]*)</);
+      if (h) seq.push({ type: 'head', level: Number(h[1]) - 1, label: clean(h[2]), title: clean(h[3]) });
+      continue;
+    }
     const num = chunk.match(/field--field_num">([^<]*)</);
     if (!num) continue;
     const head = chunk.match(/field--field_headline">([^<]*)</);
     const body = chunk.match(/field--name-field-text[^>]*><div class="tex2jax_process">([\s\S]*?)<\/div><\/div>/);
     const notes = [...chunk.matchAll(/field--name-field-footnote-description[^>]*><div class="tex2jax_process">([\s\S]*?)<\/div><\/div>/g)].map((m) => paragraphs(m[1]).join(' ')).filter(Boolean);
-    const n = (clean(num[1]).match(/^§?\s*(\d+\s?[a-z]?)(?![a-zäöü])/) || [])[1];
+    const n = (clean(num[1]).match(/^§?\s*(\d+\s?[a-z]?)(?![a-zäöüß])/) || [])[1];
     if (!n) continue;
-    pars.set(n.replace(/\s+/g, ''), { num: n, title: head ? clean(head[1]) : '', text: body ? paragraphs(body[1]) : [], notes });
+    const par = { type: 'par', num: n.replace(/\s+/g, ''), title: head ? clean(head[1]) : '', text: body ? paragraphs(body[1]) : [], notes };
+    pars.set(par.num, par);
+    seq.push(par);
   }
 
-  const items = [];
-  const seen = new Set();
-  for (const o of outline) {
-    if (o.type === 'head') items.push(o);
-    else {
-      const p = pars.get(o.num);
-      if (!p) { console.warn(`§ ${o.num} fehlt im Text`); continue; }
-      seen.add(o.num);
-      items.push({ type: 'par', ...p, title: p.title || o.title });
+  let items = [];
+  if (outline.some((o) => o.type === 'par')) {
+    const seen = new Set();
+    for (const o of outline) {
+      if (o.type === 'head') items.push(o);
+      else {
+        const p = pars.get(o.num);
+        if (!p) { console.warn(`§ ${o.num} fehlt im Text`); continue; }
+        seen.add(o.num);
+        items.push({ ...p, title: p.title || o.title });
+      }
     }
+    for (const n of pars.keys()) if (!seen.has(n)) console.warn(`§ ${n} steht nicht in der Gliederung`);
+  } else {
+    items = seq;
   }
-  for (const n of pars.keys()) if (!seen.has(n)) console.warn(`§ ${n} steht nicht in der Gliederung`);
+
+  items = items.filter((i) => !(i.type === 'par' && !i.text.length && /^\((?:aufgehoben|nicht belegt|weggefallen)\)$/.test(i.title)));   // leere Platzhalter weglassen
 
   const valid = html.match(/Gültig ab[^0-9]*(\d{2}\.\d{2}\.\d{4})/);
   const cite = html.match(/Vollzitat[\s\S]{0,300}?<\/(?:div|p)>[\s\S]{0,300}?(Polizeigesetz[^<]{20,600})</);

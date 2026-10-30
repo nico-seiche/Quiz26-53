@@ -1,0 +1,74 @@
+[
+ {
+  "slug": "polg-nrw",
+  "short": "PolG NRW",
+  "title": "Polizeigesetz des Landes Nordrhein-Westfalen",
+  "unit": "§",
+  "validFrom": "13.12.2025",
+  "count": 89
+ },
+ {
+  "slug": "obg-nrw",
+  "short": "OBG NRW",
+  "title": "Ordnungsbehördengesetz Nordrhein-Westfalen",
+  "unit": "§",
+  "validFrom": "01.07.2026",
+  "count": 73
+ },
+ {
+  "slug": "stgb",
+  "short": "StGB",
+  "title": "Strafgesetzbuch",
+  "unit": "§",
+  "validFrom": "28.09.2026",
+  "count": 519
+ },
+ {
+  "slug": "stpo",
+  "short": "StPO",
+  "title": "Strafprozeßordnung",
+  "unit": "§",
+  "validFrom": "27.10.2026",
+  "count": 674
+ },
+ {
+  "slug": "owig_1968",
+  "short": "OWiG",
+  "title": "Gesetz über Ordnungswidrigkeiten",
+  "unit": "§",
+  "validFrom": "27.10.2026",
+  "count": 148
+ },
+ {
+  "slug": "stvo_2013",
+  "short": "StVO",
+  "title": "Straßenverkehrs-Ordnung",
+  "unit": "§",
+  "validFrom": "27.05.2026",
+  "count": 59
+ },
+ {
+  "slug": "stvzo_2012",
+  "short": "StVZO",
+  "title": "Straßenverkehrs-Zulassungs-Ordnung",
+  "unit": "§",
+  "validFrom": "26.09.2025",
+  "count": 115
+ },
+ {
+  "slug": "gg",
+  "short": "GG",
+  "title": "Grundgesetz für die Bundesrepublik Deutschland",
+  "unit": "Art.",
+  "validFrom": "06.05.2026",
+  "count": 198
+ },
+ {
+  "slug": "bgb",
+  "short": "BGB",
+  "title": "Bürgerliches Gesetzbuch",
+  "unit": "§",
+  "validFrom": "26.09.2026",
+  "count": 2503
+ }
+]

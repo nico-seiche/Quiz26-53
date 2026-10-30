@@ -77,14 +77,9 @@ async function main() {
   const [name, short] = process.argv.slice(2);
   if (!name || !short) { console.error('Aufruf: import-gii.js <kurzname> "<Kürzel>"'); process.exit(1); }
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gii-'));
-  let res;
-  for (let i = 0; i < 5; i++) {      // der Server antwortet gelegentlich mit 503
-    res = await fetch(`https://www.gesetze-im-internet.de/${name}/xml.zip`, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-    if (res.ok) break;
-    await new Promise((r) => setTimeout(r, 3000 * (i + 1)));
-  }
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  fs.writeFileSync(path.join(dir, 'x.zip'), Buffer.from(await res.arrayBuffer()));
+  // curl statt fetch: läuft zuverlässig auch hinter einem Proxy; der Server antwortet gelegentlich mit 503
+  const zip = path.join(dir, 'x.zip');
+  execFileSync('curl', ['-sSL', '--fail', '--retry', '6', '--retry-delay', '3', '--retry-all-errors', '-m', '120', '-A', 'Mozilla/5.0', '-o', zip, `https://www.gesetze-im-internet.de/${name}/xml.zip`]);
   execFileSync('unzip', ['-o', '-q', path.join(dir, 'x.zip'), '-d', dir]);
   const file = fs.readdirSync(dir).find((f) => f.endsWith('.xml'));
   const tree = parse(fs.readFileSync(path.join(dir, file), 'utf8'));
@@ -96,6 +91,7 @@ async function main() {
   const title = tidy(plain(find(meta, 'langue')));
 
   const items = [];
+  let unit = '§';
   for (const norm of norms) {
     const m = find(norm, 'metadaten');
     const gl = find(m, 'gliederungseinheit');
@@ -105,7 +101,8 @@ async function main() {
       continue;
     }
     const enbez = find(m, 'enbez') && tidy(plain(find(m, 'enbez')));
-    const mm = enbez && enbez.match(/^§\s*(\d+\s?[a-z]?)$/);
+    const mm = enbez && enbez.match(/^(?:§|Art)\s*(\d+\s?[a-z]?)$/);
+    if (enbez && /^Art\s/.test(enbez)) unit = 'Art.';
     if (!mm) continue;
     const ttl = find(m, 'titel') ? tidy(plain(find(m, 'titel'))) : '';
     if (/^\(weggefallen\)$/.test(ttl)) continue;
@@ -131,7 +128,7 @@ async function main() {
   const hints = stand.filter((s) => s.typ === 'Hinweis').map((s) => s.text);
   const bd = (fs.readFileSync(path.join(dir, file), 'utf8').match(/builddate="(\d{4})(\d{2})(\d{2})/) || []);
   const law = {
-    slug: name, short, title, validFrom: bd.length ? `${bd[3]}.${bd[2]}.${bd[1]}` : null,
+    slug: name, short, title, unit, validFrom: bd.length ? `${bd[3]}.${bd[2]}.${bd[1]}` : null,
     version: `Stand ${bd.length ? `${bd[3]}.${bd[2]}.${bd[1]}` : ''}${version ? ` – ${version}` : ''}`,
     hints, source: `https://www.gesetze-im-internet.de/${name}/`, citation: null, items: kept,
   };
