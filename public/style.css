@@ -562,7 +562,7 @@ button.tw.bad:hover:not(:disabled) { transform: none; }
 #duel[hidden] { display: none; }
 
 /* Profilbild ändern */
-.avatar-edit { position: relative; flex: none; padding: 0; border: 0; background: transparent; box-shadow: none; border-radius: 50%; cursor: pointer; }
+.avatar-edit { position: relative; display: block; text-decoration: none; flex: none; padding: 0; border: 0; background: transparent; box-shadow: none; border-radius: 50%; cursor: pointer; }
 .avatar-edit .cam { position: absolute; right: -.1rem; bottom: -.1rem; width: 1.7rem; height: 1.7rem; display: grid; place-items: center; border-radius: 50%; background: var(--card); border: 1px solid var(--border); box-shadow: var(--shadow); font-size: .95rem; }
 .avatar-preview { display: grid; place-items: center; margin: .5rem 0 1rem; }
 .avatar-preview canvas { width: 9rem; height: 9rem; border-radius: 50%; background: var(--bg); box-shadow: 0 0 0 4px rgba(124, 77, 255, .25); }

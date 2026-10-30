@@ -26,7 +26,7 @@
     <a class="features-link" id="gesetze-link" href="/gesetze" hidden><span>⚖️ §-Sammlung <span class="tag" style="margin-left:.4rem">Experiment</span></span><span aria-hidden="true">→</span></a>
 
     <div class="card profile-card">
-      <button type="button" class="avatar-edit" id="avatar-open" aria-label="Profilbild ändern"><span id="profile-avatar"></span><span class="cam" aria-hidden="true">📷</span></button>
+      <a class="avatar-edit" href="/settings" aria-label="Profilbild ändern"><span id="profile-avatar"></span><span class="cam" aria-hidden="true">📷</span></a>
       <div>
         <div class="muted">Angemeldet als</div>
         <h1 id="name" style="margin:0">…</h1>
@@ -37,20 +37,15 @@
       </div>
     </div>
 
+    <a class="card friend-link" href="/settings">
+      <span>⚙️ Einstellungen</span>
+      <span class="muted">Name, Bild & mehr →</span>
+    </a>
+
     <a class="card friend-link" href="/friends" id="friend-link">
       <span>👫 Freunde &amp; ID</span>
       <span class="muted" id="friend-hint">Freunde finden und hinzufügen →</span>
     </a>
-
-    <div class="card">
-      <h2 style="margin-bottom:.4rem">🎬 Animationen</h2>
-      <select id="motion" aria-label="Animationen">
-        <option value="on">An (Standard)</option>
-        <option value="auto">Wie mein Gerät</option>
-        <option value="off">Aus</option>
-      </select>
-      <p class="muted" id="motion-hint" style="margin:.5rem 0 0"></p>
-    </div>
 
     <div class="card">
       <h2>Meine Statistik</h2>
@@ -87,25 +82,6 @@
       <button type="button" class="more-btn" id="more" hidden>Alle anzeigen</button>
     </div>
   </main>
-  <div class="changelog-backdrop" id="avatar-dialog" hidden>
-    <div class="changelog card" role="dialog" aria-modal="true" aria-labelledby="avatar-title">
-      <button type="button" class="changelog-x" id="avatar-close" aria-label="Schließen">✕</button>
-      <h2 id="avatar-title">Profilbild</h2>
-      <div class="avatar-preview"><canvas id="avatar-canvas" width="256" height="256"></canvas></div>
-      <input type="file" id="avatar-cam" accept="image/*" capture="user" hidden>
-      <input type="file" id="avatar-pick" accept="image/*" hidden>
-      <div class="row">
-        <button type="button" id="avatar-shoot">📷 Foto aufnehmen</button>
-        <button type="button" id="avatar-gallery">🖼️ Aus Galerie</button>
-      </div>
-      <p class="muted" id="avatar-hint" style="margin:.7rem 0 0">Das Bild wird quadratisch aus der Mitte zugeschnitten und ist für alle angemeldeten Spieler sichtbar.</p>
-      <p class="error" id="avatar-error"></p>
-      <div class="row" style="margin-top:.5rem">
-        <button type="button" class="primary" id="avatar-save" disabled>Speichern</button>
-        <button type="button" class="danger" id="avatar-remove">Bild entfernen</button>
-      </div>
-    </div>
-  </div>
   <script src="/js/changelog.js"></script>
   <script src="/js/common.js"></script>
   <script>
@@ -156,75 +132,6 @@
     }
 
     $('#more').onclick = () => { showAll = true; loadResults(); };
-
-    // --- Animationen: Gerät folgen, immer an oder aus ---
-    (() => {
-      const sel = $('#motion');
-      const systemReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-      let saved = 'on';
-      try { saved = localStorage.getItem('motion') || 'on'; } catch {}
-      sel.value = saved;
-      const hint = () => {
-        $('#motion-hint').textContent = saved === 'auto' && systemReduced
-          ? 'Dein Gerät hat Animationen abgeschaltet (Windows: Einstellungen → Barrierefreiheit → Visuelle Effekte → „Animationseffekte“), deshalb bleibt hier alles ruhig. Wähle „An“, um sie trotzdem zu sehen.'
-          : saved === 'off' ? 'Die Seite kommt ohne Bewegung aus.'
-          : saved === 'auto' ? 'Die Seite folgt der Einstellung deines Geräts.' : 'Bewegungen wie das Schweben der Namen, Konfetti und der animierte Zwischenstand sind aktiv, auch wenn dein Gerät sie sonst abschaltet.';
-      };
-      hint();
-      sel.onchange = () => {
-        saved = sel.value;
-        try { localStorage.setItem('motion', saved); } catch {}
-        location.reload();   // Skripte lesen die Einstellung beim Laden
-      };
-    })();
-
-    // --- Profilbild ändern ---
-    let pendingBlob = null;
-    const canvas = $('#avatar-canvas');
-    const ctx2d = canvas.getContext('2d');
-    function drawInitial() {
-      pendingBlob = null;
-      ctx2d.clearRect(0, 0, 256, 256);
-      const g = ctx2d.createLinearGradient(0, 0, 256, 256);
-      g.addColorStop(0, '#4f6cf5'); g.addColorStop(1, '#7c4dff');
-      ctx2d.fillStyle = g; ctx2d.fillRect(0, 0, 256, 256);
-      ctx2d.fillStyle = '#fff'; ctx2d.font = '800 128px system-ui, sans-serif'; ctx2d.textAlign = 'center'; ctx2d.textBaseline = 'middle';
-      ctx2d.fillText(String(window.__me.username).charAt(0).toUpperCase(), 128, 138);
-      $('#avatar-save').disabled = true;
-    }
-    function showPicked(file) {
-      if (!file) return;
-      $('#avatar-error').textContent = '';
-      const img = new Image();
-      img.onload = () => {
-        // Quadratischer Ausschnitt aus der Mitte, auf 256 × 256 verkleinert
-        const side = Math.min(img.width, img.height);
-        ctx2d.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 256, 256);
-        URL.revokeObjectURL(img.src);
-        canvas.toBlob((blob) => { pendingBlob = blob; $('#avatar-save').disabled = !blob; }, 'image/jpeg', 0.85);
-      };
-      img.onerror = () => { $('#avatar-error').textContent = 'Das Bild konnte nicht gelesen werden.'; };
-      img.src = URL.createObjectURL(file);
-    }
-    async function sendAvatar(method, body) {
-      const res = await fetch('/api/me/avatar', { method, headers: body ? { 'Content-Type': 'image/jpeg' } : {}, body });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Speichern fehlgeschlagen');
-      return res.json();
-    }
-    $('#avatar-open').onclick = () => { $('#avatar-error').textContent = ''; $('#avatar-dialog').hidden = false; drawInitial(); const my = new Image(); my.onload = () => { if (!pendingBlob) { ctx2d.drawImage(my, 0, 0, 256, 256); } }; my.src = `/api/avatar/${encodeURIComponent(window.__me.username)}?v=${window.__me.avatarVer || 0}`; };
-    $('#avatar-close').onclick = () => { $('#avatar-dialog').hidden = true; };
-    $('#avatar-shoot').onclick = () => { $('#avatar-cam').value = ''; $('#avatar-cam').click(); };
-    $('#avatar-gallery').onclick = () => { $('#avatar-pick').value = ''; $('#avatar-pick').click(); };
-    $('#avatar-cam').onchange = (e) => showPicked(e.target.files[0]);
-    $('#avatar-pick').onchange = (e) => showPicked(e.target.files[0]);
-    $('#avatar-save').onclick = async () => {
-      if (!pendingBlob) return;
-      try { await sendAvatar('POST', pendingBlob); location.reload(); } catch (err) { $('#avatar-error').textContent = err.message; }
-    };
-    $('#avatar-remove').onclick = async () => {
-      if (!confirm('Profilbild entfernen? Dann siehst du wieder deinen Anfangsbuchstaben.')) return;
-      try { await sendAvatar('DELETE'); location.reload(); } catch (err) { $('#avatar-error').textContent = err.message; }
-    };
 
     const MODE_NAMES = { cards: '🃏 Karteikarten', cloze: '✏️ Lückentext', free: '🧠 Aus dem Kopf', type: '⌨️ Tippen' };
     async function loadLearn() {

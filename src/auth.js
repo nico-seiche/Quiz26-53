@@ -53,15 +53,16 @@ function setSessionCookie(req, res, { token, expiresAt }) {
   });
 }
 
+// Buchstaben aller Sprachen (auch Umlaute, ß, é …), Zahlen und _ . -
+const USERNAME_RE = /^[\p{L}\p{N}_.-]{3,20}$/u;
+const USERNAME_ERROR = 'Nutzername: 3–20 Zeichen (Buchstaben inkl. Umlaute, Zahlen, _ . -)';
+
 const router = express.Router();
 
 router.post('/register', async (req, res) => {
   const username = String(req.body.username || '').trim().normalize('NFC');
   const password = String(req.body.password || '');
-  // Buchstaben aller Sprachen (auch Umlaute, ß, é …), Zahlen und _ . -
-  if (!/^[\p{L}\p{N}_.-]{3,20}$/u.test(username)) {
-    return res.status(400).json({ error: 'Nutzername: 3–20 Zeichen (Buchstaben inkl. Umlaute, Zahlen, _ . -)' });
-  }
+  if (!USERNAME_RE.test(username)) return res.status(400).json({ error: USERNAME_ERROR });
   if (password.length < 6) {
     return res.status(400).json({ error: 'Passwort muss mindestens 6 Zeichen haben' });
   }
@@ -85,6 +86,21 @@ router.post('/register', async (req, res) => {
   if (!user) return res.status(503).json({ error: 'Gerade keine freie ID – bitte noch einmal versuchen' });
   setSessionCookie(req, res, await createSession(user.id));
   res.json({ id: Number(user.id), username });
+});
+
+// Nutzername ändern (alles andere hängt an der Nutzer-ID, deshalb bleiben Punkte, Freunde und Quiz erhalten)
+router.patch('/username', requireAuth, async (req, res) => {
+  const username = String(req.body.username || '').trim().normalize('NFC');
+  if (!USERNAME_RE.test(username)) return res.status(400).json({ error: USERNAME_ERROR });
+  const taken = await db.one('SELECT 1 FROM quiz.users WHERE lower(username) = lower($1) AND id <> $2', [username, req.user.id]);
+  if (taken) return res.status(409).json({ error: 'Nutzername ist schon vergeben' });
+  try {
+    await db.query('UPDATE quiz.users SET username = $1 WHERE id = $2', [username, req.user.id]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Nutzername ist schon vergeben' });
+    throw err;
+  }
+  res.json({ username });
 });
 
 router.post('/login', async (req, res) => {

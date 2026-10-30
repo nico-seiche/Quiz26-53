@@ -212,3 +212,7 @@ Aktuell einfache Wertung: richtige Antwort = 500–1000 Punkte, je schneller des
 ## Rangliste zurücksetzen
 
 Die Bestenliste (und der Platz im Profil) zählt nur Spiele ab dem Stichtag `leaderboard_since` in `quiz.app_settings` (Migration `022_leaderboard_reset.sql`). Gespeicherte Spielergebnisse, Level, Profil-Statistik und Erfolge bleiben unberührt. Neuer Reset: `UPDATE quiz.app_settings SET value = now()::text WHERE key = 'leaderboard_since';`
+
+## Einstellungen
+
+`/settings` (Link im Profil): Profilbild, Nutzername (`PATCH /api/auth/username`, gleiche Regeln wie bei der Registrierung, Punkte/Freunde/Quiz hängen an der Nutzer-ID und bleiben erhalten), Animationen, Freunde-ID. Neue Einstellungen kommen als weitere Karten dazu. Die §-Sammlung ist über `quiz.app_settings` (`gesetze_user_ids`, kommagetrennte Nutzer-IDs) freigeschaltet, damit eine Namensänderung sie nicht sperrt.
