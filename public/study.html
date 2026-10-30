@@ -85,7 +85,7 @@
 
     async function load() {
       const { mine, shared } = await api('/api/study');
-      allSets = [...mine, ...shared];
+      allSets = mine;   // Battle nur mit eigenen Lernsets (auch gemeinsam bearbeitete), nicht mit fremden geteilten
       $('#mine').innerHTML = mine.length ? mine.map(rowHtml).join('')
         : `<div class="card muted"><strong>Noch kein Lernset.</strong><br>Lege Begriffe mit ihren Definitionen an
            und lerne sie als Karteikarten, Lückentext oder aus dem Kopf. Du kannst Definitionen aus deinem Skript einfach einfügen.</div>`;
@@ -118,7 +118,7 @@
       const sets = battleSets();
       $('#duel-set').innerHTML = sets.length
         ? sets.map((x) => `<option value="${x.id}">${escapeHtml(x.title)} (${nf(x.card_count)} Karten)</option>`).join('')
-        : '<option value="">Kein Lernset mit mindestens 3 Karten</option>';
+        : '<option value="">Du hast noch kein eigenes Lernset mit mindestens 3 Karten</option>';
       if (!duelFriends) {
         $('#duel-friend-box').innerHTML = '<span class="muted">Lade Freunde …</span>';
         try { duelFriends = (await api('/api/friends')).friends; } catch (err) { $('#duel-friend-box').innerHTML = ''; $('#duel-error').textContent = err.message; return; }
