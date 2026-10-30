@@ -434,7 +434,11 @@ select {
 .changelog ul { list-style: none; margin: 0 0 1.1rem; padding: 0; display: grid; gap: .8rem; }
 .changelog li { display: flex; gap: .7rem; align-items: flex-start; }
 .changelog-icon { font-size: 1.5rem; line-height: 1.3; }
-.changelog-x { position: absolute; top: .6rem; right: .6rem; padding: .3rem .6rem; }
+.changelog-x { position: absolute; top: .7rem; right: .7rem; width: 2.5rem; height: 2.5rem; padding: 0; margin: 0; border-radius: 12px; font-size: 0; line-height: 0; }
+/* Das Kreuz wird aus zwei Strichen gezeichnet, damit es exakt in der Mitte des Kastens sitzt (Schriftzeichen sitzen je Gerät versetzt) */
+.changelog-x::before, .changelog-x::after { content: ''; position: absolute; left: 50%; top: 50%; width: 1.05rem; height: 2.5px; border-radius: 2px; background: currentColor; }
+.changelog-x::before { transform: translate(-50%, -50%) rotate(45deg); }
+.changelog-x::after { transform: translate(-50%, -50%) rotate(-45deg); }
 .changelog-ok { width: 100%; }
 @keyframes changelog-in { from { opacity: 0; transform: translateY(12px) scale(.97); } }
 .reduce-motion .changelog { animation: none; }
