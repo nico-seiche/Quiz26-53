@@ -34,13 +34,23 @@
     <div class="section-head" style="margin-top:2rem"><h2>Von anderen geteilt</h2></div>
     <div class="recent-list" id="shared"></div>
   </main>
+  <button type="button" class="fab" id="fab-battle" aria-label="Battle starten" title="Battle starten"><span aria-hidden="true">⚔️</span><span class="fab-label">Battle</span></button>
   <div class="changelog-backdrop" id="duel" hidden>
     <div class="changelog card" role="dialog" aria-modal="true" aria-labelledby="duel-title">
       <button type="button" class="changelog-x" id="duel-close" aria-label="Schließen">✕</button>
-      <h2 id="duel-title">⚔️ Freund herausfordern</h2>
-      <p class="muted" id="duel-info"></p>
-      <div id="duel-list" class="friend-list"></div>
-      <p class="error" id="duel-error"></p>
+      <h2 id="duel-title">⚔️ Battle starten</h2>
+      <form id="duel-form">
+        <label for="duel-friend">Gegen wen?</label>
+        <div id="duel-friend-box"></div>
+        <label for="duel-set">Welches Lernset?</label>
+        <select id="duel-set"></select>
+        <label>Spielmodus</label>
+        <div class="mode-pick" id="duel-mode" role="radiogroup" aria-label="Spielmodus">
+          <button type="button" role="radio" aria-checked="true" data-mode="cloze"><strong>✏️ Lückentext</strong><span class="muted">Ihr füllt gleichzeitig dieselben Lücken aus – schneller und genauer gewinnt.</span></button>
+        </div>
+        <p class="error" id="duel-error"></p>
+        <button class="primary" type="submit" id="duel-go" style="width:100%">Herausfordern</button>
+      </form>
     </div>
   </div>
   <script src="/js/changelog.js"></script>
@@ -65,7 +75,6 @@
           </div>
           <div class="recent-meta">
             <a class="btn primary" href="/learn?id=${s.id}">Lernen</a>
-            ${s.card_count >= 3 ? `<button type="button" data-battle="${s.id}" data-title="${escapeHtml(s.title)}" title="Einen Freund zum Lückentext-Battle herausfordern">⚔️ Battle</button>` : ''}
             ${s.mine
               ? `<a class="btn" href="/study-edit?id=${s.id}">Bearbeiten</a>
                  ${s.isOwner ? `<button class="danger" type="button" data-delete="${s.id}">Löschen</button>` : ''}`
@@ -76,6 +85,7 @@
 
     async function load() {
       const { mine, shared } = await api('/api/study');
+      allSets = [...mine, ...shared];
       $('#mine').innerHTML = mine.length ? mine.map(rowHtml).join('')
         : `<div class="card muted"><strong>Noch kein Lernset.</strong><br>Lege Begriffe mit ihren Definitionen an
            und lerne sie als Karteikarten, Lückentext oder aus dem Kopf. Du kannst Definitionen aus deinem Skript einfach einfügen.</div>`;
@@ -96,32 +106,43 @@
       $('#battles').innerHTML = parts.length ? `<div class="card"><h2 style="margin-bottom:.4rem">⚔️ Battle</h2>${parts.join('')}</div>` : '';
     }
 
-    let duelSet = null;
-    async function openDuel(setId, title) {
-      duelSet = setId;
+    // --- Battle starten: Spieler, Lernset und Spielmodus im Menü wählen ---
+    let allSets = [];
+    let duelFriends = null;
+    const battleSets = () => allSets.filter((x) => x.card_count >= 3);
+    async function openDuel() {
       $('#duel-error').textContent = '';
-      $('#duel-info').textContent = `Lückentext-Battle mit „${title}“ – du und dein Freund füllt gleichzeitig dieselben Lücken aus.`;
-      $('#duel-list').innerHTML = '<span class="muted">Lade Freunde …</span>';
       $('#duel').hidden = false;
-      const { friends } = await api('/api/friends');
-      $('#duel-list').innerHTML = friends.length ? friends.map((f) => `
-        <div class="friend-row">${avatarHtml(f.username, '2.2rem')}<div class="friend-name"><strong>${escapeHtml(f.username)}</strong> <span class="muted">${escapeHtml(f.code)}</span></div>
-        <button type="button" class="primary" data-challenge="${escapeHtml(f.username)}">Herausfordern</button></div>`).join('')
-        : '<p class="muted">Du hast noch keine Freunde. <a href="/friends">Freunde hinzufügen →</a></p>';
+      const sets = battleSets();
+      $('#duel-set').innerHTML = sets.length
+        ? sets.map((x) => `<option value="${x.id}">${escapeHtml(x.title)} (${nf(x.card_count)} Karten)</option>`).join('')
+        : '<option value="">Kein Lernset mit mindestens 3 Karten</option>';
+      if (!duelFriends) {
+        $('#duel-friend-box').innerHTML = '<span class="muted">Lade Freunde …</span>';
+        try { duelFriends = (await api('/api/friends')).friends; } catch (err) { $('#duel-friend-box').innerHTML = ''; $('#duel-error').textContent = err.message; return; }
+      }
+      $('#duel-friend-box').innerHTML = duelFriends.length
+        ? `<select id="duel-friend">${duelFriends.map((f) => `<option value="${escapeHtml(f.username)}">${escapeHtml(f.username)} ${escapeHtml(f.code)}</option>`).join('')}</select>`
+        : '<p class="muted" style="margin:0">Du hast noch keine Freunde. <a href="/friends">Freunde hinzufügen →</a></p>';
+      $('#duel-go').disabled = !duelFriends.length || !sets.length;
     }
+    $('#fab-battle').onclick = openDuel;
     $('#duel-close').onclick = () => { $('#duel').hidden = true; };
-    $('#duel').addEventListener('click', async (e) => {
-      if (e.target === $('#duel')) $('#duel').hidden = true;
-      const friend = e.target.dataset.challenge;
-      if (!friend) return;
+    $('#duel').addEventListener('click', (e) => { if (e.target === $('#duel')) $('#duel').hidden = true; });
+    $('#duel-form').onsubmit = async (e) => {
+      e.preventDefault();
+      $('#duel-error').textContent = '';
+      const friend = $('#duel-friend') && $('#duel-friend').value;
+      const setId = $('#duel-set').value;
+      if (!friend || !setId) return;
+      $('#duel-go').disabled = true;
       try {
-        const { id } = await api('/api/battles', { method: 'POST', body: { setId: duelSet, friend } });
+        const { id } = await api('/api/battles', { method: 'POST', body: { setId, friend, mode: 'cloze' } });
         location.href = `/battle?id=${id}`;
-      } catch (err) { $('#duel-error').textContent = err.message; }
-    });
+      } catch (err) { $('#duel-error').textContent = err.message; $('#duel-go').disabled = false; }
+    };
 
     document.querySelector('main').onclick = async (e) => {
-      if (e.target.dataset.battle) return openDuel(e.target.dataset.battle, e.target.dataset.title);
       const del = e.target.dataset.delete;
       const copy = e.target.dataset.copy;
       try {
