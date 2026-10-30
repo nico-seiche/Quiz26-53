@@ -264,8 +264,7 @@ body.has-nav main { padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 0p
   position: fixed; left: 50%; transform: translateX(-50%); z-index: 40;
   bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
   width: min(94vw, 580px); display: flex; gap: .25rem; padding: .4rem;
-  background: var(--card); background: color-mix(in srgb, var(--card) 92%, transparent);
-  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  background: var(--card);
   border: 1px solid var(--border); border-radius: 999px; box-shadow: 0 12px 34px rgba(60, 50, 160, .22);
 }
 .bottom-nav a {
@@ -429,7 +428,7 @@ select {
 @media (max-width: 640px) { .hide-small { display: none; } }
 
 /* Neuigkeiten-Fenster */
-.changelog-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 1rem; background: rgba(14, 16, 36, .55); backdrop-filter: blur(3px); }
+.changelog-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 1rem; background: rgba(14, 16, 36, .6); }
 .changelog { position: relative; width: min(26rem, 100%); max-height: 90vh; overflow-y: auto; margin: 0; animation: changelog-in .25s ease-out; }
 .changelog h2 { margin: .4rem 0 .8rem; }
 .changelog ul { list-style: none; margin: 0 0 1.1rem; padding: 0; display: grid; gap: .8rem; }
