@@ -253,6 +253,16 @@ function addPasswordToggles(root = document) {
     if (input.form) input.form.addEventListener('submit', () => set(false));
     addEventListener('pagehide', () => set(false));
     wrap.appendChild(btn);
+    // Feststelltaste (nur am PC): Hinweis unter dem Feld
+    const hint = document.createElement('div');
+    hint.className = 'caps-hint';
+    hint.hidden = true;
+    hint.textContent = '⇪ Feststelltaste ist aktiv';
+    wrap.after(hint);
+    const caps = (e) => { if (e.getModifierState) hint.hidden = !e.getModifierState('CapsLock'); };
+    input.addEventListener('keydown', caps);
+    input.addEventListener('keyup', caps);
+    input.addEventListener('blur', () => { hint.hidden = true; });
   });
 }
 addPasswordToggles();

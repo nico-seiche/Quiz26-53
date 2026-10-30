@@ -246,3 +246,7 @@ Zoomen per Pinch und Doppeltippen ist abgeschaltet (`maximum-scale=1, user-scala
 ## Passwort anzeigen
 
 Alle Passwortfelder (Anmelden, Registrieren, Passwort ändern) haben ein Auge zum Anzeigen/Verbergen (`addPasswordToggles` in `public/js/common.js`); beim Absenden und Verlassen der Seite wird das Passwort wieder verdeckt.
+
+## Anmeldung: Fehlersuche
+
+Beim Anmelden werden Leerzeichen am Rand und unterschiedlich zusammengesetzte Umlaute (NFC/NFD) im Passwort toleriert (`passwordVariants` in `src/auth.js`). Fehlermeldungen unterscheiden „Nutzername unbekannt“ und „Passwort falsch (Feststelltaste?)“. Nach dem Anmelden prüft die Seite, ob der Browser das Cookie behalten hat, und erklärt es sonst. Passwortfelder zeigen einen Hinweis, wenn die Feststelltaste an ist. Fehlgeschlagene Anmeldungen schreiben (ohne Passwort) Merkmale ins Log (`login fehlgeschlagen: …`).

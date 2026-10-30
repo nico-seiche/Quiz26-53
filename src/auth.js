@@ -116,12 +116,28 @@ router.patch('/password', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+// Mögliche Schreibweisen desselben Passworts: von Tastaturen/Passwort-Managern angehängte Leerzeichen und
+// unterschiedlich zusammengesetzte Umlaute (NFC/NFD) sollen nicht zu „falsch“ führen
+function passwordVariants(p) {
+  const out = [p];
+  for (const v of [p.trim(), p.normalize('NFC'), p.normalize('NFD'), p.trim().normalize('NFC'), `${p.trim()} `]) if (!out.includes(v)) out.push(v);
+  return out;
+}
+
 router.post('/login', async (req, res) => {
   const username = String(req.body.username || '').trim().normalize('NFC');
   const password = String(req.body.password || '');
   const user = await db.one('SELECT * FROM quiz.users WHERE lower(username) = lower($1)', [username]);
-  if (!user || !(await bcrypt.compare(password, user.password_hash))) {
-    return res.status(401).json({ error: 'Nutzername oder Passwort falsch' });
+  let ok = false;
+  if (user) {
+    for (const candidate of passwordVariants(password)) {
+      if (await bcrypt.compare(candidate, user.password_hash)) { ok = true; break; }
+    }
+  }
+  if (!ok) {
+    // Ohne Passwort im Log: nur Merkmale, die bei der Fehlersuche helfen
+    console.warn(`login fehlgeschlagen: nutzer=${user ? 'gefunden' : 'unbekannt'} pwLänge=${password.length} leerzeichenAmRand=${password !== password.trim()} nichtAscii=${/[^\x20-\x7e]/.test(password)}`);
+    return res.status(401).json({ error: user ? 'Passwort falsch – achte auf die Groß-/Kleinschreibung (Feststelltaste)' : 'Diesen Nutzernamen gibt es nicht' });
   }
   setSessionCookie(req, res, await createSession(user.id));
   res.json({ id: Number(user.id), username: user.username });
