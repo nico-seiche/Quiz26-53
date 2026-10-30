@@ -66,6 +66,8 @@ header.top {
   position: sticky; top: 0; z-index: 30;
 }
 header.top a.brand { font-weight: 700; color: var(--text); text-decoration: none; }
+header.top a.brand-logo { display: inline-flex; align-items: center; }
+header.top a.brand-logo img { display: block; width: 2.5rem; height: 2.5rem; margin: -.25rem 0; }
 main { max-width: 860px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
 .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.25rem; margin-bottom: 1rem; }
 .narrow { max-width: 420px; margin: 3rem auto; }
