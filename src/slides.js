@@ -20,7 +20,7 @@ const FITS = ['contain', 'cover'];
 const TRANSITIONS = ['none', 'fade', 'slide'];
 
 const router = express.Router();
-router.use(experimentalOnly);
+router.use(experimentalOnly('slides'));
 
 const isId = (v) => /^\d{1,15}$/.test(String(v));
 const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');

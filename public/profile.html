@@ -174,7 +174,8 @@
   </script>
   <script>
     // Experiment: nur für freigeschaltete Nutzer (die API antwortet sonst mit 403)
-    api('/api/gesetze').then(() => { $('#gesetze-link').hidden = false; $('#slides-link').hidden = false; }).catch(() => {});
+    api('/api/gesetze').then(() => { $('#gesetze-link').hidden = false; }).catch(() => {});
+    api('/api/slides').then(() => { $('#slides-link').hidden = false; }).catch(() => {});
   </script>
 </body>
 </html>

@@ -18,7 +18,7 @@ const LOADERS = {
 };
 
 const router = express.Router();
-router.use(experimentalOnly);
+router.use(experimentalOnly('gesetze'));
 
 router.get('/', (req, res) => {
   res.json(INDEX);

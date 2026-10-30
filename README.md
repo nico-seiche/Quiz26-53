@@ -230,4 +230,4 @@ Präsentationen wie in PowerPoint: Link im Profil → `/slides` (Liste), `/slide
 - **Folie:** 1280 × 720 Einheiten, Elemente `text`, `shape` (Rechteck, Kreis, Dreieck) und `image`. Textfarbe „auto“ passt sich dem Hintergrund an. Gezeichnet wird alles von `public/js/slides-render.js` (Editor, Vorschaubilder, Präsentation, PDF).
 - **Editor:** Folienleiste mit Ziehen zum Umsortieren, Layouts, Ziehen/Skalieren mit Einrasten (Mitte, Ränder, andere Elemente; Alt = ohne), Doppeltippen zum Texteingeben, Eigenschaften rechts, Rückgängig/Wiederholen, Strg+C/V/D, Pfeiltasten, Bilder per Knopf, Einfügen oder Drag & Drop, automatisches Speichern.
 - **Präsentation:** Pfeiltasten/Leertaste/Wischen, Übergänge (Überblenden, Schieben), `N` Notizen, `F` Vollbild, `B` schwarz, `Esc` beenden.
-- **Freischaltung:** `quiz.app_settings` → `experimental_user_ids` (kommagetrennte Nutzer-IDs; ersatzweise `gesetze_user_ids`, sonst der Name „Nico“).
+- **Freischaltung:** `quiz.app_settings` → `slides_user_ids` (kommagetrennte Nutzer-IDs; ersatzweise `experimental_user_ids`, sonst der Name „Nico“). Die §-Sammlung hat ihren eigenen Eintrag `gesetze_user_ids`.
