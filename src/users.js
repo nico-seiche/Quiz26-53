@@ -1,7 +1,7 @@
 const express = require('express');
 const db = require('./db');
 const { requireAuth } = require('./auth');
-const { MIN_PLAYERS_FOR_SCORING, levelInfo } = require('./config');
+const { MIN_PLAYERS_FOR_SCORING, SINCE_RESET, levelInfo } = require('./config');
 const { dayStreak } = require('./results');
 const { ACHIEVEMENTS, collectorTitle } = require('./achievements');
 
@@ -28,7 +28,7 @@ router.get('/:username', async (req, res) => {
     db.one(`
       WITH ranked AS (
         SELECT u.id, RANK() OVER (ORDER BY COALESCE(SUM(r.score), 0) DESC)::int AS rank
-        FROM quiz.users u LEFT JOIN quiz.game_results r ON r.user_id = u.id AND r.player_count >= $1 GROUP BY u.id
+        FROM quiz.users u LEFT JOIN quiz.game_results r ON r.user_id = u.id AND r.player_count >= $1 AND ${SINCE_RESET} GROUP BY u.id
       ) SELECT rank FROM ranked WHERE id = $2`, [MIN_PLAYERS_FOR_SCORING, id]),
     db.one('SELECT COUNT(*)::int AS n FROM quiz.users'),
     db.query(`SELECT DISTINCT to_char(played_at AT TIME ZONE 'Europe/Berlin', 'YYYY-MM-DD') AS day

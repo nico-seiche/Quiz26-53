@@ -1,7 +1,7 @@
 const express = require('express');
 const db = require('./db');
 const { requireAuth } = require('./auth');
-const { MIN_PLAYERS_FOR_SCORING } = require('./config');
+const { MIN_PLAYERS_FOR_SCORING, SINCE_RESET } = require('./config');
 
 const router = express.Router();
 const LIMIT = 200;
@@ -26,7 +26,7 @@ router.get('/', requireAuth, async (req, res) => {
              RANK() OVER (ORDER BY COALESCE(SUM(r.score), 0) DESC)::int AS rank
       FROM quiz.users u
       LEFT JOIN quiz.game_results r
-        ON r.user_id = u.id AND r.player_count >= $1 AND ($2::int IS NULL OR r.subject_id = $2)
+        ON r.user_id = u.id AND r.player_count >= $1 AND ($2::int IS NULL OR r.subject_id = $2) AND ${SINCE_RESET}
       GROUP BY u.id
     )`;
   const params = [MIN_PLAYERS_FOR_SCORING, subjectId];
@@ -39,8 +39,8 @@ router.get('/', requireAuth, async (req, res) => {
 
   // Platz vor meinem letzten gewerteten Spiel: so erkennt man Aufsteiger
   const last = await db.one(`
-    SELECT MAX(played_at) AS at FROM quiz.game_results
-    WHERE user_id = $1 AND player_count >= $2 AND ($3::int IS NULL OR subject_id = $3)
+    SELECT MAX(r.played_at) AS at FROM quiz.game_results r
+    WHERE r.user_id = $1 AND r.player_count >= $2 AND ($3::int IS NULL OR r.subject_id = $3) AND ${SINCE_RESET}
   `, [req.user.id, MIN_PLAYERS_FOR_SCORING, subjectId]);
   me.prevRank = null;
   if (last.at) {
@@ -49,7 +49,7 @@ router.get('/', requireAuth, async (req, res) => {
         SELECT u.id, RANK() OVER (ORDER BY COALESCE(SUM(r.score), 0) DESC)::int AS rank
         FROM quiz.users u
         LEFT JOIN quiz.game_results r
-          ON r.user_id = u.id AND r.player_count >= $1 AND ($2::int IS NULL OR r.subject_id = $2) AND r.played_at < $4
+          ON r.user_id = u.id AND r.player_count >= $1 AND ($2::int IS NULL OR r.subject_id = $2) AND r.played_at < $4 AND ${SINCE_RESET}
         GROUP BY u.id
       ) SELECT rank FROM ranked WHERE id = $3
     `, [MIN_PLAYERS_FOR_SCORING, subjectId, req.user.id, last.at]);

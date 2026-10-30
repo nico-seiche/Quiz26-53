@@ -22,7 +22,10 @@ function streakBonus(streak) {
   return Math.min(Math.max(streak - 1, 0) * STREAK_BONUS_PER_STEP, STREAK_BONUS_MAX);
 }
 
+// Rangliste: zählt nur Spiele ab dem Stichtag aus quiz.app_settings (Reset ohne Löschen, siehe Migration 022)
+const SINCE_RESET = `r.played_at >= COALESCE((SELECT value::timestamptz FROM quiz.app_settings WHERE key = 'leaderboard_since'), '-infinity'::timestamptz)`;
+
 module.exports = {
-  MIN_PLAYERS_FOR_SCORING, STREAK_BONUS_PER_STEP, STREAK_BONUS_MAX, TEAM_COUNT, MIN_PLAYERS_PER_TEAM, streakBonus,
+  SINCE_RESET, MIN_PLAYERS_FOR_SCORING, STREAK_BONUS_PER_STEP, STREAK_BONUS_MAX, TEAM_COUNT, MIN_PLAYERS_PER_TEAM, streakBonus,
   POINTS_PER_LEVEL, levelInfo,
 };

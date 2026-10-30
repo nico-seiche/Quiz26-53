@@ -208,3 +208,7 @@ Aktuell einfache Wertung: richtige Antwort = 500–1000 Punkte, je schneller des
 - Oberfläche: Inhaltsverzeichnis mit Abschnitten, Suche (§-Nummer, Titel, Volltext), Verweise wie „§ 8“ im Text sind anklickbar (Verweise auf andere Gesetze nicht), Blättern mit ← →, Deep-Links `/gesetze#polg-nrw/37a`.
 - Bundesgesetze kommen aus der amtlichen XML-Fassung von gesetze-im-internet.de: `node scripts/import-gii.js stpo StPO`. Unter Aufzählungen wie „aus dem Strafgesetzbuch:“ werden §-Angaben nicht verlinkt, weil sie sich auf ein anderes Gesetz beziehen.
 - Aktuell enthalten: PolG NRW (gültig ab 13.12.2025) und StPO (Stand 27.10.2026).
+
+## Rangliste zurücksetzen
+
+Die Bestenliste (und der Platz im Profil) zählt nur Spiele ab dem Stichtag `leaderboard_since` in `quiz.app_settings` (Migration `022_leaderboard_reset.sql`). Gespeicherte Spielergebnisse, Level, Profil-Statistik und Erfolge bleiben unberührt. Neuer Reset: `UPDATE quiz.app_settings SET value = now()::text WHERE key = 'leaderboard_since';`
