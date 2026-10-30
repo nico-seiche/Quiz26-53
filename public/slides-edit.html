@@ -17,7 +17,7 @@
   <style>
     html, body { height: 100%; }
     body.ed-body { display: flex; flex-direction: column; overflow: hidden; }
-    .ed-top { display: flex; align-items: center; gap: .6rem; padding: .5rem .8rem; padding-top: calc(.5rem + env(safe-area-inset-top, 0px)); background: var(--card); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .ed-top { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: .6rem; padding: .5rem .8rem; padding-top: calc(.5rem + env(safe-area-inset-top, 0px)); background: var(--card); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
     .ed-top .back { font-weight: 800; color: var(--text); text-decoration: none; white-space: nowrap; }
     .ed-top input.title { flex: 1 1 12rem; min-width: 8rem; font-weight: 800; font-size: 1.05rem; padding: .4rem .6rem; margin: 0; }
     .ed-top button, .ed-top a.btn { padding: .45rem .8rem; font-size: .92rem; margin: 0; }
