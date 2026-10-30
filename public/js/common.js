@@ -176,11 +176,16 @@ function isDark() {
   const t = document.documentElement.dataset.theme;
   return t ? t === 'dark' : themeQuery.matches;
 }
+// Statusleiste/Browserleiste bekommt die Farbe der Kopfleiste, damit dort kein Übergang (Verlauf) zu sehen ist
+function applyThemeColor() {
+  const meta = document.querySelector('meta[name=theme-color]');
+  if (meta) meta.content = isDark() ? '#1b1e38' : '#ffffff';
+}
+applyThemeColor();
 function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
   try { localStorage.setItem('theme', theme); } catch {}
-  const meta = document.querySelector('meta[name=theme-color]');
-  if (meta) meta.content = theme === 'dark' ? '#14172e' : '#5b4de8';
+  applyThemeColor();
   document.querySelectorAll('.theme-switch').forEach(syncSwitch);
 }
 function syncSwitch(btn) {
