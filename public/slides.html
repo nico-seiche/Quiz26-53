@@ -41,6 +41,7 @@
   <script src="/js/changelog.js"></script>
   <script src="/js/common.js"></script>
   <script src="/js/slides-render.js"></script>
+  <script src="/js/slides-pdf.js"></script>
   <script>
     const fmt = (d) => new Date(d).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' });
 
@@ -55,6 +56,7 @@
           <div class="deck-actions">
             <a class="btn primary" href="/slides-present?id=${d.id}">▶ Präsentieren</a>
             <a class="btn" href="/slides-edit?id=${d.id}">Bearbeiten</a>
+            <button type="button" data-pdf="${d.id}">⬇ PDF</button>
             <button type="button" data-dup="${d.id}">Duplizieren</button>
             <button type="button" class="danger" data-del="${d.id}" data-title="${escapeHtml(d.title)}">Löschen</button>
           </div>
@@ -74,6 +76,14 @@
       if (!t) return;
       try {
         if (t.dataset.open) location.href = `/slides-edit?id=${t.dataset.open}`;
+        else if (t.dataset.pdf) {
+          const label = t.textContent;
+          t.disabled = true;
+          try {
+            const deck = await api(`/api/slides/${t.dataset.pdf}`);
+            await SlidesPdf.exportDeck(deck, (i, n) => { t.textContent = i < n ? `Folie ${i + 1}/${n} …` : '✓ Fertig'; });
+          } finally { setTimeout(() => { t.disabled = false; t.textContent = label; }, 1500); }
+        }
         else if (t.dataset.dup) { await api(`/api/slides/${t.dataset.dup}/duplicate`, { method: 'POST' }); load(); }
         else if (t.dataset.del && confirm(`„${t.dataset.title}“ wirklich löschen?`)) { await api(`/api/slides/${t.dataset.del}`, { method: 'DELETE' }); load(); }
       } catch (err) { $('#error').textContent = err.message; }

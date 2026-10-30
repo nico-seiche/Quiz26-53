@@ -121,7 +121,7 @@ const SlideRender = (() => {
       el.appendChild(textBox(e, slide, { padding: '4px 8px' }));
     } else if (e.type === 'shape') {
       el.innerHTML = shapeSvg(e, slide);
-      el.appendChild(textBox(e, slide, { padding: '10px 16px', position: 'absolute', inset: '0', justifyContent: { top: 'flex-start', middle: 'center', bottom: 'flex-end' }[e.valign || 'middle'] }));
+      el.appendChild(textBox(e, slide, { padding: '10px 16px', position: 'absolute', left: '0', top: '0', right: '0', bottom: '0', justifyContent: { top: 'flex-start', middle: 'center', bottom: 'flex-end' }[e.valign || 'middle'] }));
     } else if (e.type === 'table') {
       el.appendChild(tableEl(e, slide));
     } else if (e.type === 'placeholder') {
@@ -176,7 +176,7 @@ const SlideRender = (() => {
     .sl-wrap { position: relative; overflow: hidden; flex: none; }
     .sl { position: absolute; left: 0; top: 0; width: ${W}px; height: ${H}px; overflow: hidden; transform-origin: 0 0; font-family: ${FONTS.sans}; }
     .sl-el { position: absolute; box-sizing: border-box; }
-    .sl-svg { position: absolute; inset: 0; overflow: visible; }
+    .sl-svg { position: absolute; left: 0; top: 0; overflow: visible; }
     .sl-text { box-sizing: border-box; width: 100%; height: 100%; display: flex; flex-direction: column; line-height: 1.25; overflow: hidden; }
     .sl-line { overflow-wrap: anywhere; white-space: pre-wrap; }
     .sl-image img { width: 100%; height: 100%; display: block; }

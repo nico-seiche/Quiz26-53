@@ -91,7 +91,7 @@
     <a class="back" href="/slides">← Folien</a>
     <input class="title" id="title" maxlength="120" aria-label="Titel der Präsentation" placeholder="Titel der Präsentation">
     <span class="muted" id="state" aria-live="polite"></span>
-    <button type="button" id="pdf" title="Als PDF speichern (über den Druckdialog)">PDF</button>
+    <button type="button" id="pdf" title="Präsentation als PDF herunterladen">⬇ PDF</button>
     <button type="button" class="primary" id="present">▶ Präsentieren</button>
   </div>
   <div class="ed">
@@ -120,6 +120,7 @@
   <script src="/js/changelog.js"></script>
   <script src="/js/common.js"></script>
   <script src="/js/slides-render.js"></script>
+  <script src="/js/slides-pdf.js"></script>
   <script>
     const W = SlideRender.W;
     const H = SlideRender.H;
@@ -881,7 +882,15 @@
     $('#redo').onclick = redo;
     $('#title').addEventListener('input', (e) => { deck.title = e.target.value; dirty(); });
     $('#present').onclick = async () => { endEdit(); await flush(); location.href = `/slides-present?id=${id}&n=${cur + 1}`; };
-    $('#pdf').onclick = async () => { endEdit(); await flush(); window.open(`/slides-present?id=${id}&print=1`, '_blank'); };
+    $('#pdf').onclick = async () => {
+      const btn = $('#pdf');
+      endEdit(); await flush();
+      btn.disabled = true;
+      try {
+        await SlidesPdf.exportDeck(deck, (i, n) => { btn.textContent = i < n ? `Folie ${i + 1}/${n} …` : '✓ Fertig'; });
+      } catch (err) { setState(`PDF fehlgeschlagen: ${err.message}`, 'warn'); }
+      setTimeout(() => { btn.disabled = false; btn.textContent = '⬇ PDF'; }, 1500);
+    };
     async function flush() { for (let i = 0; i < 20 && (pending || saving); i++) { if (!saving) await save(); else await new Promise((r) => setTimeout(r, 150)); } }
 
     document.addEventListener('keydown', (ev) => {

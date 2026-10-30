@@ -224,12 +224,13 @@ Beim Kopieren merkt sich die Kopie ihr Original (`study_sets.copied_from`, `sync
 
 ## Folien
 
-Präsentationen wie in PowerPoint: Link im Profil → `/slides` (Liste), `/slides-edit?id=` (Editor), `/slides-present?id=` (Präsentation; `&print=1` öffnet den Druckdialog für den PDF-Export).
+Präsentationen wie in PowerPoint: Link im Profil → `/slides` (Liste), `/slides-edit?id=` (Editor), `/slides-present?id=` (Präsentation; `&print=1` öffnet den Druckdialog als zweite Möglichkeit für ein PDF mit auswählbarem Text).
 
 - **Daten:** `quiz.slide_decks` (ein JSON-Dokument je Präsentation, `rev` gegen unbemerktes Überschreiben) und `quiz.slide_assets` (Bilder als Bytes, werden vor dem Hochladen auf max. 1600 px verkleinert). Die API (`src/slides.js`, `/api/slides`) prüft das Dokument streng (Elementtypen, Farben, Schriftlisten, nur eigene Bild-URLs). Migration `024_slides.sql`.
 - **Folie:** 1280 × 720 Einheiten, Elemente `text`, `shape` (Rechteck, Kreis, Dreieck) und `image`. Textfarbe „auto“ passt sich dem Hintergrund an. Gezeichnet wird alles von `public/js/slides-render.js` (Editor, Vorschaubilder, Präsentation, PDF).
 - **Editor:** Folienleiste mit Ziehen zum Umsortieren, Layouts, Ziehen/Skalieren mit Einrasten (Mitte, Ränder, andere Elemente; Alt = ohne), Doppeltippen zum Texteingeben, Eigenschaften rechts, Rückgängig/Wiederholen, Strg+C/V/D, Pfeiltasten, Bilder per Knopf, Einfügen oder Drag & Drop, automatisches Speichern.
 - **Bausteine:** Der Knopf „▦ Blöcke“ im Editor öffnet fertige Blöcke mit Vorschau: Überschrift 1–3, Textabsatz, Zitat, Aufzählung, nummerierte Liste, Buttons (gefüllt/Umriss), Bildplatzhalter (16:9/quadratisch) und Tabellen. Tabellen (`type: table`) lassen sich zellenweise bearbeiten (Doppeltippen, Tab springt weiter) und haben Zeilen-/Spalten-Knöpfe, Kopfzeile und Streifen. Bildplatzhalter (`type: placeholder`) werden per Knopf, Drag & Drop oder Einfügen durch ein Bild ersetzt und erscheinen nicht in Präsentation und PDF. Buttons können in der Präsentation auf eine Folie springen (`goto`).
+- **PDF-Export:** Der Knopf „⬇ PDF“ (Editor und Liste) lädt direkt eine Datei herunter: `public/js/slides-pdf.js` zeichnet jede Folie mit dem Renderer, macht ein Bild (html2canvas, 1920 × 1080) und setzt die Seiten mit jsPDF zusammen (beide Bibliotheken werden erst beim ersten Export von cdnjs geladen). Der Text im PDF ist dadurch ein Bild und nicht auswählbar.
 - **Präsentation:** Pfeiltasten/Leertaste/Wischen, Übergänge (Überblenden, Schieben), `N` Notizen, `F` Vollbild, `B` schwarz, `Esc` beenden.
 - **Zugriff:** für alle angemeldeten Nutzer; jede Präsentation gehört ihrem Ersteller.
 
