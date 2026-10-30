@@ -4,7 +4,13 @@ const { requireAuth } = require('./auth');
 
 // Experimentell: die §-Sammlung ist vorerst nur für den Nutzer „Nico“ freigeschaltet.
 // Weitere Gesetze: mit scripts/import-recht-nrw.js (Landesrecht NRW) oder scripts/import-gii.js (Bundesrecht) erzeugen und hier eintragen.
-const LAWS = [require('./gesetze/polg-nrw.json'), require('./gesetze/stpo.json')];
+const LAWS = [
+  require('./gesetze/polg-nrw.json'),
+  require('./gesetze/stgb.json'),
+  require('./gesetze/stpo.json'),
+  require('./gesetze/stvo_2013.json'),
+  require('./gesetze/stvzo_2012.json'),
+];
 
 const router = express.Router();
 // Freigeschaltet sind die Nutzer-IDs in quiz.app_settings (gesetze_user_ids, kommagetrennt), damit eine Namensänderung nichts kaputt macht.
