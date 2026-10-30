@@ -242,3 +242,7 @@ Unter „Einem Quiz beitreten“ ist die Schnellauswahl zweigeteilt: links **Ers
 ## Zoom
 
 Zoomen per Pinch und Doppeltippen ist abgeschaltet (`maximum-scale=1, user-scalable=no`, `touch-action: pan-x pan-y`, `gesturestart` abgefangen; auf Touch-Geräten haben Eingabefelder mindestens 16 px, damit iOS nicht hineinzoomt).
+
+## Passwort anzeigen
+
+Alle Passwortfelder (Anmelden, Registrieren, Passwort ändern) haben ein Auge zum Anzeigen/Verbergen (`addPasswordToggles` in `public/js/common.js`); beim Absenden und Verlassen der Seite wird das Passwort wieder verdeckt.

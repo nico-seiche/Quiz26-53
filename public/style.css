@@ -722,3 +722,9 @@ body.lobby-lock .info-bar { margin-bottom: .5rem; }
 
 /* Kein Zoomen: Eingabefelder mindestens 16 px, sonst zoomt iOS beim Antippen von selbst hinein */
 @media (pointer: coarse) { input, select, textarea { font-size: max(16px, 1em); } }
+
+/* Passwortfeld mit Auge */
+.pw-wrap { position: relative; }
+.pw-wrap input { padding-right: 3rem; }
+.pw-toggle { position: absolute; right: .35rem; top: 50%; transform: translateY(-50%); width: 2.3rem; height: 2.3rem; display: grid; place-items: center; padding: 0; margin: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); box-shadow: none; cursor: pointer; }
+.pw-toggle:hover, .pw-toggle[aria-pressed="true"] { color: var(--primary); background: var(--bg); }

@@ -226,3 +226,33 @@ function mountTheme() {
   ['gesturestart', 'gesturechange', 'gestureend'].forEach((t) => document.addEventListener(t, stop, { passive: false }));
   document.addEventListener('touchmove', (e) => { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
 })();
+
+// Passwortfelder bekommen ein Auge zum Ein-/Ausblenden (wird beim Absenden und beim Verlassen der Seite wieder verdeckt)
+function addPasswordToggles(root = document) {
+  const eye = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 12S5.5 4.5 12 4.5 22.5 12 22.5 12 18.5 19.5 12 19.5 1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/></svg>';
+  const eyeOff = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.7 10.7 0 0 1 12 4.5c6.5 0 10.5 7.5 10.5 7.5a17 17 0 0 1-3.2 4M6.4 6.6A17 17 0 0 0 1.5 12S5.5 19.5 12 19.5a10.6 10.6 0 0 0 4.2-.9"/><path d="M9.9 9.9a3.2 3.2 0 0 0 4.2 4.2"/></svg>';
+  root.querySelectorAll('input[type="password"]').forEach((input) => {
+    if (input.closest('.pw-wrap')) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'pw-wrap';
+    input.replaceWith(wrap);
+    wrap.appendChild(input);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'pw-toggle';
+    btn.setAttribute('aria-label', 'Passwort anzeigen');
+    btn.setAttribute('aria-pressed', 'false');
+    btn.innerHTML = eye;
+    const set = (show) => {
+      input.type = show ? 'text' : 'password';
+      btn.setAttribute('aria-pressed', String(show));
+      btn.setAttribute('aria-label', show ? 'Passwort verbergen' : 'Passwort anzeigen');
+      btn.innerHTML = show ? eyeOff : eye;
+    };
+    btn.addEventListener('click', () => { set(input.type === 'password'); input.focus({ preventScroll: true }); });
+    if (input.form) input.form.addEventListener('submit', () => set(false));
+    addEventListener('pagehide', () => set(false));
+    wrap.appendChild(btn);
+  });
+}
+addPasswordToggles();
