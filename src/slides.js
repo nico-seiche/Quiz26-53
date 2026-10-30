@@ -1,8 +1,8 @@
 const express = require('express');
 const db = require('./db');
-const { experimentalOnly } = require('./experimental');
+const { requireAuth } = require('./auth');
 
-// Folien (experimentell, nur für freigeschaltete Nutzer). Eine Präsentation ist ein JSON-Dokument (siehe cleanDeck),
+// Folien. Eine Präsentation ist ein JSON-Dokument (siehe cleanDeck),
 // Bilder liegen als Zeilen in slide_assets und werden über /api/slides/assets/:id ausgeliefert.
 const MAX_SLIDES = 200;
 const MAX_ELEMENTS = 300;
@@ -20,7 +20,7 @@ const FITS = ['contain', 'cover'];
 const TRANSITIONS = ['none', 'fade', 'slide'];
 
 const router = express.Router();
-router.use(experimentalOnly('slides'));
+router.use(requireAuth);
 
 const isId = (v) => /^\d{1,15}$/.test(String(v));
 const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');

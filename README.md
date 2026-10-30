@@ -201,9 +201,9 @@ Aktuell einfache Wertung: richtige Antwort = 500–1000 Punkte, je schneller des
 - **Umfragen:** `quizzes.kind = 'poll'`. Keine richtige Antwort, keine Punkte, keine Rangliste, kein Eintrag in Erfolgen oder Ergebnissen. Nach jeder Frage zeigt der Host ein Balkendiagramm, am Ende alle Diagramme (`public/js/poll.js`). Das Ergebnis wird in `poll_runs` gespeichert und ist für Besitzer und Mitbearbeiter unter `/poll-results?quiz=<id>` abrufbar (`/api/polls`).
 - Migration: `supabase/migrations/021_multi_poll.sql`.
 
-## §-Sammlung (Experiment, nur für den Nutzer „Nico“)
+## Gesetze (§-Sammlung)
 
-- Erreichbar über einen Link im Profil (`/gesetze`). Die API (`/api/gesetze`, `src/gesetze.js`) antwortet allen anderen mit 403; der Link erscheint nur, wenn die API zugänglich ist.
+- Erreichbar über die Startseite und das Profil (`/gesetze`), für alle angemeldeten Nutzer (`/api/gesetze`, `src/gesetze.js`).
 - Gesetzestexte liegen als JSON in `src/gesetze/<slug>.json` (Gliederung, Paragraphen, Absätze, Änderungshistorie) und werden mit `scripts/import-recht-nrw.js` aus der amtlichen Fassung auf recht.nrw.de erzeugt, z. B. `node scripts/import-recht-nrw.js <url> polg-nrw "PolG NRW" "Polizeigesetz des Landes Nordrhein-Westfalen"`. Neues Gesetz = JSON erzeugen und in `LAWS` (`src/gesetze.js`) eintragen.
 - Oberfläche: Übersichtsseite je Gesetz (Zahlenraster, eine Reihe pro Zehnerblock, Paragraphen mit Buchstaben wie 12a stehen nicht im Raster oder Verzeichnis, sondern als „Dazu gehören“-Chips auf der Seite des Paragraphen; die Suche findet sie), Inhaltsverzeichnis mit Abschnitten (standardmäßig ausgeblendet, per Button), Suche (§-Nummer, Titel, Volltext), Verweise wie „§ 8“ im Text sind anklickbar (Verweise auf andere Gesetze nicht), Blättern mit ← →, Deep-Links `/gesetze#polg-nrw/37a`.
 - Bundesgesetze kommen aus der amtlichen XML-Fassung von gesetze-im-internet.de: `node scripts/import-gii.js stpo StPO`. Unter Aufzählungen wie „aus dem Strafgesetzbuch:“ werden §-Angaben nicht verlinkt, weil sie sich auf ein anderes Gesetz beziehen.
@@ -216,13 +216,13 @@ Die Bestenliste (und der Platz im Profil) zählt nur Spiele ab dem Stichtag `lea
 
 ## Einstellungen
 
-`/settings` (Link im Profil): Profilbild, Passwort (`PATCH /api/auth/password`: altes Passwort + neues zweimal, andere Geräte werden abgemeldet; Mail-Verknüpfung/„Passwort vergessen“ ist bewusst noch nicht gebaut), Nutzername (`PATCH /api/auth/username`, gleiche Regeln wie bei der Registrierung, Punkte/Freunde/Quiz hängen an der Nutzer-ID und bleiben erhalten), Animationen, Freunde-ID. Neue Einstellungen kommen als weitere Karten dazu. Die §-Sammlung ist über `quiz.app_settings` (`gesetze_user_ids`, kommagetrennte Nutzer-IDs) freigeschaltet, damit eine Namensänderung sie nicht sperrt.
+`/settings` (Link im Profil): Profilbild, Passwort (`PATCH /api/auth/password`: altes Passwort + neues zweimal, andere Geräte werden abgemeldet; Mail-Verknüpfung/„Passwort vergessen“ ist bewusst noch nicht gebaut), Nutzername (`PATCH /api/auth/username`, gleiche Regeln wie bei der Registrierung, Punkte/Freunde/Quiz hängen an der Nutzer-ID und bleiben erhalten), Animationen, Freunde-ID. Neue Einstellungen kommen als weitere Karten dazu.
 
 ## Lernsets kopieren und aktualisieren
 
 Beim Kopieren merkt sich die Kopie ihr Original (`study_sets.copied_from`, `synced_to`; Karten tragen `source_card_id`). Das Original verschwindet aus „Von anderen geteilt“, solange die Kopie aktuell ist. Wird es danach geändert, erscheint es mit „Update verfügbar“ und dem Knopf „Kopie aktualisieren“ (`POST /api/study/:id/sync`): neue Karten kommen dazu, geänderte werden übernommen, im Original gelöschte entfallen, eigene Zusatzkarten und der Lernfortschritt bleiben. Kopien, die vor Migration 023 entstanden sind, kennen ihr Original nicht und bleiben unverändert sichtbar.
 
-## Folien (Experiment, nur für freigeschaltete Nutzer)
+## Folien
 
 Präsentationen wie in PowerPoint: Link im Profil → `/slides` (Liste), `/slides-edit?id=` (Editor), `/slides-present?id=` (Präsentation; `&print=1` öffnet den Druckdialog für den PDF-Export).
 
@@ -231,4 +231,8 @@ Präsentationen wie in PowerPoint: Link im Profil → `/slides` (Liste), `/slide
 - **Editor:** Folienleiste mit Ziehen zum Umsortieren, Layouts, Ziehen/Skalieren mit Einrasten (Mitte, Ränder, andere Elemente; Alt = ohne), Doppeltippen zum Texteingeben, Eigenschaften rechts, Rückgängig/Wiederholen, Strg+C/V/D, Pfeiltasten, Bilder per Knopf, Einfügen oder Drag & Drop, automatisches Speichern.
 - **Bausteine:** Der Knopf „▦ Blöcke“ im Editor öffnet fertige Blöcke mit Vorschau: Überschrift 1–3, Textabsatz, Zitat, Aufzählung, nummerierte Liste, Buttons (gefüllt/Umriss), Bildplatzhalter (16:9/quadratisch) und Tabellen. Tabellen (`type: table`) lassen sich zellenweise bearbeiten (Doppeltippen, Tab springt weiter) und haben Zeilen-/Spalten-Knöpfe, Kopfzeile und Streifen. Bildplatzhalter (`type: placeholder`) werden per Knopf, Drag & Drop oder Einfügen durch ein Bild ersetzt und erscheinen nicht in Präsentation und PDF. Buttons können in der Präsentation auf eine Folie springen (`goto`).
 - **Präsentation:** Pfeiltasten/Leertaste/Wischen, Übergänge (Überblenden, Schieben), `N` Notizen, `F` Vollbild, `B` schwarz, `Esc` beenden.
-- **Freischaltung:** `quiz.app_settings` → `slides_user_ids` (kommagetrennte Nutzer-IDs; ersatzweise `experimental_user_ids`, sonst der Name „Nico“). Die §-Sammlung hat ihren eigenen Eintrag `gesetze_user_ids`.
+- **Zugriff:** für alle angemeldeten Nutzer; jede Präsentation gehört ihrem Ersteller.
+
+## Startseite
+
+Unter „Einem Quiz beitreten“ ist die Schnellauswahl zweigeteilt: links **Erstellen** (Quiz, Umfrage über `/edit?kind=poll`, Lernset, Präsentation), rechts **Ansehen** (Meine Quiz, Lernen, Präsentationen, Gesetze, Bestenliste).

@@ -2,6 +2,15 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-05',
+    title: 'Neu: Folien, Gesetze und eine neue Startseite',
+    items: [
+      ['🖥️', 'Folien', 'Erstelle Präsentationen für die Vorlesung: fertige Blöcke (Überschriften, Text, Listen, Buttons, Bildplatzhalter, Tabellen), Präsentationsmodus und PDF-Export.'],
+      ['⚖️', 'Gesetze', 'PolG NRW, OBG NRW, StGB, StPO, OWiG, StVO, StVZO, GG und BGB zum Nachlesen – mit Zahlenübersicht, Suche und anklickbaren Verweisen.'],
+      ['🏠', 'Schnellauswahl', 'Auf der Startseite wählst du links, was du erstellen willst, und rechts, was du ansehen willst.'],
+    ],
+  },
+  {
     id: '2026-11-04',
     title: 'Neu: Mehrfachauswahl und Umfragen',
     items: [

@@ -702,3 +702,20 @@ body.lobby-lock .info-bar { margin-bottom: .5rem; }
 .player-pick .pp-code { font-size: .8rem; }
 .player-pick .pp-check { position: absolute; top: .4rem; right: .45rem; width: 1.5rem; height: 1.5rem; display: none; place-items: center; border-radius: 50%; background: var(--primary-grad); color: #fff; font-size: .85rem; font-weight: 900; }
 .player-pick button[aria-checked="true"] .pp-check { display: grid; }
+
+/* Startseite: zweigeteilte Schnellauswahl (Erstellen | Ansehen) */
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; margin-bottom: 1.6rem; }
+.split-half { margin: 0; padding: 1rem; display: flex; flex-direction: column; gap: .55rem; border-top: 5px solid var(--primary); }
+.split-view { border-top-color: #1fb6c9; }
+.split-half h2 { margin: 0 0 .15rem; font-size: 1.15rem; }
+.pick { display: flex; align-items: center; gap: .65rem; width: 100%; padding: .7rem .75rem; border: 1.5px solid var(--border); border-radius: 16px; background: var(--card); color: var(--text); text-align: left; text-decoration: none; cursor: pointer; box-shadow: none; font: inherit; min-height: 3.6rem; transition: transform .12s, border-color .12s, background .12s; }
+.pick:hover { transform: translateY(-2px); border-color: var(--primary); background: var(--bg); }
+.pick-ico { flex: none; width: 2.5rem; height: 2.5rem; display: grid; place-items: center; font-size: 1.4rem; border-radius: 12px; background: var(--bg); }
+.pick strong { display: block; font-size: 1rem; line-height: 1.2; }
+.pick small { display: block; color: var(--muted); font-weight: 500; font-size: .78rem; line-height: 1.25; }
+@media (max-width: 520px) {
+  .split { gap: .6rem; }
+  .split-half { padding: .7rem; gap: .45rem; }
+  .pick { flex-direction: column; align-items: flex-start; gap: .3rem; padding: .6rem; min-height: 0; }
+  .pick strong { font-size: .92rem; overflow-wrap: anywhere; }
+}

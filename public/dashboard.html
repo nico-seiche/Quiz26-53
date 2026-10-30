@@ -13,7 +13,7 @@
   <link rel="icon" href="/icons/icon-192.png?v=2">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2">
   <title>Quiz – Home</title>
-  <link rel="stylesheet" href="/style.css?v=6">
+  <link rel="stylesheet" href="/style.css?v=7">
 </head>
 <body>
   <header class="top">
@@ -45,6 +45,24 @@
       </div>
     </div>
 
+    <section class="split" aria-label="Schnellauswahl">
+      <div class="card split-half split-create">
+        <h2>✨ Erstellen</h2>
+        <a class="pick" href="/edit"><span class="pick-ico" aria-hidden="true">❓</span><span><strong>Quiz</strong><small>Fragen mit Punkten</small></span></a>
+        <a class="pick" href="/edit?kind=poll"><span class="pick-ico" aria-hidden="true">📊</span><span><strong>Umfrage</strong><small>Mit Diagramm</small></span></a>
+        <a class="pick" href="/study-edit"><span class="pick-ico" aria-hidden="true">🃏</span><span><strong>Lernset</strong><small>Karteikarten</small></span></a>
+        <button class="pick" type="button" id="new-deck"><span class="pick-ico" aria-hidden="true">🖥️</span><span><strong>Präsentation</strong><small>Folien</small></span></button>
+      </div>
+      <div class="card split-half split-view">
+        <h2>👀 Ansehen</h2>
+        <a class="pick" href="/quizzes"><span class="pick-ico" aria-hidden="true">🗂️</span><span><strong>Meine Quiz</strong><small>Starten &amp; bearbeiten</small></span></a>
+        <a class="pick" href="/study"><span class="pick-ico" aria-hidden="true">📚</span><span><strong>Lernen</strong><small>Lernsets &amp; Battles</small></span></a>
+        <a class="pick" href="/slides"><span class="pick-ico" aria-hidden="true">🎞️</span><span><strong>Präsentationen</strong><small>Meine Folien</small></span></a>
+        <a class="pick" href="/gesetze"><span class="pick-ico" aria-hidden="true">⚖️</span><span><strong>Gesetze</strong><small>Paragraphen lesen</small></span></a>
+        <a class="pick" href="/leaderboard"><span class="pick-ico" aria-hidden="true">🏅</span><span><strong>Bestenliste</strong><small>Rangliste</small></span></a>
+      </div>
+    </section>
+
     <div class="tile-grid">
       <a class="tile tile-gold" href="/profile">
         <span class="tile-icon" aria-hidden="true">🏆</span>
@@ -72,14 +90,6 @@
     </div>
     <div class="recent-list" id="recent"></div>
 
-    <div class="create-card">
-      <span class="q-bubble" aria-hidden="true">?</span>
-      <div>
-        <h2>Eigenes Quiz erstellen</h2>
-        <span class="muted">Wähle Fach und Spielmodus und lade deinen Kurs ein.</span>
-      </div>
-      <a class="btn primary" href="/edit">+ Neues Quiz</a>
-    </div>
   </main>
   <script src="/js/changelog.js"></script>
   <script src="/js/common.js"></script>
@@ -89,6 +99,11 @@
       e.preventDefault();
       const pin = $('#join-pin').value.trim();
       if (pin) location.href = `/play?pin=${encodeURIComponent(pin)}`;
+    };
+
+    $('#new-deck').onclick = async () => {
+      try { const { id } = await api('/api/slides', { method: 'POST', body: { title: 'Neue Präsentation' } }); location.href = `/slides-edit?id=${id}`; }
+      catch (err) { alert(err.message); }
     };
 
     const nf = (n) => n.toLocaleString('de-DE');

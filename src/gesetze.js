@@ -1,7 +1,7 @@
 const express = require('express');
-const { experimentalOnly } = require('./experimental');
+const { requireAuth } = require('./auth');
 
-// Experimentell: die §-Sammlung ist vorerst nur für den Nutzer „Nico“ freigeschaltet.
+// Gesetzessammlung für alle angemeldeten Nutzer.
 // Weitere Gesetze: mit scripts/import-recht-nrw.js (Landesrecht NRW) oder scripts/import-gii.js (Bundesrecht) erzeugen und hier eintragen.
 // Die Texte werden erst bei Bedarf geladen (große JSON-Dateien); die Liste kommt aus index.json (scripts/build-gesetze-index.js).
 const INDEX = require('./gesetze/index.json');
@@ -18,7 +18,7 @@ const LOADERS = {
 };
 
 const router = express.Router();
-router.use(experimentalOnly('gesetze'));
+router.use(requireAuth);
 
 router.get('/', (req, res) => {
   res.json(INDEX);
