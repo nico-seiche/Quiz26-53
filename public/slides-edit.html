@@ -34,7 +34,19 @@
     .layout-menu { position: absolute; left: 0; top: calc(100% + .3rem); z-index: 20; width: 15rem; padding: .4rem; background: var(--card); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); display: grid; gap: .2rem; }
     .layout-menu button { text-align: left; border: 0; box-shadow: none; background: transparent; padding: .5rem .6rem; font-weight: 700; }
     .layout-menu button:hover { background: var(--bg); }
-    .ed-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+    .ed-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; }
+    .blocks-pop { position: absolute; left: .6rem; top: 3.4rem; z-index: 25; width: min(52rem, calc(100% - 1.2rem)); column-count: 2; column-gap: 1.2rem; max-height: calc(100% - 4.2rem); overflow-y: auto; padding: .9rem; background: var(--card); border: 1px solid var(--border); border-radius: 18px; box-shadow: 0 16px 50px rgba(30, 30, 80, .3); }
+    .blocks-pop .cat { break-inside: avoid; margin-bottom: .6rem; }
+    .blocks-pop h3 { margin: .2rem 0 .5rem; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+    .blocks-pop h3:first-child { margin-top: 0; }
+    .block-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.6rem, 1fr)); gap: .5rem; }
+    .block-card { display: flex; flex-direction: column; gap: .4rem; align-items: stretch; padding: .5rem; text-align: left; border: 2px solid var(--border); border-radius: 14px; background: var(--card); color: var(--text); cursor: pointer; box-shadow: none; margin: 0; }
+    .block-card:hover { border-color: var(--primary); background: var(--bg); }
+    .block-card .pv { height: 3.6rem; display: grid; place-items: center; overflow: hidden; border-radius: 8px; background: #fff; pointer-events: none; }
+    .block-card .pv > div { transform-origin: center; }
+    .block-card .nm { font-weight: 800; font-size: .88rem; }
+    #stagebox td, #stagebox th { cursor: move; }
+    .cell-editing { outline: 2px dashed #4f6cf5; outline-offset: -2px; cursor: text !important; -webkit-user-select: text; user-select: text; }
     .ed-tools { display: flex; flex-wrap: wrap; gap: .35rem; padding: .5rem .7rem; background: var(--card); border-bottom: 1px solid var(--border); align-items: center; }
     .ed-tools button { padding: .4rem .7rem; font-size: .9rem; margin: 0; }
     .ed-tools .sep { width: 1px; height: 1.5rem; background: var(--border); margin: 0 .2rem; }
@@ -63,6 +75,7 @@
     .swatches { display: flex; flex-wrap: wrap; gap: .35rem; }
     .swatch { width: 2.1rem; height: 1.4rem; border-radius: 6px; border: 1px solid var(--border); padding: 0; box-shadow: none; cursor: pointer; margin: 0; }
     .drop-hint { outline: 3px dashed var(--primary); outline-offset: -6px; }
+    @media (max-width: 700px) { .blocks-pop { column-count: 1; } }
     @media (max-width: 1000px) {
       body.ed-body { overflow: auto; height: auto; }
       .ed { grid-template-columns: 1fr; grid-template-rows: auto auto auto; }
@@ -85,6 +98,8 @@
     <aside class="ed-slides" id="slides" aria-label="Folien"></aside>
     <section class="ed-main">
       <div class="ed-tools" id="tools">
+        <button type="button" class="primary" id="blocks-btn" aria-expanded="false" aria-controls="blocks">▦ Blöcke</button>
+        <span class="sep"></span>
         <button type="button" data-add="text">🔤 Text</button>
         <button type="button" data-add="rect">▭ Rechteck</button>
         <button type="button" data-add="ellipse">◯ Kreis</button>
@@ -94,6 +109,7 @@
         <button type="button" id="undo" title="Rückgängig (Strg+Z)">↶</button>
         <button type="button" id="redo" title="Wiederholen (Strg+Y)">↷</button>
       </div>
+      <div class="blocks-pop" id="blocks" hidden></div>
       <div class="ed-stagewrap" id="stagewrap">
         <div id="stagebox"><div id="stagehost"></div><div id="overlay"></div></div>
       </div>
@@ -296,11 +312,66 @@
     }
     function renderAll() { renderSlides(); renderStage(); renderProps(); updateHistButtons(); }
     function afterChange({ props = false, thumb = true } = {}) {
+      if (editing) { if (thumb) refreshThumb(); dirty(); return; }   // beim Tippen nicht die Bühne neu aufbauen
       renderStage();
       if (thumb) refreshThumb();
       if (props) renderProps(); else syncProps();
       dirty();
     }
+
+    // ---------------- Bausteine (Blöcke) ----------------
+    const T0 = { size: 32, color: 'auto', font: 'sans', align: 'left', valign: 'top', list: 'none', bold: false, italic: false, underline: false };
+    const accent = () => (SlideRender.isDark(slide()) ? '#7c9cff' : '#4f6cf5');
+    const BLOCKS = [
+      { cat: 'Überschriften', name: 'Überschrift 1', make: () => ({ type: 'text', w: 1100, h: 110, text: 'Große Überschrift', fill: 'none', ...T0, size: 72, bold: true, valign: 'middle' }) },
+      { cat: 'Überschriften', name: 'Überschrift 2', make: () => ({ type: 'text', w: 1000, h: 80, text: 'Mittlere Überschrift', fill: 'none', ...T0, size: 48, bold: true, valign: 'middle' }) },
+      { cat: 'Überschriften', name: 'Überschrift 3', make: () => ({ type: 'text', w: 900, h: 60, text: 'Kleine Überschrift', fill: 'none', ...T0, size: 34, bold: true, valign: 'middle' }) },
+      { cat: 'Text', name: 'Textabsatz', make: () => ({ type: 'text', w: 900, h: 220, text: 'Hier steht dein Text. Doppeltippe, um ihn zu ändern, und schreibe ein bis zwei klare Sätze zum Thema.', fill: 'none', ...T0, size: 30 }) },
+      { cat: 'Text', name: 'Zitat', make: () => ({ type: 'text', w: 900, h: 180, text: '„Ein kurzes, einprägsames Zitat.“', fill: 'none', ...T0, size: 40, italic: true, align: 'center', valign: 'middle' }) },
+      { cat: 'Listen', name: 'Aufzählung', make: () => ({ type: 'text', w: 900, h: 280, text: 'Erster Punkt\nZweiter Punkt\nDritter Punkt', fill: 'none', ...T0, size: 34, list: 'bullet' }) },
+      { cat: 'Listen', name: 'Nummerierte Liste', make: () => ({ type: 'text', w: 900, h: 280, text: 'Erster Schritt\nZweiter Schritt\nDritter Schritt', fill: 'none', ...T0, size: 34, list: 'number' }) },
+      { cat: 'Buttons', name: 'Button (gefüllt)', make: () => ({ type: 'shape', kind: 'rect', w: 320, h: 84, fill: accent(), stroke: 'none', strokeWidth: 0, radius: 42, text: 'Weiter', ...T0, color: '#ffffff', size: 32, bold: true, align: 'center', valign: 'middle', goto: 0 }) },
+      { cat: 'Buttons', name: 'Button (Umriss)', make: () => ({ type: 'shape', kind: 'rect', w: 320, h: 84, fill: 'none', stroke: accent(), strokeWidth: 4, radius: 42, text: 'Mehr erfahren', ...T0, color: 'auto', size: 30, bold: true, align: 'center', valign: 'middle', goto: 0 }) },
+      { cat: 'Bilder', name: 'Bildplatzhalter 16:9', make: () => ({ type: 'placeholder', w: 640, h: 360, label: 'Bild einfügen', radius: 16 }) },
+      { cat: 'Bilder', name: 'Bildplatzhalter quadratisch', make: () => ({ type: 'placeholder', w: 400, h: 400, label: 'Bild einfügen', radius: 16 }) },
+      { cat: 'Tabellen', name: 'Tabelle 3 × 3', make: () => ({ type: 'table', w: 900, h: 270, rows: [['Spalte 1', 'Spalte 2', 'Spalte 3'], ['', '', ''], ['', '', '']], header: true, zebra: false, size: 28, color: 'auto', align: 'left', font: 'sans', headFill: accent(), headColor: '#ffffff', border: '#cbd2ee' }) },
+      { cat: 'Tabellen', name: 'Vergleich 2 × 4', make: () => ({ type: 'table', w: 900, h: 360, rows: [['Vorteile', 'Nachteile'], ['', ''], ['', ''], ['', '']], header: true, zebra: true, size: 28, color: 'auto', align: 'left', font: 'sans', headFill: accent(), headColor: '#ffffff', border: '#cbd2ee' }) },
+    ];
+    function renderBlocks() {
+      const box = $('#blocks');
+      const cats = [...new Set(BLOCKS.map((b) => b.cat))];
+      box.innerHTML = cats.map((c) => `<div class="cat"><h3>${c}</h3><div class="block-grid">${BLOCKS.map((b, i) => (b.cat === c ? `<button type="button" class="block-card" data-block="${i}"><div class="pv"></div><span class="nm">${b.name}</span></button>` : '')).join('')}</div></div>`).join('');
+      // Vorschau: das echte Element, verkleinert
+      box.querySelectorAll('.block-card').forEach((card) => {
+        const e = BLOCKS[Number(card.dataset.block)].make();
+        Object.assign(e, { id: 'pv', x: 0, y: 0, opacity: 1 });
+        const dom = SlideRender.elementEl(e, { bg: '#ffffff', elements: [] });
+        dom.style.position = 'relative'; dom.style.left = '0'; dom.style.top = '0';
+        const k = Math.min(120 / e.w, 52 / e.h);
+        const wrap = document.createElement('div');
+        wrap.style.cssText = `width:${e.w}px;height:${e.h}px;transform:scale(${k});margin:${-(e.h - e.h * k) / 2}px ${-(e.w - e.w * k) / 2}px;`;
+        wrap.appendChild(dom);
+        card.querySelector('.pv').appendChild(wrap);
+      });
+    }
+    function toggleBlocks(open) {
+      const box = $('#blocks');
+      const show = open === undefined ? box.hidden : open;
+      if (show && !box.children.length) renderBlocks();
+      box.hidden = !show;
+      $('#blocks-btn').setAttribute('aria-expanded', String(show));
+    }
+    function insertBlock(i) {
+      const e = BLOCKS[i].make();
+      e.x = Math.round((W - e.w) / 2);
+      e.y = Math.round((H - e.h) / 2);
+      while (slide().elements.some((o) => o.x === e.x && o.y === e.y)) { e.x += 24; e.y += 24; }   // nicht exakt auf ein vorhandenes Element legen
+      addElement(e);
+      toggleBlocks(false);
+    }
+    $('#blocks-btn').onclick = (ev) => { ev.stopPropagation(); toggleBlocks(); };
+    $('#blocks').addEventListener('click', (ev) => { const c = ev.target.closest('[data-block]'); if (c) insertBlock(Number(c.dataset.block)); });
+    document.addEventListener('click', (ev) => { if (!$('#blocks').hidden && !ev.target.closest('#blocks, #blocks-btn')) toggleBlocks(false); });
 
     // ---------------- Elemente einfügen ----------------
     function addElement(e, { edit = false } = {}) {
@@ -323,7 +394,7 @@
     }
 
     // Bild verkleinern (längste Seite 1600 px) und hochladen
-    async function uploadImage(file) {
+    async function uploadImage(file, placeholderId) {
       if (!file || !/^image\//.test(file.type)) return;
       setState('Bild wird hochgeladen …');
       try {
@@ -343,47 +414,65 @@
         const res = await fetch(`/api/slides/${id}/assets`, { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(body.error || 'Hochladen fehlgeschlagen');
-        const k = Math.min(1, 900 / w, 520 / h);
-        const iw = Math.round(w * k); const ih = Math.round(h * k);
-        addElement({ type: 'image', x: Math.round((W - iw) / 2), y: Math.round((H - ih) / 2), w: iw, h: ih, src: body.url, fit: 'contain', radius: 0 });
+        const ph = placeholderId && elOf(placeholderId);
+        if (ph && ph.type === 'placeholder') {   // Platzhalter durch das Bild ersetzen (gleiche Position und Größe, zugeschnitten)
+          pushHist();
+          Object.assign(ph, { type: 'image', src: body.url, fit: 'cover', radius: ph.radius || 0 });
+          delete ph.label;
+          selId = ph.id;
+          afterChange({ props: true });
+        } else {
+          const k = Math.min(1, 900 / w, 520 / h);
+          const iw = Math.round(w * k); const ih = Math.round(h * k);
+          addElement({ type: 'image', x: Math.round((W - iw) / 2), y: Math.round((H - ih) / 2), w: iw, h: ih, src: body.url, fit: 'contain', radius: 0 });
+        }
         setState('');
       } catch (err) { setState(err.message, 'warn'); }
     }
-    $('#file').onchange = (e) => { uploadImage(e.target.files[0]); e.target.value = ''; };
+    let fillTarget = null;      // Platzhalter, der mit dem nächsten Bild gefüllt wird
+    const selectedPlaceholder = () => { const e = sel(); return e && e.type === 'placeholder' ? e.id : null; };
+    $('#file').onchange = (e) => { uploadImage(e.target.files[0], fillTarget || selectedPlaceholder()); fillTarget = null; e.target.value = ''; };
     addEventListener('paste', (e) => {
       if (editing || /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
       const f = [...(e.clipboardData?.files || [])].find((x) => /^image\//.test(x.type));
-      if (f) { e.preventDefault(); uploadImage(f); }
+      if (f) { e.preventDefault(); uploadImage(f, selectedPlaceholder()); }
     });
     const stageWrap = $('#stagewrap');
     stageWrap.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); stageWrap.classList.add('drop-hint'); } });
     stageWrap.addEventListener('dragleave', () => stageWrap.classList.remove('drop-hint'));
-    stageWrap.addEventListener('drop', (e) => { stageWrap.classList.remove('drop-hint'); const f = e.dataTransfer?.files?.[0]; if (f) { e.preventDefault(); uploadImage(f); } });
+    stageWrap.addEventListener('drop', (e) => { stageWrap.classList.remove('drop-hint'); const f = e.dataTransfer?.files?.[0]; if (f) { e.preventDefault(); const t = document.elementsFromPoint(e.clientX, e.clientY).find((n) => n.classList && n.classList.contains('sl-placeholder')); uploadImage(f, t ? t.dataset.id : selectedPlaceholder()); } });
 
     // ---------------- Text bearbeiten ----------------
-    function startEdit(eid) {
-      const e = elOf(eid);
-      if (!isTextual(e)) return;
-      endEdit();
-      selId = eid;
-      editing = eid;
-      const dom = $('#stagehost').querySelector(`[data-id="${eid}"]`);
-      const box = dom && dom.querySelector('.sl-text');
-      if (!box) { editing = null; return; }
+    let editEl = null;       // das gerade bearbeitete DOM-Element (Textbox oder Tabellenzelle)
+    function beginEditable(box, eid, onText) {
       pushHist();
-      box.textContent = e.text === '​' ? '' : e.text;
-      box.style.whiteSpace = 'pre-wrap';
       try { box.contentEditable = 'plaintext-only'; } catch { /* ältere Browser */ }
       if (box.contentEditable !== 'plaintext-only') box.contentEditable = 'true';
-      dom.classList.add('editing');
-      box.style.overflow = 'auto';
+      editing = eid;
+      editEl = box;
       box.focus();
       const range = document.createRange();
       range.selectNodeContents(box);
       range.collapse(false);
       const sel2 = getSelection(); sel2.removeAllRanges(); sel2.addRange(range);
-      box.oninput = () => { e.text = box.innerText.replace(/​/g, '').replace(/\n$/, ''); refreshThumb(); dirty(); };
+      box.oninput = () => { onText(box.innerText.replace(/\u200b/g, '').replace(/\n$/, '')); refreshThumb(); dirty(); };
       box.onblur = () => endEdit();
+    }
+    function startEdit(eid) {
+      const e = elOf(eid);
+      if (e && e.type === 'placeholder') { fillTarget = eid; $('#file').click(); return; }
+      if (e && e.type === 'table') return startCellEdit(eid, 0, 0);
+      if (!isTextual(e)) return;
+      endEdit();
+      selId = eid;
+      const dom = $('#stagehost').querySelector(`[data-id="${eid}"]`);
+      const box = dom && dom.querySelector('.sl-text');
+      if (!box) return;
+      box.textContent = e.text === '\u200b' ? '' : e.text;
+      box.style.whiteSpace = 'pre-wrap';
+      box.style.overflow = 'auto';
+      dom.classList.add('editing');
+      beginEditable(box, eid, (t) => { e.text = t; });
       box.onkeydown = (ev) => {
         if (ev.key === 'Escape') { ev.preventDefault(); box.blur(); }
         const mod = ev.metaKey || ev.ctrlKey;
@@ -392,11 +481,40 @@
       };
       renderOverlay();
     }
+    // Tabellenzelle bearbeiten; Tab springt zur nächsten Zelle
+    function startCellEdit(eid, r, c) {
+      const e = elOf(eid);
+      if (!e || e.type !== 'table') return;
+      endEdit();
+      selId = eid;
+      r = clamp(r, 0, e.rows.length - 1); c = clamp(c, 0, e.rows[0].length - 1);
+      const td = $('#stagehost').querySelector(`[data-id="${eid}"] [data-r="${r}"][data-c="${c}"]`);
+      if (!td) return;
+      td.classList.add('cell-editing');
+      beginEditable(td, eid, (t) => { e.rows[r][c] = t; });
+      td.onkeydown = (ev) => {
+        if (ev.key === 'Escape') { ev.preventDefault(); td.blur(); }
+        else if (ev.key === 'Tab') {
+          ev.preventDefault();
+          const cols = e.rows[0].length;
+          let i = r * cols + c + (ev.shiftKey ? -1 : 1);
+          if (i >= e.rows.length * cols) { addTableRow(e); }
+          i = clamp(i, 0, e.rows.length * cols - 1);
+          const nr = Math.floor(i / cols); const nc = i % cols;
+          const keep = editing; editEl.onblur = null;
+          endEdit(true);
+          renderStage();
+          startCellEdit(keep, nr, nc);
+        }
+        ev.stopPropagation();
+      };
+      renderOverlay();
+    }
     function endEdit(silent) {
       if (!editing) return;
-      const eid = editing;
+      const dom = editEl;
       editing = null;
-      const dom = $('#stagehost').querySelector(`[data-id="${eid}"] .sl-text`);
+      editEl = null;
       if (dom) { dom.onblur = null; dom.oninput = null; dom.onkeydown = null; }
       if (!silent) { renderStage(); refreshThumb(); renderProps(); }
     }
@@ -408,7 +526,7 @@
     function pt(ev) { const r = host.getBoundingClientRect(); return { x: (ev.clientX - r.left) / zoom, y: (ev.clientY - r.top) / zoom }; }
 
     host.addEventListener('pointerdown', (ev) => {
-      if (editing && ev.target.closest('.editing')) return;
+      if (editing && ev.target.closest('.editing, .cell-editing')) return;
       const handle = ev.target.closest('.handle');
       lastDown = null;
       if (handle) {
@@ -427,6 +545,8 @@
       renderOverlay();
       drag = { mode: 'move', start: pt(ev), orig: { x: e.x, y: e.y }, moved: false };
       lastDown = drag; lastDown.id = e.id;
+      const cell = ev.target.closest('td, th');
+      lastDown.cell = cell ? [Number(cell.dataset.r), Number(cell.dataset.c)] : null;
       host.setPointerCapture(ev.pointerId);
       ev.preventDefault();
     });
@@ -503,7 +623,11 @@
     host.addEventListener('pointerup', (ev) => {
       if (!lastDown || lastDown.moved) { lastTap = { id: null, t: 0 }; return; }
       const now = Date.now();
-      if (lastTap.id === lastDown.id && now - lastTap.t < 450) { lastTap = { id: null, t: 0 }; startEdit(lastDown.id); return; }
+      if (lastTap.id === lastDown.id && now - lastTap.t < 450) {
+        lastTap = { id: null, t: 0 };
+        if (lastDown.cell) startCellEdit(lastDown.id, lastDown.cell[0], lastDown.cell[1]); else startEdit(lastDown.id);
+        return;
+      }
       lastTap = { id: lastDown.id, t: now };
     });
 
@@ -548,7 +672,7 @@
       }
       const textual = isTextual(e);
       let html = '';
-      html += `<h3>${{ text: 'Textfeld', shape: 'Form', image: 'Bild' }[e.type]}</h3>`;
+      html += `<h3>${{ text: 'Textfeld', shape: 'Form', image: 'Bild', table: 'Tabelle', placeholder: 'Bildplatzhalter' }[e.type]}</h3>`;
       if (textual) {
         html += `
           <label for="p-font">Schrift</label>
@@ -579,6 +703,30 @@
       if (e.type === 'image') {
         html += `<label for="p-fit">Anpassung</label><select id="p-fit" data-set-select="fit"><option value="contain">Ganz zeigen</option><option value="cover">Füllen (zuschneiden)</option></select>
           <label for="p-rad">Rundung</label><input id="p-rad" type="range" min="0" max="200" value="${e.radius || 0}" data-range="radius">`;
+      }
+      if (e.type === 'placeholder') {
+        html += `<button type="button" class="primary mini" data-op="fill" style="width:100%">🖼️ Bild hochladen</button>
+          <p class="muted" style="font-size:.8rem;margin:.3rem 0 0">Oder ein Bild per Drag &amp; Drop auf die Folie ziehen bzw. einfügen (Strg+V). Platzhalter sieht man nur im Editor.</p>
+          <label for="p-label">Beschriftung</label><input id="p-label" type="text" maxlength="60" data-str="label" value="${escapeHtml(e.label || '')}">
+          <label for="p-prad">Rundung</label><input id="p-prad" type="range" min="0" max="200" value="${e.radius || 0}" data-range="radius">`;
+      }
+      if (e.type === 'table') {
+        html += `
+          <p class="muted" style="font-size:.8rem;margin:0 0 .4rem">Doppeltippe auf eine Zelle, um sie zu bearbeiten (Tab springt weiter).</p>
+          <div class="row-inline"><button type="button" class="mini" data-table-op="addRow">＋ Zeile</button><button type="button" class="mini" data-table-op="delRow" ${e.rows.length < 2 ? 'disabled' : ''}>－ Zeile</button>
+            <button type="button" class="mini" data-table-op="addCol">＋ Spalte</button><button type="button" class="mini" data-table-op="delCol" ${e.rows[0].length < 2 ? 'disabled' : ''}>－ Spalte</button></div>
+          <div class="row-inline" style="margin-top:.5rem"><div class="seg"><button type="button" data-toggle="header" aria-pressed="${e.header !== false}">Kopfzeile</button><button type="button" data-toggle="zebra" aria-pressed="${!!e.zebra}">Streifen</button></div></div>
+          <label for="p-tsize">Schrift</label>
+          <div class="grid2"><select id="p-tfont" data-set-select="font"><option value="sans">Modern</option><option value="serif">Serif</option><option value="display">Display</option><option value="mono">Mono</option></select>${num('size', e.size, 'min="8" max="120" aria-label="Schriftgröße" id="p-tsize"')}</div>
+          <div style="margin-top:.5rem">${seg('align', [['left', '⯇', 'Linksbündig'], ['center', '≡', 'Zentriert'], ['right', '⯈', 'Rechtsbündig']], e.align)}</div>
+          <label>Textfarbe</label><div class="row-inline"><input type="color" data-color="color" value="${colorHex(e.color)}" aria-label="Textfarbe"><button type="button" class="mini" data-color-auto="color" aria-pressed="${e.color === 'auto'}">Automatisch</button></div>
+          <div class="grid2"><div><label>Kopf: Füllung</label><input type="color" data-color="headFill" value="${colorHex(e.headFill)}" aria-label="Kopfzeile Füllung"></div>
+            <div><label>Kopf: Schrift</label><input type="color" data-color="headColor" value="${colorHex(e.headColor)}" aria-label="Kopfzeile Schrift"></div></div>
+          <label>Rahmenfarbe</label><div class="row-inline"><input type="color" data-color="border" value="${colorHex(e.border)}" aria-label="Rahmenfarbe"></div>`;
+      }
+      if (e.type === 'shape' || e.type === 'text') {
+        html += `<label for="p-goto">Bei Klick springen zu Folie (Präsentation)</label>
+          <input id="p-goto" type="number" min="0" max="${deck.data.slides.length}" data-num="goto" value="${e.goto || 0}" placeholder="0 = nichts">`;
       }
       html += `<label for="p-op">Deckkraft</label><input id="p-op" type="range" min="0.1" max="1" step="0.05" value="${e.opacity ?? 1}" data-range="opacity">
         <h3>Position &amp; Größe</h3>
@@ -614,6 +762,7 @@
       if (t.dataset.num && e) { const v = Number(t.value); if (Number.isFinite(v)) setProp(t.dataset.num, ['w', 'h'].includes(t.dataset.num) ? Math.max(20, v) : v); }
       else if (t.dataset.color && e) setProp(t.dataset.color, t.value);
       else if (t.dataset.range && e) setProp(t.dataset.range, Number(t.value));
+      else if (t.dataset.str && e) setProp(t.dataset.str, t.value);
       else if (t.dataset.bg === 'color') { pushHist('bg'); slide().bg = t.value; afterChange(); }
       else if (t.dataset.slideProp) { pushHist(`s:${t.dataset.slideProp}`); slide()[t.dataset.slideProp] = t.value; if (t.dataset.slideProp === 'notes') dirty(); else afterChange(); }
     });
@@ -640,10 +789,23 @@
       else if (d.slideOp === 'del' && confirm('Diese Folie löschen?')) deleteSlide();
       else if (d.arrange && e) arrange(d.arrange);
       else if (d.align && e) alignTo(d.align);
+      else if (d.tableOp && e && e.type === 'table') tableOp(d.tableOp);
+      else if (d.op === 'fill') { fillTarget = selId; $('#file').click(); }
       else if (d.op === 'dup') duplicateElement();
       else if (d.op === 'del') deleteElement();
     });
 
+    function addTableRow(e) { const rh = e.h / e.rows.length; e.rows.push(Array(e.rows[0].length).fill('')); e.h = Math.round(rh * e.rows.length); }
+    function tableOp(op) {
+      const e = sel();
+      pushHist();
+      const rh = e.h / e.rows.length; const cw = e.w / e.rows[0].length;
+      if (op === 'addRow') addTableRow(e);
+      if (op === 'delRow' && e.rows.length > 1) { e.rows.pop(); e.h = Math.max(20, Math.round(rh * e.rows.length)); }
+      if (op === 'addCol') { e.rows.forEach((r) => r.push('')); e.w = Math.min(W - e.x, Math.round(cw * e.rows[0].length)); }
+      if (op === 'delCol' && e.rows[0].length > 1) { e.rows.forEach((r) => r.pop()); e.w = Math.max(20, Math.round(cw * e.rows[0].length)); }
+      afterChange({ props: true });
+    }
     function arrange(how) {
       const list = slide().elements;
       const i = list.findIndex((x) => x.id === selId);
@@ -739,7 +901,7 @@
       }
       if (!e) return;
       if (ev.key === 'Delete' || ev.key === 'Backspace') { ev.preventDefault(); deleteElement(); }
-      else if (ev.key === 'Enter' && isTextual(e)) { ev.preventDefault(); startEdit(e.id); }
+      else if (ev.key === 'Enter' && (isTextual(e) || e.type === 'table')) { ev.preventDefault(); startEdit(e.id); }
       else if (ev.key === 'Escape') { selId = null; renderOverlay(); renderProps(); }
       else if (ev.key.startsWith('Arrow')) {
         ev.preventDefault();

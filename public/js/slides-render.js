@@ -86,7 +86,30 @@ const SlideRender = (() => {
     return `<svg class="sl-svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" stroke-linejoin="round">${shape}</svg>`;
   }
 
-  function elementEl(e, slide) {
+  function tableEl(e, slide) {
+    const t = document.createElement('table');
+    t.className = 'sl-table';
+    const color = resolve(e.color, slide, DARK_TEXT);
+    const border = resolve(e.border, slide, '#cbd2ee');
+    t.style.cssText = `width:100%;height:100%;border-collapse:collapse;table-layout:fixed;font-size:${e.size || 24}px;font-family:${FONTS[e.font] || FONTS.sans};color:${color}`;
+    (e.rows || [['']]).forEach((row, r) => {
+      const tr = document.createElement('tr');
+      const head = e.header !== false && r === 0;
+      row.forEach((cell, c) => {
+        const td = document.createElement(head ? 'th' : 'td');
+        td.dataset.r = r; td.dataset.c = c;
+        td.textContent = cell;
+        const zebra = e.zebra && !head && r % 2 === 0 ? 'background:rgba(128,128,128,.12);' : '';
+        td.style.cssText = `border:2px solid ${border};padding:6px 12px;text-align:${e.align || 'left'};vertical-align:middle;overflow-wrap:anywhere;white-space:pre-wrap;line-height:1.25;${zebra}` +
+          (head ? `background:${resolve(e.headFill, slide, '#4f6cf5')};color:${resolve(e.headColor, slide, '#ffffff')};font-weight:800;` : '');
+        tr.appendChild(td);
+      });
+      t.appendChild(tr);
+    });
+    return t;
+  }
+
+  function elementEl(e, slide, opts) {
     const el = document.createElement('div');
     el.className = `sl-el sl-${e.type}`;
     el.dataset.id = e.id;
@@ -99,6 +122,19 @@ const SlideRender = (() => {
     } else if (e.type === 'shape') {
       el.innerHTML = shapeSvg(e, slide);
       el.appendChild(textBox(e, slide, { padding: '10px 16px', position: 'absolute', inset: '0', justifyContent: { top: 'flex-start', middle: 'center', bottom: 'flex-end' }[e.valign || 'middle'] }));
+    } else if (e.type === 'table') {
+      el.appendChild(tableEl(e, slide));
+    } else if (e.type === 'placeholder') {
+      el.className += ' sl-placeholder';
+      const s2 = Math.min(e.w, e.h);
+      el.style.cssText += `;border:3px dashed rgba(128,128,128,.55);background:rgba(128,128,128,.1);border-radius:${Number(e.radius) || 0}px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:${s2 * 0.04}px;color:rgba(110,110,130,.9);`;
+      const icon = document.createElement('div');
+      icon.textContent = '🖼️';
+      icon.style.fontSize = `${Math.max(16, s2 * 0.3)}px`;
+      const label = document.createElement('div');
+      label.textContent = e.label || 'Bild einfügen';
+      label.style.cssText = `font-size:${Math.max(12, Math.min(28, s2 * 0.1))}px;font-weight:700;text-align:center;padding:0 12px`;
+      el.append(icon, label);
     } else if (e.type === 'image') {
       const img = document.createElement('img');
       img.src = e.src;
@@ -108,26 +144,28 @@ const SlideRender = (() => {
       img.style.borderRadius = `${Number(e.radius) || 0}px`;
       el.appendChild(img);
     }
+    if (opts && opts.present && e.goto > 0) { el.dataset.goto = e.goto; el.style.cursor = 'pointer'; }
     return el;
   }
 
   // Die Folie in Originalgröße (1280 × 720) als Element
-  function slideEl(slide) {
+  // opts.present: Bildplatzhalter werden nicht gezeigt, Schaltflächen mit Ziel sind klickbar
+  function slideEl(slide, opts) {
     const root = document.createElement('div');
     root.className = 'sl';
     root.style.background = bgCss(slide);
-    (slide.elements || []).forEach((e) => root.appendChild(elementEl(e, slide)));
+    (slide.elements || []).forEach((e) => { if (!(opts && opts.present && e.type === 'placeholder')) root.appendChild(elementEl(e, slide, opts)); });
     return root;
   }
 
   // Folie skaliert in einen Container setzen (Breite in Pixeln); gibt { wrap, slide, scale } zurück
-  function mount(container, slide, width) {
+  function mount(container, slide, width, opts) {
     const scale = width / W;
     const wrap = document.createElement('div');
     wrap.className = 'sl-wrap';
     wrap.style.width = `${width}px`;
     wrap.style.height = `${H * scale}px`;
-    const sl = slideEl(slide);
+    const sl = slideEl(slide, opts);
     sl.style.transform = `scale(${scale})`;
     wrap.appendChild(sl);
     container.replaceChildren(wrap);

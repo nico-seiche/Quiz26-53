@@ -32,6 +32,16 @@ const color = (v, dflt) => (typeof v === 'string' && (/^#[0-9a-f]{3,8}$/i.test(v
 const assetUrl = (v) => (typeof v === 'string' && /^\/api\/slides\/assets\/\d{1,15}$/.test(v) ? v : '');
 const eid = (v, i) => (typeof v === 'string' && /^[\w-]{1,24}$/.test(v) ? v : `e${i}`);
 
+const MAX_TABLE_ROWS = 30;
+const MAX_TABLE_COLS = 10;
+
+function cleanRows(rows) {
+  const list = (Array.isArray(rows) ? rows : []).slice(0, MAX_TABLE_ROWS).map((r) => (Array.isArray(r) ? r : []).slice(0, MAX_TABLE_COLS).map((c) => str(c, 500)));
+  const cols = Math.max(1, ...list.map((r) => r.length));
+  const out = list.map((r) => [...r, ...Array(cols - r.length).fill('')]);
+  return out.length ? out : [['']];
+}
+
 function cleanTextProps(e, out) {
   out.text = str(e.text, 5000);
   out.size = num(e.size, 8, 240, 32);
@@ -55,13 +65,23 @@ function cleanElement(e, i) {
     opacity: num(e.opacity, 0, 1, 1),
   };
   if (e.type === 'text') {
-    const out = { type: 'text', ...base, fill: color(e.fill, 'none') };
+    const out = { type: 'text', ...base, fill: color(e.fill, 'none'), goto: num(e.goto, 0, MAX_SLIDES, 0) | 0 };
     return cleanTextProps(e, out);
+  }
+  if (e.type === 'table') {
+    return {
+      type: 'table', ...base, rows: cleanRows(e.rows), header: e.header !== false, zebra: bool(e.zebra),
+      size: num(e.size, 8, 120, 24), color: color(e.color, 'auto'), align: pick(e.align, ALIGN, 'left'), font: pick(e.font, FONTS, 'sans'),
+      headFill: color(e.headFill, '#4f6cf5'), headColor: color(e.headColor, '#ffffff'), border: color(e.border, '#cbd2ee'),
+    };
+  }
+  if (e.type === 'placeholder') {
+    return { type: 'placeholder', ...base, label: str(e.label, 60), radius: num(e.radius, 0, 300, 16) };
   }
   if (e.type === 'shape') {
     const out = {
       type: 'shape', ...base, kind: pick(e.kind, SHAPES, 'rect'),
-      fill: color(e.fill, '#4f6cf5'), stroke: color(e.stroke, 'none'), strokeWidth: num(e.strokeWidth, 0, 40, 0), radius: num(e.radius, 0, 300, 0),
+      fill: color(e.fill, '#4f6cf5'), stroke: color(e.stroke, 'none'), strokeWidth: num(e.strokeWidth, 0, 40, 0), radius: num(e.radius, 0, 300, 0), goto: num(e.goto, 0, MAX_SLIDES, 0) | 0,
     };
     return cleanTextProps(e, out);
   }
