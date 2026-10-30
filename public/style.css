@@ -61,8 +61,7 @@ body {
 header.top {
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
   padding: .75rem 1rem; padding-top: calc(.75rem + env(safe-area-inset-top, 0px)); background: var(--card); border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--card) 82%, transparent);
-  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  /* Deckend und ohne Weichzeichner: backdrop-filter lässt die Leiste auf iPad/iOS verschwommen wirken */
   position: sticky; top: 0; z-index: 30;
 }
 header.top a.brand { font-weight: 700; color: var(--text); text-decoration: none; }
