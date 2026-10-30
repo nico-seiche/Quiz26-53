@@ -23,7 +23,9 @@
     .law-tab { padding: .45rem .9rem; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: var(--text); font-weight: 800; cursor: pointer; }
     .law-tab[aria-pressed="true"] { background: var(--primary-grad); color: #fff; border-color: transparent; box-shadow: var(--glow); }
 
-    .law-layout { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+    .law-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+    .law-layout.side-open { grid-template-columns: 340px minmax(0, 1fr); }
+    .law-layout:not(.side-open) .law-side { display: none; }
     .law-side { position: sticky; top: 4.5rem; max-height: calc(100vh - 11rem); display: flex; flex-direction: column; padding: .9rem; }
     .law-side input { margin-bottom: .6rem; }
     .toc { overflow-y: auto; margin: 0 -.3rem; padding: 0 .3rem; flex: 1; overscroll-behavior: contain; }
@@ -49,19 +51,18 @@
     .law-views { display: flex; gap: .5rem; margin-bottom: .9rem; }
     .law-views button { padding: .45rem .8rem; font-size: .9rem; }
     .law-views button[aria-pressed="true"] { background: var(--bg); border-color: var(--primary); color: var(--link); }
-    .law-views .only-mobile { display: none; }
     .grid-head { margin: .2rem 0 .2rem; font-size: 1.3rem; }
-    .num-grid { display: grid; grid-template-columns: 3.6rem repeat(10, minmax(0, 1fr)); gap: .4rem; align-items: start; }
-    .num-row-label { align-self: start; padding-top: .85rem; font-size: .78rem; font-weight: 800; color: var(--muted); }
-    .num-cell { display: flex; flex-direction: column; gap: .25rem; min-width: 0; }
-    .num-tile { width: 100%; aspect-ratio: 1 / .8; display: grid; place-items: center; padding: 0; border: 1.5px solid var(--link); border-radius: 10px; background: var(--card); color: var(--text); font-weight: 800; font-size: 1rem; font-variant-numeric: tabular-nums; cursor: pointer; box-shadow: none; transition: transform .12s, background .12s; }
+    .num-row { display: grid; grid-template-columns: 3.8rem minmax(0, 1fr); gap: .5rem; align-items: center; margin-bottom: .55rem; }
+    .num-tiles { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: .55rem; }
+    .num-row-label { font-size: .8rem; font-weight: 800; color: var(--muted); }
+    .num-tile { width: 100%; aspect-ratio: 1 / .8; display: grid; place-items: center; padding: 0; border: 2px solid var(--link); border-radius: 14px; background: var(--card); color: var(--text); font-weight: 800; font-size: 1.5rem; font-variant-numeric: tabular-nums; cursor: pointer; box-shadow: none; transition: transform .12s, background .12s; }
     .num-tile:hover { background: var(--primary-grad); color: #fff; border-color: transparent; transform: translateY(-2px); }
     .num-tile[aria-current="true"] { background: var(--primary-grad); color: #fff; border-color: transparent; box-shadow: var(--glow); }
     .num-tile.empty { border: 1.5px dashed var(--border); background: transparent; color: var(--muted); font-weight: 600; opacity: .45; cursor: default; }
     .num-tile.empty:hover { transform: none; background: transparent; color: var(--muted); }
-    .num-sub { display: flex; flex-wrap: wrap; gap: .2rem; }
-    .num-sub button { padding: 0 .35rem; min-width: 1.4rem; height: 1.4rem; border: 1px solid var(--link); border-radius: 7px; background: var(--card); color: var(--link); font-size: .72rem; font-weight: 800; cursor: pointer; box-shadow: none; }
-    .num-sub button:hover, .num-sub button[aria-current="true"] { background: var(--primary-grad); color: #fff; border-color: transparent; }
+    .related { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin: -.4rem 0 1.1rem; font-size: .85rem; color: var(--muted); }
+    .related button { padding: .2rem .65rem; border: 1px solid var(--link); border-radius: 999px; background: var(--card); color: var(--link); font-size: .85rem; font-weight: 800; cursor: pointer; box-shadow: none; }
+    .related button:hover, .related button[aria-current="true"] { background: var(--primary-grad); color: #fff; border-color: transparent; }
     .law-crumb { font-size: .82rem; color: var(--muted); margin-bottom: .6rem; line-height: 1.4; }
     .par-head { display: flex; align-items: baseline; gap: .7rem; flex-wrap: wrap; margin-bottom: 1.1rem; }
     .par-num { font-size: 2rem; font-weight: 900; background: var(--primary-grad); -webkit-background-clip: text; background-clip: text; color: transparent; letter-spacing: -.02em; }
@@ -94,15 +95,15 @@
 
     @media (max-width: 860px) {
       main.law-main { padding-left: .75rem; padding-right: .75rem; }
-      .law-layout { grid-template-columns: minmax(0, 1fr); }
+      .law-layout, .law-layout.side-open { grid-template-columns: minmax(0, 1fr); }
+      .law-layout:not(.side-open) .law-side { display: block; }
       .law-side { position: static; max-height: none; }
       .toc { overflow: visible; }
       .law-layout:not(.mobile-toc) .law-side { display: none; }
       .law-layout.mobile-toc .law-read { display: none; }
-      .law-views .only-mobile { display: inline-flex; }
-      .num-grid { grid-template-columns: 2.4rem repeat(10, minmax(0, 1fr)); gap: .25rem; }
-      .num-tile { font-size: .72rem; border-radius: 7px; aspect-ratio: 1 / 1.1; border-width: 1px; }
-      .num-row-label { font-size: .64rem; padding-top: .6rem; }
+      .num-row { grid-template-columns: minmax(0, 1fr); gap: .3rem; margin-bottom: .9rem; }
+      .num-tiles { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .45rem; }
+      .num-tile { font-size: 1.35rem; aspect-ratio: 1 / .9; }
       .law-read { padding: 1.1rem 1rem; }
       .law-keys { display: none; }
     }
@@ -219,6 +220,8 @@
           continue;
         } else if (item.type === 'head') {
           html += `<div class="toc-sub l${item.level}">${escapeHtml([item.label, item.title].filter(Boolean).join(' · '))}</div>`;
+        } else if (isLettered(item)) {
+          continue;
         } else {
           html += `<button type="button" class="toc-par" data-num="${item.num}" ${current && current.num === item.num ? 'aria-current="true"' : ''}><span class="n">§ ${item.num}</span><span>${escapeHtml(item.title)}</span></button>`;
         }
@@ -295,41 +298,51 @@
       </div>`;
     }
 
-    // Übersicht: je Zehnerblock eine Reihe (1–9, 10–19, 20–29 …); Buchstaben-Paragraphen (12a) hängen unter ihrer Zahl
+    // Übersicht: je Zehnerblock eine Reihe (1–9, 10–19, 20–29 …); Paragraphen mit Buchstaben (12a) stehen nur auf der Seite ihres Paragraphen
+    const baseOf = (num) => num.replace(/[a-z]+$/, '');
+    const isLettered = (p) => /[a-z]$/.test(p.num);
     function gridHtml() {
       const slots = new Map();   // Zahl → { main, subs[] }
       for (const p of pars) {
-        const m = p.num.match(/^(\d+)([a-z]*)$/);
-        if (!m) continue;
-        const n = Number(m[1]);
+        const n = Number(baseOf(p.num));
         if (!slots.has(n)) slots.set(n, { main: null, subs: [] });
-        if (m[2]) slots.get(n).subs.push(p); else slots.get(n).main = p;
+        if (isLettered(p)) slots.get(n).subs.push(p); else slots.get(n).main = p;
       }
       const nums = [...slots.keys()];
       const first = Math.floor(Math.min(...nums) / 10);
       const last = Math.floor(Math.max(...nums) / 10);
-      const cur = current ? current.num : null;
+      const cur = current ? baseOf(current.num) : null;
       let html = '';
       for (let row = first; row <= last; row++) {
-        html += `<div class="num-row-label">${row === 0 ? '1–9' : `${row * 10}–${row * 10 + 9}`}</div>`;
+        let tiles = '';
         for (let col = 0; col < 10; col++) {
           const n = row * 10 + col;
           const slot = slots.get(n);
-          if (!slot) { html += `<div class="num-cell"><span class="num-tile empty" aria-hidden="true">${n === 0 ? '' : n}</span></div>`; continue; }
-          const main = slot.main
-            ? `<button type="button" class="num-tile" data-num="${slot.main.num}" title="§ ${slot.main.num} ${escapeHtml(slot.main.title)}" ${cur === slot.main.num ? 'aria-current="true"' : ''}>${n}</button>`
-            : `<span class="num-tile empty" aria-hidden="true">${n}</span>`;
-          const subs = slot.subs.length ? `<div class="num-sub">${slot.subs.map((x) => `<button type="button" data-num="${x.num}" title="§ ${x.num} ${escapeHtml(x.title)}" ${cur === x.num ? 'aria-current="true"' : ''}>${x.num.replace(/^\d+/, '')}</button>`).join('')}</div>` : '';
-          html += `<div class="num-cell">${main}${subs}</div>`;
+          const target = slot && (slot.main || slot.subs[0]);
+          tiles += target
+            ? `<button type="button" class="num-tile" data-num="${target.num}" title="§ ${target.num} ${escapeHtml(target.title)}" ${cur === String(n) ? 'aria-current="true"' : ''}>${n}</button>`
+            : `<span class="num-tile empty" aria-hidden="true">${n === 0 ? '' : n}</span>`;
         }
+        html += `<div class="num-row"><div class="num-row-label">${row === 0 ? '1–9' : `${row * 10}–${row * 10 + 9}`}</div><div class="num-tiles">${tiles}</div></div>`;
       }
       return `<div class="num-grid">${html}</div>`;
     }
 
+    // Zusammengehörige Paragraphen (12, 12a, 12b …) als Chips auf der Seite des Paragraphen
+    function relatedHtml(p) {
+      const base = baseOf(p.num);
+      const group = pars.filter((x) => baseOf(x.num) === base);
+      if (group.length < 2) return '';
+      return `<div class="related"><span>Dazu gehören:</span>${group.map((x) => `<button type="button" data-num="${x.num}" title="${escapeHtml(x.title)}" ${x.num === p.num ? 'aria-current="true"' : ''}>§ ${x.num}</button>`).join('')}</div>`;
+    }
+
+    const isMobile = () => matchMedia('(max-width: 860px)').matches;
+    const tocOpen = () => $('#layout').classList.contains(isMobile() ? 'mobile-toc' : 'side-open');
+
     function viewsHtml() {
       return `<div class="law-views">
         <button type="button" data-view="grid" aria-pressed="${pane === 'grid'}">▦ Übersicht</button>
-        <button type="button" data-view="toc" class="only-mobile">☰ Inhalt</button>
+        <button type="button" data-view="toc" aria-pressed="${tocOpen()}">☰ Inhaltsverzeichnis</button>
       </div>`;
     }
 
@@ -350,6 +363,7 @@
         </div>
         <div class="law-crumb">${escapeHtml(law.short)} › ${escapeHtml(crumbOf(current.num))}</div>
         <div class="par-head"><span class="par-num">§ ${current.num}</span><h2 class="par-title">${highlight(escapeHtml(current.title))}</h2></div>
+        ${relatedHtml(current)}
         ${linesHtml(current.text)}
         ${current.notes.length ? `<details class="notes"><summary>Änderungshistorie (${current.notes.length})</summary>${current.notes.map((n) => `<p>${escapeHtml(n)}</p>`).join('')}</details>` : ''}`;
     }
@@ -379,10 +393,12 @@
         window.scrollTo({ top: 0 });
         history.replaceState(null, '', `#${law.slug}`);
       } else {
-        $('#layout').classList.add('mobile-toc');
+        const cls = isMobile() ? 'mobile-toc' : 'side-open';
+        $('#layout').classList.toggle(cls);
         renderToc();
+        renderRead();
         const cur = $('#toc [aria-current]');
-        if (cur) cur.scrollIntoView({ block: 'center' });
+        if (cur && tocOpen()) cur.scrollIntoView({ block: 'center' });
       }
     }
 
@@ -437,7 +453,7 @@
     document.addEventListener('keydown', (e) => {
       if (!law || e.metaKey || e.ctrlKey || e.altKey) return;
       const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
-      if (e.key === '/' && !typing) { e.preventDefault(); $('#search').focus(); return; }
+      if (e.key === '/' && !typing) { e.preventDefault(); if (!tocOpen()) showView('toc'); $('#search').focus(); return; }
       if (typing || !current || pane !== 'read') return;
       const i = pars.indexOf(current);
       if (e.key === 'ArrowLeft' && pars[i - 1]) show(pars[i - 1].num);
