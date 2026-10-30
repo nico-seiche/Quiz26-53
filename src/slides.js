@@ -93,10 +93,16 @@ function cleanElement(e, i) {
   return null;
 }
 
+// Hintergrund: Farbe (String), Farbverlauf { from, to, angle } oder Bild { image, fit, overlay, color }
 function cleanBg(bg) {
-  if (bg && typeof bg === 'object') return { from: color(bg.from, '#ffffff'), to: color(bg.to, '#ffffff'), angle: num(bg.angle, 0, 360, 135) };
+  if (bg && typeof bg === 'object') {
+    const image = assetUrl(bg.image);
+    if (image) return { image, fit: pick(bg.fit, ['cover', 'contain'], 'cover'), overlay: num(bg.overlay, -0.9, 0.9, 0), color: color(bg.color, '#ffffff') };
+    return { from: color(bg.from, '#ffffff'), to: color(bg.to, '#ffffff'), angle: num(bg.angle, 0, 360, 135) };
+  }
   return color(bg, '#ffffff');
 }
+const hexOnly = (v) => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : null);
 
 function cleanDeck(data) {
   if (!data || typeof data !== 'object' || !Array.isArray(data.slides)) throw new Error('Ungültige Präsentation');
@@ -114,7 +120,11 @@ function cleanDeck(data) {
       elements: list.map(cleanElement).filter(Boolean),
     };
   });
-  const out = { v: 1, slides };
+  // Eigene Farben und Verläufe der Präsentation (für die Auswahl im Editor)
+  const palette = (Array.isArray(data.palette) ? data.palette : []).map(hexOnly).filter(Boolean).slice(0, 24);
+  const gradients = (Array.isArray(data.gradients) ? data.gradients : []).slice(0, 12)
+    .map((g) => (g && typeof g === 'object' && hexOnly(g.from) && hexOnly(g.to) ? { from: hexOnly(g.from), to: hexOnly(g.to), angle: num(g.angle, 0, 360, 135) } : null)).filter(Boolean);
+  const out = { v: 1, slides, palette: [...new Set(palette)], gradients };
   if (Buffer.byteLength(JSON.stringify(out)) > MAX_JSON_BYTES) throw new Error('Die Präsentation ist zu groß');
   return out;
 }

@@ -74,6 +74,29 @@
     .ed-props .mini { padding: .3rem .55rem; font-size: .82rem; margin: 0; }
     .swatches { display: flex; flex-wrap: wrap; gap: .35rem; }
     .swatch { width: 2.1rem; height: 1.4rem; border-radius: 6px; border: 1px solid var(--border); padding: 0; box-shadow: none; cursor: pointer; margin: 0; }
+    .colorbtn { width: 2.6rem; height: 2.1rem; padding: 0; border: 2px solid var(--border); border-radius: 9px; cursor: pointer; margin: 0; box-shadow: none; flex: none; position: relative; overflow: hidden; }
+    .colorbtn.none::after { content: ''; position: absolute; left: -10%; top: 50%; width: 120%; height: 2px; background: #e11d48; transform: rotate(-35deg); }
+    .bgbtn { width: 4.4rem; height: 2.6rem; border-radius: 10px; border: 2px solid var(--border); cursor: pointer; padding: 0; box-shadow: none; margin: 0; }
+    .pop { position: fixed; z-index: 70; width: 19.5rem; max-width: calc(100vw - 16px); max-height: min(80vh, 36rem); overflow-y: auto; padding: .8rem; background: var(--card); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 16px 50px rgba(30, 30, 80, .32); }
+    .pop h4 { margin: .7rem 0 .35rem; font-size: .76rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+    .pop h4:first-child { margin-top: 0; }
+    .pop .sw { width: 1.75rem; height: 1.75rem; border-radius: 8px; border: 1px solid rgba(120, 120, 150, .45); padding: 0; cursor: pointer; box-shadow: none; margin: 0; }
+    .pop .sw.on { outline: 3px solid var(--primary); outline-offset: 1px; }
+    .pop .sw.wide { width: 2.6rem; }
+    .pop .sw-row { display: flex; flex-wrap: wrap; gap: .35rem; }
+    .pop.editing .sw.custom { outline: 2px dashed #e11d48; outline-offset: 1px; position: relative; }
+    .pop input[type="color"] { width: 2.4rem; height: 2rem; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: none; cursor: pointer; margin: 0; }
+    .pop input[type="text"], .pop input[type="number"], .pop select { margin: 0; padding: .35rem .5rem; font-size: .9rem; }
+    .pop .tabs { display: flex; gap: .3rem; margin-bottom: .7rem; }
+    .pop .tabs button { flex: 1; padding: .4rem .3rem; font-size: .88rem; margin: 0; }
+    .pop .tabs button[aria-pressed="true"] { background: var(--primary-grad); color: #fff; border-color: transparent; }
+    .pop .gprev { height: 3.2rem; border-radius: 12px; border: 1px solid var(--border); margin-bottom: .6rem; }
+    .pop .imgprev { height: 5rem; border-radius: 12px; border: 1px solid var(--border); background: #e9ecfa center / cover no-repeat; margin-bottom: .5rem; }
+    .pop label { font-size: .8rem; margin: .45rem 0 .15rem; display: block; }
+    .pop .mini { padding: .3rem .55rem; font-size: .82rem; margin: 0; }
+    .ask-backdrop { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 1rem; background: rgba(14, 16, 36, .6); }
+    .ask { width: min(26rem, 100%); margin: 0; }
+    .ask-prev { height: 6.5rem; border-radius: 14px; border: 1px solid var(--border); margin: .4rem 0 .8rem; }
     .drop-hint { outline: 3px dashed var(--primary); outline-offset: -6px; }
     @media (max-width: 700px) { .blocks-pop { column-count: 1; } }
     @media (max-width: 1000px) {
@@ -117,6 +140,16 @@
     <aside class="ed-props" id="props" aria-label="Eigenschaften"></aside>
   </div>
   <input type="file" id="file" accept="image/*" hidden>
+  <input type="file" id="bgfile" accept="image/*" hidden>
+  <div class="pop" id="pop" hidden></div>
+  <div class="ask-backdrop" id="ask" hidden>
+    <div class="ask card" role="dialog" aria-modal="true" aria-labelledby="ask-title">
+      <h2 id="ask-title">Hintergrund für alle Folien übernehmen?</h2>
+      <div class="ask-prev" id="ask-prev"></div>
+      <p class="muted" style="margin:.2rem 0 1rem">Du hast den Hintergrund dieser Folie geändert. Soll er bei allen <span id="ask-n"></span> Folien gelten?</p>
+      <div class="row-inline"><button type="button" class="primary" id="ask-all">Für alle Folien</button><button type="button" id="ask-one">Nur diese Folie</button></div>
+    </div>
+  </div>
   <script src="/js/changelog.js"></script>
   <script src="/js/common.js"></script>
   <script src="/js/slides-render.js"></script>
@@ -394,38 +427,43 @@
       }
     }
 
-    // Bild verkleinern (längste Seite 1600 px) und hochladen
+    // Bild verkleinern (längste Seite maxSide px) und hochladen → { url, w, h }
+    async function uploadAsset(file, maxSide = 1600) {
+      const bmp = await createImageBitmap(file).catch(() => null);
+      let blob = file;
+      let w; let h;
+      if (bmp) {
+        const k = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+        w = Math.round(bmp.width * k); h = Math.round(bmp.height * k);
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(bmp, 0, 0, w, h);
+        const keepPng = /png|gif|webp/.test(file.type);
+        blob = await new Promise((r) => c.toBlob(r, keepPng ? 'image/png' : 'image/jpeg', 0.88));
+        if (keepPng && blob.size > 1400000) blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.85));
+        if (blob.size > 1450000) blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.7));
+      } else { w = 800; h = 450; }
+      const res = await fetch(`/api/slides/${id}/assets`, { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'Hochladen fehlgeschlagen');
+      return { url: body.url, w, h };
+    }
     async function uploadImage(file, placeholderId) {
       if (!file || !/^image\//.test(file.type)) return;
       setState('Bild wird hochgeladen …');
       try {
-        const bmp = await createImageBitmap(file).catch(() => null);
-        let blob = file;
-        let w; let h;
-        if (bmp) {
-          const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
-          w = Math.round(bmp.width * k); h = Math.round(bmp.height * k);
-          const c = document.createElement('canvas');
-          c.width = w; c.height = h;
-          c.getContext('2d').drawImage(bmp, 0, 0, w, h);
-          const keepPng = /png|gif|webp/.test(file.type);
-          blob = await new Promise((r) => c.toBlob(r, keepPng ? 'image/png' : 'image/jpeg', 0.88));
-          if (keepPng && blob.size > 1400000) blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.85));
-        } else { w = 800; h = 450; }
-        const res = await fetch(`/api/slides/${id}/assets`, { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob });
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(body.error || 'Hochladen fehlgeschlagen');
+        const { url, w, h } = await uploadAsset(file);
         const ph = placeholderId && elOf(placeholderId);
         if (ph && ph.type === 'placeholder') {   // Platzhalter durch das Bild ersetzen (gleiche Position und Größe, zugeschnitten)
           pushHist();
-          Object.assign(ph, { type: 'image', src: body.url, fit: 'cover', radius: ph.radius || 0 });
+          Object.assign(ph, { type: 'image', src: url, fit: 'cover', radius: ph.radius || 0 });
           delete ph.label;
           selId = ph.id;
           afterChange({ props: true });
         } else {
           const k = Math.min(1, 900 / w, 520 / h);
           const iw = Math.round(w * k); const ih = Math.round(h * k);
-          addElement({ type: 'image', x: Math.round((W - iw) / 2), y: Math.round((H - ih) / 2), w: iw, h: ih, src: body.url, fit: 'contain', radius: 0 });
+          addElement({ type: 'image', x: Math.round((W - iw) / 2), y: Math.round((H - ih) / 2), w: iw, h: ih, src: url, fit: 'contain', radius: 0 });
         }
         setState('');
       } catch (err) { setState(err.message, 'warn'); }
@@ -633,12 +671,15 @@
     });
 
     // ---------------- Eigenschaften ----------------
-    const COLORS = ['#ffffff', '#f3f4f8', '#14172e', '#1b1d3a', '#4f6cf5', '#7c4dff', '#e11d48', '#d97706', '#16a34a', '#0ea5e9'];
+    const BASE_COLORS = ['#ffffff', '#f3f4f8', '#d0d5e8', '#8a90b8', '#3d4266', '#14172e', '#000000', '#e11d48', '#f97316', '#facc15', '#16a34a', '#0ea5e9', '#4f6cf5', '#7c4dff', '#d946ef', '#14b8a6'];
     const GRADIENTS = [
       { from: '#4f6cf5', to: '#7c4dff', angle: 135 }, { from: '#1fd1c3', to: '#4f8cff', angle: 135 },
       { from: '#f97316', to: '#e11d48', angle: 135 }, { from: '#14172e', to: '#3b2a7a', angle: 160 },
+      { from: '#fde68a', to: '#fb7185', angle: 135 }, { from: '#0f172a', to: '#334155', angle: 180 },
     ];
     const seg = (name, items, value) => `<div class="seg" role="group">${items.map(([v, label, title]) => `<button type="button" data-set="${name}" data-value="${v}" aria-pressed="${value === v}" title="${title || ''}">${label}</button>`).join('')}</div>`;
+    const colorBg = (c) => (c === 'none' ? 'transparent' : SlideRender.resolve(c, slide(), '#000000'));
+    const colorCls = (c) => (c === 'none' ? 'none' : '');
     const colorHex = (c, e) => { const v = SlideRender.resolve(c, slide(), '#000000'); return /^#[0-9a-f]{6}$/i.test(v) ? v : '#000000'; };
     const num = (name, v, extra = '') => `<input type="number" data-num="${name}" value="${Math.round(v)}" ${extra}>`;
 
@@ -652,10 +693,9 @@
         box.innerHTML = `
           <h3>Folie ${cur + 1} von ${deck.data.slides.length}</h3>
           <label>Hintergrund</label>
-          <div class="row-inline"><input type="color" data-bg="color" value="${typeof bg === 'string' ? bg : bg.from}" aria-label="Hintergrundfarbe">
-            <button type="button" class="mini" data-bg-all>Auf alle Folien</button></div>
-          <div class="swatches" style="margin-top:.5rem">${COLORS.map((c) => `<button type="button" class="swatch" style="background:${c}" data-bg-set="${c}" aria-label="${c}"></button>`).join('')}
-            ${GRADIENTS.map((g, i) => `<button type="button" class="swatch" style="background:linear-gradient(${g.angle}deg,${g.from},${g.to})" data-bg-grad="${i}" aria-label="Farbverlauf ${i + 1}"></button>`).join('')}</div>
+          <div class="row-inline"><button type="button" class="bgbtn" id="bg-open" style="background:${SlideRender.bgCss(s)}" aria-label="Hintergrund ändern" title="Hintergrund ändern"></button>
+            <button type="button" class="mini" id="bg-open2">Ändern …</button></div>
+          <div class="row-inline" style="margin-top:.5rem"><button type="button" class="mini" data-bg-all ${deck.data.slides.length < 2 ? 'disabled' : ''}>Auf alle Folien</button></div>
           <label for="trans">Übergang zur Folie</label>
           <select id="trans" data-slide-prop="transition"><option value="fade">Überblenden</option><option value="slide">Schieben</option><option value="none">Keiner</option></select>
           <label for="notes">Notizen (nur für dich, im Präsentationsmodus mit N)</label>
@@ -686,20 +726,20 @@
             ${seg('valign', [['top', '⤒', 'Oben'], ['middle', '↕', 'Mitte'], ['bottom', '⤓', 'Unten']], e.valign || (e.type === 'shape' ? 'middle' : 'top'))}
             ${seg('list', [['none', '¶', 'Fließtext'], ['bullet', '•', 'Aufzählung'], ['number', '1.', 'Nummerierung']], e.list || 'none')}</div>
           <label>Textfarbe</label>
-          <div class="row-inline"><input type="color" data-color="color" value="${colorHex(e.color)}" aria-label="Textfarbe"><button type="button" class="mini" data-color-auto="color" aria-pressed="${e.color === 'auto'}">Automatisch</button></div>`;
+          <div class="row-inline"><button type="button" class="colorbtn ${colorCls(e.color)}" data-pick="color" data-auto="1" data-none="" style="background:${colorBg(e.color)}" aria-label="Textfarbe"></button><button type="button" class="mini" data-color-auto="color" aria-pressed="${e.color === 'auto'}">Automatisch</button></div>`;
       }
       if (e.type === 'shape') {
         html += `
           <label for="p-kind">Form</label>
           <select id="p-kind" data-set-select="kind"><option value="rect">Rechteck</option><option value="ellipse">Kreis / Ellipse</option><option value="triangle">Dreieck</option></select>
           <label>Füllung</label>
-          <div class="row-inline"><input type="color" data-color="fill" value="${colorHex(e.fill)}" aria-label="Füllfarbe"><button type="button" class="mini" data-color-none="fill">Keine</button></div>
+          <div class="row-inline"><button type="button" class="colorbtn ${colorCls(e.fill)}" data-pick="fill" data-auto="" data-none="1" style="background:${colorBg(e.fill)}" aria-label="Füllfarbe"></button><button type="button" class="mini" data-color-none="fill">Keine</button></div>
           <label>Rahmen</label>
-          <div class="row-inline"><input type="color" data-color="stroke" value="${colorHex(e.stroke)}" aria-label="Rahmenfarbe">${num('strokeWidth', e.strokeWidth || 0, 'min="0" max="40" aria-label="Rahmenstärke" style="width:4.5rem"')}<button type="button" class="mini" data-color-none="stroke">Keiner</button></div>
+          <div class="row-inline"><button type="button" class="colorbtn ${colorCls(e.stroke)}" data-pick="stroke" data-auto="" data-none="1" style="background:${colorBg(e.stroke)}" aria-label="Rahmenfarbe"></button>${num('strokeWidth', e.strokeWidth || 0, 'min="0" max="40" aria-label="Rahmenstärke" style="width:4.5rem"')}<button type="button" class="mini" data-color-none="stroke">Keiner</button></div>
           ${e.kind === 'rect' ? `<label for="p-radius">Rundung</label><input id="p-radius" type="range" min="0" max="200" value="${e.radius || 0}" data-range="radius">` : ''}`;
       }
       if (e.type === 'text') {
-        html += `<label>Hintergrund des Felds</label><div class="row-inline"><input type="color" data-color="fill" value="${colorHex(e.fill === 'none' ? '#ffffff' : e.fill)}" aria-label="Hintergrundfarbe"><button type="button" class="mini" data-color-none="fill">Keiner</button></div>`;
+        html += `<label>Hintergrund des Felds</label><div class="row-inline"><button type="button" class="colorbtn ${colorCls(e.fill)}" data-pick="fill" data-auto="" data-none="1" style="background:${colorBg(e.fill)}" aria-label="Hintergrundfarbe des Felds"></button><button type="button" class="mini" data-color-none="fill">Keiner</button></div>`;
       }
       if (e.type === 'image') {
         html += `<label for="p-fit">Anpassung</label><select id="p-fit" data-set-select="fit"><option value="contain">Ganz zeigen</option><option value="cover">Füllen (zuschneiden)</option></select>
@@ -720,10 +760,10 @@
           <label for="p-tsize">Schrift</label>
           <div class="grid2"><select id="p-tfont" data-set-select="font"><option value="sans">Modern</option><option value="serif">Serif</option><option value="display">Display</option><option value="mono">Mono</option></select>${num('size', e.size, 'min="8" max="120" aria-label="Schriftgröße" id="p-tsize"')}</div>
           <div style="margin-top:.5rem">${seg('align', [['left', '⯇', 'Linksbündig'], ['center', '≡', 'Zentriert'], ['right', '⯈', 'Rechtsbündig']], e.align)}</div>
-          <label>Textfarbe</label><div class="row-inline"><input type="color" data-color="color" value="${colorHex(e.color)}" aria-label="Textfarbe"><button type="button" class="mini" data-color-auto="color" aria-pressed="${e.color === 'auto'}">Automatisch</button></div>
-          <div class="grid2"><div><label>Kopf: Füllung</label><input type="color" data-color="headFill" value="${colorHex(e.headFill)}" aria-label="Kopfzeile Füllung"></div>
-            <div><label>Kopf: Schrift</label><input type="color" data-color="headColor" value="${colorHex(e.headColor)}" aria-label="Kopfzeile Schrift"></div></div>
-          <label>Rahmenfarbe</label><div class="row-inline"><input type="color" data-color="border" value="${colorHex(e.border)}" aria-label="Rahmenfarbe"></div>`;
+          <label>Textfarbe</label><div class="row-inline"><button type="button" class="colorbtn ${colorCls(e.color)}" data-pick="color" data-auto="1" data-none="" style="background:${colorBg(e.color)}" aria-label="Textfarbe"></button><button type="button" class="mini" data-color-auto="color" aria-pressed="${e.color === 'auto'}">Automatisch</button></div>
+          <div class="grid2"><div><label>Kopf: Füllung</label><button type="button" class="colorbtn ${colorCls(e.headFill)}" data-pick="headFill" data-auto="" data-none="" style="background:${colorBg(e.headFill)}" aria-label="Kopfzeile Füllung"></button></div>
+            <div><label>Kopf: Schrift</label><button type="button" class="colorbtn ${colorCls(e.headColor)}" data-pick="headColor" data-auto="" data-none="" style="background:${colorBg(e.headColor)}" aria-label="Kopfzeile Schrift"></button></div></div>
+          <label>Rahmenfarbe</label><div class="row-inline"><button type="button" class="colorbtn ${colorCls(e.border)}" data-pick="border" data-auto="" data-none="" style="background:${colorBg(e.border)}" aria-label="Rahmenfarbe"></button></div>`;
       }
       if (e.type === 'shape' || e.type === 'text') {
         html += `<label for="p-goto">Bei Klick springen zu Folie (Präsentation)</label>
@@ -761,10 +801,8 @@
       const t = ev.target;
       const e = sel();
       if (t.dataset.num && e) { const v = Number(t.value); if (Number.isFinite(v)) setProp(t.dataset.num, ['w', 'h'].includes(t.dataset.num) ? Math.max(20, v) : v); }
-      else if (t.dataset.color && e) setProp(t.dataset.color, t.value);
       else if (t.dataset.range && e) setProp(t.dataset.range, Number(t.value));
       else if (t.dataset.str && e) setProp(t.dataset.str, t.value);
-      else if (t.dataset.bg === 'color') { pushHist('bg'); slide().bg = t.value; afterChange(); }
       else if (t.dataset.slideProp) { pushHist(`s:${t.dataset.slideProp}`); slide()[t.dataset.slideProp] = t.value; if (t.dataset.slideProp === 'notes') dirty(); else afterChange(); }
     });
     props.addEventListener('change', (ev) => {
@@ -781,8 +819,8 @@
       else if (d.set) setProp(d.set, d.value);
       else if (d.colorAuto) setProp(d.colorAuto, 'auto');
       else if (d.colorNone) setProp(d.colorNone, 'none');
-      else if (d.bgSet !== undefined) { pushHist(); slide().bg = d.bgSet; afterChange({ props: true }); }
-      else if (d.bgGrad !== undefined) { pushHist(); slide().bg = { ...GRADIENTS[Number(d.bgGrad)] }; afterChange({ props: true }); }
+      else if (t.id === 'bg-open' || t.id === 'bg-open2') openBgPop(t);
+      else if (d.pick && e) openColorPop(t, d.pick);
       else if (d.bgAll !== undefined) { pushHist(); deck.data.slides.forEach((s) => { s.bg = JSON.parse(JSON.stringify(slide().bg)); }); renderAll(); dirty(); }
       else if (d.slideOp === 'up') moveSlide(cur, cur - 1);
       else if (d.slideOp === 'down') moveSlide(cur, cur + 2);
@@ -845,6 +883,185 @@
       selId = null;
       afterChange({ props: true });
     }
+
+    // ---------------- Farbwahl und Hintergrund (Popover) ----------------
+    const pop = $('#pop');
+    let popState = null;      // { kind: 'color' | 'bg', anchor, ... }
+    const HEX6 = /^#[0-9a-f]{6}$/i;
+    const palette = () => { if (!deck.data.palette) deck.data.palette = []; return deck.data.palette; };
+    const gradientsList = () => { if (!deck.data.gradients) deck.data.gradients = []; return deck.data.gradients; };
+    function addCustomColor(c) {
+      c = String(c).toLowerCase();
+      if (!HEX6.test(c) || BASE_COLORS.includes(c) || palette().includes(c)) return;
+      palette().unshift(c);
+      if (palette().length > 24) palette().length = 24;
+      dirty();
+    }
+    function placePop(anchor) {
+      const r = anchor.getBoundingClientRect();
+      pop.hidden = false;
+      const pw = pop.offsetWidth; const ph = pop.offsetHeight;
+      let left = clamp(r.left, 8, innerWidth - pw - 8);
+      let top = r.bottom + 6;
+      if (top + ph > innerHeight - 8) top = Math.max(8, r.top - ph - 6);
+      pop.style.left = `${left}px`; pop.style.top = `${top}px`;
+    }
+    function closePop() {
+      if (!popState) return;
+      const st = popState;
+      popState = null;
+      pop.hidden = true;
+      pop.classList.remove('editing');
+      if (st.kind === 'bg' && JSON.stringify(slide().bg) !== st.before && deck.data.slides.length > 1) askAll();
+    }
+    const swatch = (c, cur, extra = '') => `<button type="button" class="sw ${extra} ${c.toLowerCase() === String(cur).toLowerCase() ? 'on' : ''}" data-sw="${c}" style="background:${c}" aria-label="${c}"></button>`;
+    function colorsHtml(cur) {
+      const custom = palette();
+      return `<h4>Farben</h4><div class="sw-row">${BASE_COLORS.map((c) => swatch(c, cur)).join('')}</div>
+        <h4>Eigene Farben ${custom.length ? '<button type="button" class="mini" data-edit-custom style="float:right;padding:.1rem .45rem">✎</button>' : ''}</h4>
+        <div class="sw-row">${custom.map((c) => swatch(c, cur, 'custom')).join('')}
+          <label class="sw" style="display:grid;place-items:center;font-weight:900;cursor:pointer;background:var(--bg)" title="Eigene Farbe wählen">＋<input type="color" data-native style="position:absolute;opacity:0;width:0;height:0" value="${HEX6.test(cur) ? cur : '#4f6cf5'}"></label></div>
+        <div class="row-inline" style="margin-top:.5rem"><input type="text" data-hex placeholder="#rrggbb" maxlength="7" style="width:6.5rem" aria-label="Hex-Farbe"><button type="button" class="mini" data-hex-ok>Übernehmen</button></div>`;
+    }
+    // Farbe eines Elements (Text-, Füll-, Rahmenfarbe …)
+    function openColorPop(anchor, prop) {
+      if (popState) closePop();
+      const e = sel();
+      const apply = (v, key) => { setProp(prop, v, key || `pick:${prop}`); anchor.style.background = colorBg(v); anchor.classList.toggle('none', v === 'none'); };
+      popState = { kind: 'color', anchor, apply, prop };
+      const cur = SlideRender.resolve(e[prop], slide(), '#000000');
+      pop.innerHTML = `${colorsHtml(cur)}<div class="row-inline" style="margin-top:.6rem">${anchor.dataset.auto ? '<button type="button" class="mini" data-sw="auto">Automatisch</button>' : ''}${anchor.dataset.none ? '<button type="button" class="mini" data-sw="none">Keine</button>' : ''}<button type="button" class="mini" data-pop-close style="margin-left:auto">Fertig</button></div>`;
+      placePop(anchor);
+    }
+    // Hintergrund der Folie: Farbe, Verlauf oder Bild
+    let gState = { from: '#4f6cf5', to: '#7c4dff', angle: 135 };
+    function applyBg(bg, key) { pushHist(key || 'bg'); slide().bg = bg; afterChange({ props: true }); }
+    function bgType(bg) { return typeof bg === 'string' ? 'color' : bg.image ? 'image' : 'gradient'; }
+    function openBgPop(anchor) {
+      if (popState) closePop();
+      const bg = slide().bg;
+      if (bgType(bg) === 'gradient') gState = { ...bg };
+      popState = { kind: 'bg', anchor, tab: bgType(bg), before: JSON.stringify(bg) };
+      renderBgPop();
+      placePop(anchor);
+    }
+    function renderBgPop() {
+      const bg = slide().bg;
+      const tab = popState.tab;
+      const tabs = `<div class="tabs" role="tablist">${[['color', 'Farbe'], ['gradient', 'Verlauf'], ['image', 'Bild']].map(([k, l]) => `<button type="button" data-bg-tab="${k}" aria-pressed="${tab === k}">${l}</button>`).join('')}</div>`;
+      let body = '';
+      if (tab === 'color') body = colorsHtml(typeof bg === 'string' ? bg : '');
+      if (tab === 'gradient') {
+        const g = bgType(bg) === 'gradient' ? bg : gState;
+        const custom = gradientsList();
+        const gsw = (x, extra = '') => `<button type="button" class="sw wide ${extra}" data-grad='${JSON.stringify(x)}' style="background:linear-gradient(${x.angle}deg,${x.from},${x.to})" aria-label="Farbverlauf"></button>`;
+        body = `<div class="gprev" id="gprev" style="background:linear-gradient(${g.angle}deg,${g.from},${g.to})"></div>
+          <div class="row-inline"><div><label>Von</label><input type="color" data-g="from" value="${g.from}"></div><button type="button" class="mini" data-g-swap title="Farben tauschen" style="align-self:flex-end">⇄</button><div><label>Nach</label><input type="color" data-g="to" value="${g.to}"></div></div>
+          <label>Richtung: <span id="gang">${Math.round(g.angle)}</span>°</label><input type="range" min="0" max="360" value="${g.angle}" data-g="angle" style="width:100%">
+          <div class="row-inline" style="margin-top:.5rem"><button type="button" class="mini" data-g-apply>Verlauf verwenden</button><button type="button" class="mini" data-g-save>＋ Als eigenen speichern</button></div>
+          <h4>Vorlagen</h4><div class="sw-row">${GRADIENTS.map((x) => gsw(x)).join('')}</div>
+          <h4>Eigene Verläufe ${custom.length ? '<button type="button" class="mini" data-edit-custom style="float:right;padding:.1rem .45rem">✎</button>' : ''}</h4>
+          <div class="sw-row">${custom.map((x) => gsw(x, 'custom')).join('') || '<span class="muted" style="font-size:.82rem">Noch keine – speichere oben einen.</span>'}</div>`;
+      }
+      if (tab === 'image') {
+        if (bgType(bg) === 'image') {
+          body = `<div class="imgprev" style="background-image:url('${bg.image}');background-size:${bg.fit === 'contain' ? 'contain' : 'cover'}"></div>
+            <div class="row-inline"><button type="button" class="mini" data-bg-pick>Anderes Bild …</button><button type="button" class="mini danger" data-bg-remove>Bild entfernen</button></div>
+            <label>Anpassung</label><select data-bgimg="fit"><option value="cover">Füllen (zuschneiden)</option><option value="contain">Ganz zeigen</option></select>
+            <label>Heller ◂ ▸ Dunkler (für lesbaren Text)</label><input type="range" min="-80" max="80" value="${Math.round((bg.overlay || 0) * 100)}" data-bgimg="overlay" style="width:100%">
+            <label>Farbe hinter dem Bild</label><input type="color" data-bgimg="color" value="${HEX6.test(bg.color) ? bg.color : '#ffffff'}">`;
+        } else body = '<p class="muted" style="margin:.2rem 0 .6rem">Ein Foto oder eine Grafik als Hintergrund der Folie.</p><button type="button" class="primary" data-bg-pick style="width:100%">🖼️ Bild auswählen</button>';
+      }
+      pop.innerHTML = `${tabs}${body}<div class="row-inline" style="margin-top:.7rem"><button type="button" class="mini" data-pop-close style="margin-left:auto">Fertig</button></div>`;
+      const fit = pop.querySelector('[data-bgimg="fit"]'); if (fit) fit.value = bg.fit || 'cover';
+    }
+    const gradApply = (key) => applyBg({ from: gState.from, to: gState.to, angle: gState.angle }, key);
+    function hexPick(v) { v = String(v).trim(); if (!v.startsWith('#')) v = `#${v}`; return HEX6.test(v) ? v.toLowerCase() : null; }
+
+    pop.addEventListener('click', (ev) => {
+      const t = ev.target.closest('button');
+      if (!t || !popState) return;
+      const d = t.dataset;
+      if (d.popClose !== undefined) return closePop();
+      if (d.editCustom !== undefined) { pop.classList.toggle('editing'); return; }
+      if (d.sw !== undefined) {
+        const c = d.sw;
+        if (pop.classList.contains('editing') && t.classList.contains('custom')) { palette().splice(palette().indexOf(c), 1); dirty(); return popState.kind === 'bg' ? renderBgPop() : openColorPop(popState.anchor, popState.prop); }
+        if (popState.kind === 'color') { popState.apply(c); return; }
+        applyBg(c, null); popState.tab = 'color'; return renderBgPop();
+      }
+      if (d.bgTab) { popState.tab = d.bgTab; return renderBgPop(); }
+      if (d.grad) {
+        const g = JSON.parse(d.grad);
+        if (pop.classList.contains('editing') && t.classList.contains('custom')) { const i = gradientsList().findIndex((x) => x.from === g.from && x.to === g.to && Math.round(x.angle) === Math.round(g.angle)); if (i >= 0) gradientsList().splice(i, 1); dirty(); return renderBgPop(); }
+        gState = { ...g }; applyBg({ ...g }); return renderBgPop();
+      }
+      if (d.gSwap !== undefined) { gState = { from: gState.to, to: gState.from, angle: gState.angle }; gradApply('bg'); return renderBgPop(); }
+      if (d.gApply !== undefined) { gradApply(); return renderBgPop(); }
+      if (d.gSave !== undefined) {
+        const g = { from: gState.from.toLowerCase(), to: gState.to.toLowerCase(), angle: Math.round(gState.angle) };
+        if (!gradientsList().some((x) => x.from === g.from && x.to === g.to && Math.round(x.angle) === g.angle)) { gradientsList().unshift(g); if (gradientsList().length > 12) gradientsList().length = 12; dirty(); }
+        return renderBgPop();
+      }
+      if (d.hexOk !== undefined) { const v = hexPick(pop.querySelector('[data-hex]').value); if (v) { addCustomColor(v); if (popState.kind === 'color') { popState.apply(v); openColorPop(popState.anchor, popState.prop); } else { applyBg(v); renderBgPop(); } } return; }
+      if (d.bgPick !== undefined) return $('#bgfile').click();
+      if (d.bgRemove !== undefined) { applyBg(slide().bg.color || '#ffffff'); popState.tab = 'color'; return renderBgPop(); }
+    });
+    pop.addEventListener('input', (ev) => {
+      const t = ev.target;
+      if (!popState) return;
+      if (t.dataset.native !== undefined) { if (popState.kind === 'color') popState.apply(t.value); else applyBg(t.value, 'bgnative'); }
+      else if (t.dataset.g) {
+        gState[t.dataset.g] = t.dataset.g === 'angle' ? Number(t.value) : t.value;
+        const prev = $('#gprev'); if (prev) prev.style.background = `linear-gradient(${gState.angle}deg,${gState.from},${gState.to})`;
+        if (t.dataset.g === 'angle') $('#gang').textContent = Math.round(gState.angle);
+        gradApply('bggrad');
+      } else if (t.dataset.bgimg) {
+        const bg = { ...slide().bg };
+        bg[t.dataset.bgimg] = t.dataset.bgimg === 'overlay' ? Number(t.value) / 100 : t.value;
+        applyBg(bg, 'bgimg');
+      }
+    });
+    pop.addEventListener('change', (ev) => {
+      const t = ev.target;
+      if (!popState) return;
+      if (t.dataset.native !== undefined) { addCustomColor(t.value); if (popState.kind === 'color') openColorPop(popState.anchor, popState.prop); else { popState.tab = 'color'; renderBgPop(); } }
+      else if (t.dataset.hex !== undefined) { const v = hexPick(t.value); if (v) pop.querySelector('[data-hex-ok]').click(); }
+      else if (t.dataset.bgimg === 'fit') { applyBg({ ...slide().bg, fit: t.value }, 'bgimg'); renderBgPop(); }
+    });
+    $('#bgfile').onchange = async (ev) => {
+      const f = ev.target.files[0];
+      ev.target.value = '';
+      if (!f || !popState || popState.kind !== 'bg') return;
+      setState('Bild wird hochgeladen …');
+      try {
+        const { url } = await uploadAsset(f, 1920);
+        const old = typeof slide().bg === 'object' && slide().bg.image ? slide().bg : null;
+        applyBg({ image: url, fit: old ? old.fit : 'cover', overlay: old ? old.overlay : 0, color: old ? old.color : '#ffffff' });
+        popState.tab = 'image'; renderBgPop();
+        setState('');
+      } catch (err) { setState(err.message, 'warn'); }
+    };
+    document.addEventListener('pointerdown', (ev) => { if (popState && !pop.hidden && !ev.target.closest('#pop, .colorbtn, .bgbtn, #bg-open2')) closePop(); });
+    addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && popState) closePop(); }, true);
+    addEventListener('resize', () => { if (popState) closePop(); });
+
+    // Rückfrage: Hintergrund für alle Folien übernehmen?
+    function askAll() {
+      $('#ask-prev').style.background = SlideRender.bgCss(slide());
+      $('#ask-n').textContent = deck.data.slides.length;
+      $('#ask').hidden = false;
+      $('#ask-all').focus();
+    }
+    $('#ask-all').onclick = () => {
+      pushHist();
+      const bg = slide().bg;
+      deck.data.slides.forEach((x) => { x.bg = JSON.parse(JSON.stringify(bg)); });
+      $('#ask').hidden = true;
+      renderAll(); dirty();
+    };
+    $('#ask-one').onclick = () => { $('#ask').hidden = true; };
+    $('#ask').addEventListener('click', (ev) => { if (ev.target === $('#ask')) $('#ask').hidden = true; });
 
     // ---------------- Folienleiste: Klicks, Ziehen ----------------
     $('#slides').addEventListener('click', (ev) => {

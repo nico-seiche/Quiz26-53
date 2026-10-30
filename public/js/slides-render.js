@@ -23,11 +23,21 @@ const SlideRender = (() => {
 
   function bgCss(slide) {
     const bg = slide.bg;
+    if (bg && typeof bg === 'object' && bg.image) {
+      const a = Math.abs(Number(bg.overlay) || 0);
+      const veil = a > 0.001 ? `linear-gradient(${bg.overlay > 0 ? `rgba(0,0,0,${a})` : `rgba(255,255,255,${a})`}, ${bg.overlay > 0 ? `rgba(0,0,0,${a})` : `rgba(255,255,255,${a})`}), ` : '';
+      return `${veil}url(${/^\/api\/slides\/assets\/\d+$/.test(bg.image) ? bg.image : ''}) center / ${bg.fit === 'contain' ? 'contain' : 'cover'} no-repeat, ${HEX.test(bg.color) ? bg.color : '#ffffff'}`;
+    }
     if (bg && typeof bg === 'object') return `linear-gradient(${Number(bg.angle) || 0}deg, ${HEX.test(bg.from) ? bg.from : '#fff'}, ${HEX.test(bg.to) ? bg.to : '#fff'})`;
     return HEX.test(bg) ? bg : '#ffffff';
   }
-  const bgBase = (slide) => (slide.bg && typeof slide.bg === 'object' ? slide.bg.from : slide.bg);
-  const isDark = (slide) => luminance(bgBase(slide) || '#ffffff') < 0.35;
+  const bgBase = (slide) => (slide.bg && typeof slide.bg === 'object' ? (slide.bg.image ? slide.bg.color : slide.bg.from) : slide.bg);
+  // Bild mit starker Abdunkelung/Aufhellung entscheidet über die automatische Textfarbe, sonst die Farbe dahinter
+  const isDark = (slide) => {
+    const bg = slide.bg;
+    if (bg && typeof bg === 'object' && bg.image) { if (bg.overlay >= 0.35) return true; if (bg.overlay <= -0.35) return false; }
+    return luminance(bgBase(slide) || '#ffffff') < 0.35;
+  };
   const autoColor = (slide) => (isDark(slide) ? LIGHT_TEXT : DARK_TEXT);
   // „auto“ = Kontrastfarbe zum Folienhintergrund, „none“ = keine Farbe
   function resolve(c, slide, dflt) {
