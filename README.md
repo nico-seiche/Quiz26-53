@@ -238,3 +238,7 @@ Präsentationen wie in PowerPoint: Link im Profil → `/slides` (Liste), `/slide
 ## Startseite
 
 Unter „Einem Quiz beitreten“ ist die Schnellauswahl zweigeteilt: links **Erstellen** (Quiz, Umfrage über `/edit?kind=poll`, Lernset, Präsentation), rechts **Ansehen** (Meine Quiz, Lernen, Präsentationen, Gesetze, Bestenliste).
+
+## Zoom
+
+Zoomen per Pinch und Doppeltippen ist abgeschaltet (`maximum-scale=1, user-scalable=no`, `touch-action: pan-x pan-y`, `gesturestart` abgefangen; auf Touch-Geräten haben Eingabefelder mindestens 16 px, damit iOS nicht hineinzoomt).

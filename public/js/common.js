@@ -218,3 +218,11 @@ function mountTheme() {
   }
   themeQuery.addEventListener('change', () => document.querySelectorAll('.theme-switch').forEach(syncSwitch));
 }
+
+// Kein Zoomen per Zwei-Finger-Geste (auch in der installierten App): iOS ignoriert user-scalable=no teilweise, deshalb zusätzlich die
+// Gesten abfangen. Doppeltippen-Zoom ist über touch-action (CSS) abgeschaltet; Tippen und Scrollen bleiben unberührt.
+(() => {
+  const stop = (e) => e.preventDefault();
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach((t) => document.addEventListener(t, stop, { passive: false }));
+  document.addEventListener('touchmove', (e) => { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+})();
