@@ -694,3 +694,11 @@ body.lobby-lock .info-bar { margin-bottom: .5rem; }
 .mode-pick button { display: flex; flex-direction: column; align-items: flex-start; gap: .15rem; text-align: left; padding: .7rem .9rem; border: 2px solid var(--border); border-radius: 14px; background: var(--card); color: var(--text); cursor: pointer; box-shadow: none; }
 .mode-pick button[aria-checked="true"] { border-color: var(--primary); background: var(--bg); }
 .mode-pick .muted { font-size: .85rem; font-weight: 500; }
+.player-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: .6rem; max-height: 17rem; overflow-y: auto; padding: .4rem; margin-bottom: 1rem; overscroll-behavior: contain; }
+.player-pick button { position: relative; display: flex; flex-direction: column; align-items: center; gap: .3rem; padding: .9rem .5rem .75rem; border: 2px solid var(--border); border-radius: 18px; background: var(--card); color: var(--text); text-align: center; cursor: pointer; box-shadow: none; transition: transform .12s, border-color .12s, background .12s; }
+.player-pick button:hover { transform: translateY(-2px); border-color: var(--primary); }
+.player-pick button[aria-checked="true"] { border-color: var(--primary); background: var(--bg); box-shadow: var(--glow); }
+.player-pick .pp-name { font-weight: 800; font-size: 1.02rem; max-width: 100%; overflow-wrap: anywhere; line-height: 1.2; }
+.player-pick .pp-code { font-size: .8rem; }
+.player-pick .pp-check { position: absolute; top: .4rem; right: .45rem; width: 1.5rem; height: 1.5rem; display: none; place-items: center; border-radius: 50%; background: var(--primary-grad); color: #fff; font-size: .85rem; font-weight: 900; }
+.player-pick button[aria-checked="true"] .pp-check { display: grid; }

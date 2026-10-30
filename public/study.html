@@ -40,7 +40,7 @@
       <button type="button" class="changelog-x" id="duel-close" aria-label="Schließen">✕</button>
       <h2 id="duel-title">⚔️ Battle starten</h2>
       <form id="duel-form">
-        <label for="duel-friend">Gegen wen?</label>
+        <label id="duel-friend-label">Gegen wen?</label>
         <div id="duel-friend-box"></div>
         <label for="duel-set">Welches Lernset?</label>
         <select id="duel-set"></select>
@@ -49,7 +49,7 @@
           <button type="button" role="radio" aria-checked="true" data-mode="cloze"><strong>✏️ Lückentext</strong><span class="muted">Ihr füllt gleichzeitig dieselben Lücken aus – schneller und genauer gewinnt.</span></button>
         </div>
         <p class="error" id="duel-error"></p>
-        <button class="primary" type="submit" id="duel-go" style="width:100%">Herausfordern</button>
+        <button class="primary" type="submit" id="duel-go" style="width:100%" disabled>Herausfordern</button>
       </form>
     </div>
   </div>
@@ -109,6 +109,8 @@
     // --- Battle starten: Spieler, Lernset und Spielmodus im Menü wählen ---
     let allSets = [];
     let duelFriends = null;
+    let duelPick = null;       // gewählter Gegner
+    let duelSetsOk = false;
     const battleSets = () => allSets.filter((x) => x.card_count >= 3);
     async function openDuel() {
       $('#duel-error').textContent = '';
@@ -121,18 +123,33 @@
         $('#duel-friend-box').innerHTML = '<span class="muted">Lade Freunde …</span>';
         try { duelFriends = (await api('/api/friends')).friends; } catch (err) { $('#duel-friend-box').innerHTML = ''; $('#duel-error').textContent = err.message; return; }
       }
+      duelPick = null;
       $('#duel-friend-box').innerHTML = duelFriends.length
-        ? `<select id="duel-friend">${duelFriends.map((f) => `<option value="${escapeHtml(f.username)}">${escapeHtml(f.username)} ${escapeHtml(f.code)}</option>`).join('')}</select>`
+        ? `<div class="player-pick" role="radiogroup" aria-labelledby="duel-friend-label">${duelFriends.map((f) => `
+            <button type="button" role="radio" aria-checked="false" data-friend="${escapeHtml(f.username)}">
+              ${avatarHtml(f.username, '3.4rem')}
+              <span class="pp-name">${escapeHtml(f.username)}</span>
+              <span class="muted pp-code">${escapeHtml(f.code)}</span>
+              <span class="pp-check" aria-hidden="true">✓</span>
+            </button>`).join('')}</div>`
         : '<p class="muted" style="margin:0">Du hast noch keine Freunde. <a href="/friends">Freunde hinzufügen →</a></p>';
-      $('#duel-go').disabled = !duelFriends.length || !sets.length;
+      $('#duel-go').disabled = true;
+      duelSetsOk = sets.length > 0;
     }
     $('#fab-battle').onclick = openDuel;
+    $('#duel-friend-box').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-friend]');
+      if (!b) return;
+      duelPick = b.dataset.friend;
+      document.querySelectorAll('#duel-friend-box [data-friend]').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+      $('#duel-go').disabled = !duelSetsOk;
+    });
     $('#duel-close').onclick = () => { $('#duel').hidden = true; };
     $('#duel').addEventListener('click', (e) => { if (e.target === $('#duel')) $('#duel').hidden = true; });
     $('#duel-form').onsubmit = async (e) => {
       e.preventDefault();
       $('#duel-error').textContent = '';
-      const friend = $('#duel-friend') && $('#duel-friend').value;
+      const friend = duelPick;
       const setId = $('#duel-set').value;
       if (!friend || !setId) return;
       $('#duel-go').disabled = true;
