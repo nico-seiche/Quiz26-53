@@ -215,4 +215,4 @@ Die Bestenliste (und der Platz im Profil) zählt nur Spiele ab dem Stichtag `lea
 
 ## Einstellungen
 
-`/settings` (Link im Profil): Profilbild, Nutzername (`PATCH /api/auth/username`, gleiche Regeln wie bei der Registrierung, Punkte/Freunde/Quiz hängen an der Nutzer-ID und bleiben erhalten), Animationen, Freunde-ID. Neue Einstellungen kommen als weitere Karten dazu. Die §-Sammlung ist über `quiz.app_settings` (`gesetze_user_ids`, kommagetrennte Nutzer-IDs) freigeschaltet, damit eine Namensänderung sie nicht sperrt.
+`/settings` (Link im Profil): Profilbild, Passwort (`PATCH /api/auth/password`: altes Passwort + neues zweimal, andere Geräte werden abgemeldet; Mail-Verknüpfung/„Passwort vergessen“ ist bewusst noch nicht gebaut), Nutzername (`PATCH /api/auth/username`, gleiche Regeln wie bei der Registrierung, Punkte/Freunde/Quiz hängen an der Nutzer-ID und bleiben erhalten), Animationen, Freunde-ID. Neue Einstellungen kommen als weitere Karten dazu. Die §-Sammlung ist über `quiz.app_settings` (`gesetze_user_ids`, kommagetrennte Nutzer-IDs) freigeschaltet, damit eine Namensänderung sie nicht sperrt.

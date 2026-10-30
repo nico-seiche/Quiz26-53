@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2">
   <title>Quiz – Einstellungen</title>
   <link rel="stylesheet" href="/style.css">
-  <style>#name-error:empty { display: none; }</style>
+  <style>#name-error:empty, #pw-error:empty { display: none; }</style>
 </head>
 <body>
   <header class="top">
@@ -43,6 +43,22 @@
         <p class="error" id="name-error"></p>
         <p id="name-ok" style="color:var(--ok);font-weight:800" hidden>✓ Gespeichert</p>
         <button class="primary" type="submit" id="name-save" disabled>Namen ändern</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Passwort</h2>
+      <form id="pw-form">
+        <label for="pw-old">Altes Passwort</label>
+        <input type="password" id="pw-old" autocomplete="current-password">
+        <label for="pw-new">Neues Passwort</label>
+        <input type="password" id="pw-new" autocomplete="new-password" minlength="6">
+        <label for="pw-new2">Neues Passwort wiederholen</label>
+        <input type="password" id="pw-new2" autocomplete="new-password" minlength="6">
+        <p class="muted" style="margin:.5rem 0">Mindestens 6 Zeichen. Auf allen anderen Geräten wirst du danach abgemeldet.</p>
+        <p class="error" id="pw-error"></p>
+        <p id="pw-ok" style="color:var(--ok);font-weight:800" hidden>✓ Passwort geändert</p>
+        <button class="primary" type="submit">Passwort ändern</button>
       </form>
     </div>
 
@@ -176,6 +192,17 @@
           const nameEl = document.querySelector('#me .hide-small');
           if (nameEl) nameEl.textContent = res.username;
         } catch (err) { $('#name-error').textContent = err.message; }
+      };
+      $('#pw-form').onsubmit = async (e) => {
+        e.preventDefault();
+        $('#pw-error').textContent = '';
+        $('#pw-ok').hidden = true;
+        if ($('#pw-new').value !== $('#pw-new2').value) { $('#pw-error').textContent = 'Die beiden neuen Passwörter sind nicht gleich'; return; }
+        try {
+          await api('/api/auth/password', { method: 'PATCH', body: { current: $('#pw-old').value, next: $('#pw-new').value } });
+          $('#pw-form').reset();
+          $('#pw-ok').hidden = false;
+        } catch (err) { $('#pw-error').textContent = err.message; }
       };
       mountNav('profile', me);
     });

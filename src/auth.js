@@ -103,6 +103,19 @@ router.patch('/username', requireAuth, async (req, res) => {
   res.json({ username });
 });
 
+// Passwort ändern: altes Passwort zur Bestätigung; alle anderen angemeldeten Geräte werden abgemeldet
+router.patch('/password', requireAuth, async (req, res) => {
+  const current = String(req.body.current || '');
+  const next = String(req.body.next || '');
+  const user = await db.one('SELECT password_hash FROM quiz.users WHERE id = $1', [req.user.id]);
+  if (!(await bcrypt.compare(current, user.password_hash))) return res.status(403).json({ error: 'Das alte Passwort stimmt nicht' });
+  if (next.length < 6) return res.status(400).json({ error: 'Das neue Passwort muss mindestens 6 Zeichen haben' });
+  if (next === current) return res.status(400).json({ error: 'Das neue Passwort ist dasselbe wie das alte' });
+  await db.query('UPDATE quiz.users SET password_hash = $1 WHERE id = $2', [await bcrypt.hash(next, 10), req.user.id]);
+  await db.query('DELETE FROM quiz.sessions WHERE user_id = $1 AND token <> $2', [req.user.id, sessionToken(req)]);
+  res.json({ ok: true });
+});
+
 router.post('/login', async (req, res) => {
   const username = String(req.body.username || '').trim().normalize('NFC');
   const password = String(req.body.password || '');
