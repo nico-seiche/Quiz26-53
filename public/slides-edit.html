@@ -102,8 +102,8 @@
     @media (max-width: 700px) { .blocks-pop { column-count: 1; } }
     @media (max-width: 1000px) {
       /* Layout-Auswahl: fest am unteren Rand, komplett sichtbar, ohne Scrollen (die Folienleiste ist hier eine scrollende Reihe) */
-      .layout-menu { position: fixed; left: .75rem; right: .75rem; top: auto; bottom: calc(.75rem + env(safe-area-inset-bottom, 0px)); width: auto; z-index: 80; grid-template-columns: 1fr 1fr; gap: .4rem; padding: .7rem; box-shadow: 0 -10px 40px rgba(20, 20, 60, .35); }
-      .layout-menu .layout-title { display: block; }
+      .layout-menu { position: fixed; left: 50%; top: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%); width: min(22rem, calc(100vw - 2rem)); z-index: 80; grid-template-columns: 1fr 1fr; gap: .5rem; padding: 1rem; border: 2px solid var(--primary); border-radius: 20px; box-shadow: 0 0 0 100vmax rgba(14, 16, 36, .6), 0 20px 60px rgba(0, 0, 0, .45); }   /* mittig, Hintergrund abgedunkelt */
+      .layout-menu .layout-title { display: block; font-size: 1rem; color: var(--text); text-align: center; padding-bottom: .4rem; }
       .layout-menu button { border: 1px solid var(--border); border-radius: 12px; padding: .8rem .7rem; text-align: center; background: var(--bg); }
       .layout-menu button:last-child { grid-column: 1 / -1; }
       .posarr { display: flex; flex-direction: column; }
