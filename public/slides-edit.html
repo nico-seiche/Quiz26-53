@@ -32,6 +32,7 @@
     .add-slide { position: relative; }
     .add-slide > button { width: 100%; }
     .layout-menu { position: absolute; left: 0; top: calc(100% + .3rem); z-index: 20; width: 15rem; padding: .4rem; background: var(--card); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); display: grid; gap: .2rem; }
+    .layout-title { display: none; font-weight: 800; padding: .2rem .4rem .5rem; color: var(--muted); font-size: .85rem; grid-column: 1 / -1; }
     .layout-menu button { text-align: left; border: 0; box-shadow: none; background: transparent; padding: .5rem .6rem; font-weight: 700; }
     .layout-menu button:hover { background: var(--bg); }
     .ed-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; }
@@ -100,6 +101,11 @@
     .drop-hint { outline: 3px dashed var(--primary); outline-offset: -6px; }
     @media (max-width: 700px) { .blocks-pop { column-count: 1; } }
     @media (max-width: 1000px) {
+      /* Layout-Auswahl: fest am unteren Rand, komplett sichtbar, ohne Scrollen (die Folienleiste ist hier eine scrollende Reihe) */
+      .layout-menu { position: fixed; left: .75rem; right: .75rem; top: auto; bottom: calc(.75rem + env(safe-area-inset-bottom, 0px)); width: auto; z-index: 80; grid-template-columns: 1fr 1fr; gap: .4rem; padding: .7rem; box-shadow: 0 -10px 40px rgba(20, 20, 60, .35); }
+      .layout-menu .layout-title { display: block; }
+      .layout-menu button { border: 1px solid var(--border); border-radius: 12px; padding: .8rem .7rem; text-align: center; background: var(--bg); }
+      .layout-menu button:last-child { grid-column: 1 / -1; }
       .posarr { display: flex; flex-direction: column; }
       .sec-arr { order: -1; }   /* auf dem Handy/Tablet hochkant: Anordnen vor Position & Größe */
       body.ed-body { overflow: auto; height: auto; }
@@ -250,6 +256,7 @@
       add.className = 'add-slide';
       add.innerHTML = `<button type="button" id="add-slide">＋ Folie</button>
         <div class="layout-menu" id="layout-menu" hidden>
+          <div class="layout-title">Layout für die neue Folie</div>
           <button type="button" data-layout="titleContent">Titel &amp; Inhalt</button>
           <button type="button" data-layout="title">Titelfolie</button>
           <button type="button" data-layout="two">Zwei Spalten</button>
