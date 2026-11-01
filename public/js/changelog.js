@@ -2,6 +2,16 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-06',
+    title: 'Neu: Präsentationen gemeinsam bearbeiten und teilen',
+    items: [
+      ['👥', 'Gleichzeitig arbeiten', 'Lade Freunde zu deiner Präsentation ein. Ihr bearbeitet Folien und Elemente zur selben Zeit, Änderungen erscheinen nach wenigen Sekunden bei allen.'],
+      ['👀', 'Du siehst, wer wo ist', 'Oben zeigen Profilbilder, wer mitarbeitet. Elemente, an denen jemand gerade arbeitet, sind farbig markiert.'],
+      ['🔗', 'Link zum Ansehen', 'Teile eine Präsentation per Link: Jeder kann sie ansehen und präsentieren, ohne Konto und ohne etwas zu ändern. Den Link kannst du jederzeit beenden.'],
+      ['🤝', 'Mit mir geteilt', 'Präsentationen, zu denen du eingeladen wurdest, stehen in deiner Liste unter „Mit mir geteilt“.'],
+    ],
+  },
+  {
     id: '2026-11-05',
     title: 'Neu: Folien, Gesetze und eine neue Startseite',
     items: [

@@ -26,9 +26,11 @@
       <h1 style="margin:0">🖥️ Folien</h1>
       <button type="button" class="primary" id="new">+ Neue Präsentation</button>
     </div>
-    <p class="muted">Erstelle Präsentationen für die Vorlesung: Folien mit Text, Formen und Bildern, Präsentationsmodus und PDF-Export.</p>
+    <p class="muted">Erstelle Präsentationen für die Vorlesung, arbeite mit Freunden gleichzeitig daran und teile sie per Link.</p>
     <p class="error" id="error"></p>
     <div class="deck-grid" id="decks"></div>
+    <h2 id="shared-head" hidden style="margin-top:2rem">🤝 Mit mir geteilt</h2>
+    <div class="deck-grid" id="shared-decks"></div>
   </main>
   <style>
     .deck-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
@@ -45,24 +47,28 @@
   <script>
     const fmt = (d) => new Date(d).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' });
 
-    async function load() {
-      const decks = await api('/api/slides');
-      const box = $('#decks');
-      if (!decks.length) { box.innerHTML = '<div class="card muted">Noch keine Präsentation – lege mit „Neue Präsentation“ deine erste an.</div>'; return; }
-      box.innerHTML = decks.map((d) => `
+    const card = (d, mine) => `
         <div class="card deck-card" data-id="${d.id}">
           <button type="button" class="deck-thumb" data-open="${d.id}" aria-label="${escapeHtml(d.title)} öffnen"></button>
-          <div><div class="deck-title">${escapeHtml(d.title)}</div><span class="muted">${d.slides} ${d.slides === 1 ? 'Folie' : 'Folien'} · ${fmt(d.updatedAt)}</span></div>
+          <div><div class="deck-title">${escapeHtml(d.title)}</div><span class="muted">${d.slides} ${d.slides === 1 ? 'Folie' : 'Folien'} · ${fmt(d.updatedAt)}</span>${mine ? '' : `<br><span class="tag">🤝 von ${escapeHtml(d.owner)}</span>`}</div>
           <div class="deck-actions">
             <a class="btn primary" href="/slides-present?id=${d.id}">▶ Präsentieren</a>
             <a class="btn" href="/slides-edit?id=${d.id}">Bearbeiten</a>
             <button type="button" data-pdf="${d.id}">⬇ PDF</button>
             <button type="button" data-dup="${d.id}">Duplizieren</button>
-            <button type="button" class="danger" data-del="${d.id}" data-title="${escapeHtml(d.title)}">Löschen</button>
+            ${mine ? `<button type="button" class="danger" data-del="${d.id}" data-title="${escapeHtml(d.title)}">Löschen</button>` : ''}
           </div>
-        </div>`).join('');
-      decks.forEach((d) => {
-        const thumb = box.querySelector(`[data-open="${d.id}"]`);
+        </div>`;
+
+    async function load() {
+      const { mine, shared } = await api('/api/slides');
+      const box = $('#decks');
+      box.innerHTML = mine.length ? mine.map((d) => card(d, true)).join('') : '<div class="card muted">Noch keine Präsentation – lege mit „Neue Präsentation“ deine erste an.</div>';
+      $('#shared-head').hidden = !shared.length;
+      const sbox = $('#shared-decks');
+      sbox.innerHTML = shared.map((d) => card(d, false)).join('');
+      [...mine, ...shared].forEach((d) => {
+        const thumb = document.querySelector(`[data-open="${d.id}"]`);
         if (thumb && d.first) SlideRender.mount(thumb, d.first, thumb.clientWidth || 260);
       });
     }
@@ -71,7 +77,7 @@
       try { const { id } = await api('/api/slides', { method: 'POST', body: { title: 'Neue Präsentation' } }); location.href = `/slides-edit?id=${id}`; }
       catch (err) { $('#error').textContent = err.message; }
     };
-    $('#decks').onclick = async (e) => {
+    document.querySelector('main').onclick = async (e) => {
       const t = e.target.closest('button');
       if (!t) return;
       try {

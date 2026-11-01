@@ -98,6 +98,20 @@
     .ask-backdrop { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 1rem; background: rgba(14, 16, 36, .6); }
     .ask { width: min(26rem, 100%); margin: 0; }
     .ask-prev { height: 6.5rem; border-radius: 14px; border: 1px solid var(--border); margin: .4rem 0 .8rem; }
+    .peers { display: flex; gap: .3rem; align-items: center; }
+    .peer { display: inline-flex; align-items: center; gap: .25rem; padding: .1rem .5rem .1rem .15rem; border-radius: 999px; border: 2px solid var(--pc); font-size: .8rem; font-weight: 800; }
+    .peer small { opacity: .7; }
+    .thumb .dots { position: absolute; right: 4px; bottom: 6px; display: flex; gap: 2px; }
+    .thumb .dots i { width: .6rem; height: .6rem; border-radius: 50%; border: 1px solid #fff; }
+    .peer-box { position: absolute; border: 2px dashed var(--pc); box-sizing: border-box; pointer-events: none; }
+    .peer-box span { position: absolute; left: -2px; top: -1.35rem; padding: 0 .35rem; font-size: .7rem; font-weight: 800; color: #fff; background: var(--pc); border-radius: 5px 5px 0 0; white-space: nowrap; }
+    .share-section { margin: .8rem 0 0; }
+    .share-section h3 { margin: 0 0 .4rem; font-size: .95rem; }
+    .chip-row { display: flex; flex-wrap: wrap; gap: .4rem; }
+    .chip { display: inline-flex; align-items: center; gap: .3rem; padding: .2rem .35rem .2rem .55rem; border-radius: 999px; background: var(--bg); font-weight: 700; font-size: .88rem; }
+    .chip button { padding: 0 .35rem; border: 0; background: transparent; box-shadow: none; font-size: .95rem; color: var(--muted); cursor: pointer; margin: 0; }
+    .share-link { display: flex; gap: .4rem; }
+    .share-link input { flex: 1; min-width: 0; margin: 0; font-size: .85rem; }
     .drop-hint { outline: 3px dashed var(--primary); outline-offset: -6px; }
     @media (max-width: 700px) { .blocks-pop { column-count: 1; } }
     @media (max-width: 1000px) {
@@ -121,7 +135,9 @@
   <div class="ed-top">
     <a class="back" href="/slides">← Folien</a>
     <input class="title" id="title" maxlength="120" aria-label="Titel der Präsentation" placeholder="Titel der Präsentation">
+    <span class="peers" id="peers" aria-label="Wer gerade mitarbeitet"></span>
     <span class="muted" id="state" aria-live="polite"></span>
+    <button type="button" id="share-btn" title="Teilen und zusammen bearbeiten">👥 Teilen</button>
     <button type="button" id="pdf" title="Präsentation als PDF herunterladen">⬇ PDF</button>
     <button type="button" class="primary" id="present">▶ Präsentieren</button>
   </div>
@@ -150,6 +166,31 @@
   <input type="file" id="file" accept="image/*" hidden>
   <input type="file" id="bgfile" accept="image/*" hidden>
   <div class="pop" id="pop" hidden></div>
+  <div class="ask-backdrop" id="share" hidden>
+    <div class="ask card share-card" role="dialog" aria-modal="true" aria-labelledby="share-title" style="max-height:90vh;overflow-y:auto">
+      <button type="button" class="changelog-x" id="share-close" aria-label="Schließen"></button>
+      <h2 id="share-title">Teilen</h2>
+      <div class="share-section">
+        <h3>👥 Zusammen bearbeiten</h3>
+        <p class="muted" id="share-info" style="margin:0 0 .5rem;font-size:.9rem"></p>
+        <div class="chip-row" id="share-people"></div>
+        <div id="share-invite" hidden>
+          <p class="muted" style="margin:.7rem 0 .3rem;font-size:.85rem">Freund einladen – er kann dann gleichzeitig mit dir an den Folien arbeiten:</p>
+          <div class="chip-row" id="share-friends"></div>
+        </div>
+      </div>
+      <div class="share-section" id="share-link-box" hidden>
+        <h3>🔗 Link zum Ansehen</h3>
+        <p class="muted" style="margin:0 0 .5rem;font-size:.9rem">Wer den Link hat, kann die Präsentation ansehen – ohne Konto und ohne etwas zu ändern.</p>
+        <label class="inline-check"><input type="checkbox" id="share-on"> Link aktiv</label>
+        <div id="share-url-row" hidden>
+          <div class="share-link"><input type="text" id="share-url" readonly aria-label="Link zum Ansehen"><button type="button" id="share-copy">Kopieren</button></div>
+          <div class="row-inline" style="margin-top:.5rem"><button type="button" class="mini" id="share-native" hidden>Teilen …</button><button type="button" class="mini" id="share-renew">Neuen Link erzeugen</button></div>
+        </div>
+      </div>
+      <p class="error" id="share-error"></p>
+    </div>
+  </div>
   <div class="ask-backdrop" id="ask" hidden>
     <div class="ask card" role="dialog" aria-modal="true" aria-labelledby="ask-title">
       <h2 id="ask-title">Hintergrund für alle Folien übernehmen?</h2>
@@ -160,7 +201,9 @@
   </div>
   <script src="/js/changelog.js"></script>
   <script src="/js/common.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   <script src="/js/slides-render.js"></script>
+  <script src="/js/slides-sync.js"></script>
   <script src="/js/slides-pdf.js"></script>
   <script>
     const W = SlideRender.W;
@@ -187,33 +230,95 @@
     let saveTimer = null;
     let saving = false;
     let pending = false;
-    let conflict = false;
+    let base = null;           // letzter Stand, den der Server bestätigt hat: { title, slides, palette, gradients }
+    let staleRender = false;   // fremde Änderungen sind eingearbeitet, aber noch nicht gezeichnet (Tippen/Ziehen läuft)
     function setState(text, cls) { const s = $('#state'); s.textContent = text; s.style.color = cls === 'warn' ? 'var(--danger)' : cls === 'ok' ? 'var(--ok)' : ''; }
+    const docOf = () => ({ title: deck.title, slides: deck.data.slides, palette: deck.data.palette || [], gradients: deck.data.gradients || [] });
     function dirty() {
       pending = true;
-      if (conflict) return;
       setState('Ungespeichert …');
       clearTimeout(saveTimer);
       saveTimer = setTimeout(save, 900);
     }
+    // Neuen Stand übernehmen (Abgleich: eigene noch nicht gesicherte Änderungen werden auf den Stand des Servers gelegt)
+    function adopt(merged, rev, { remote }) {
+      const curSlideId = deck.data.slides[cur] && deck.data.slides[cur].id;
+      deck.title = merged.title;
+      deck.data = { v: 1, slides: merged.slides, palette: merged.palette, gradients: merged.gradients };
+      deck.rev = rev;
+      const i = deck.data.slides.findIndex((x) => x.id === curSlideId);
+      cur = i >= 0 ? i : Math.min(cur, deck.data.slides.length - 1);
+      if (selId && !elOf(selId)) selId = null;
+      if (!remote) return;
+      hist.length = 0; future.length = 0; histKey = null;     // Rückgängig würde sonst fremde Änderungen mit zurücknehmen
+      if (document.activeElement !== $('#title')) $('#title').value = deck.title;
+      if (editing || drag) { staleRender = true; return; }
+      renderAll();
+    }
     async function save() {
       clearTimeout(saveTimer);
-      if (saving || !pending || conflict) return;
-      saving = true;
+      if (saving || !pending) return;
+      const sent = SlidesSync.clone(docOf());
+      const ops = SlidesSync.diff(base, sent);
       pending = false;
+      if (!ops.length) { setState('✓ Gespeichert', 'ok'); return; }
+      saving = true;
       try {
-        const r = await api(`/api/slides/${id}`, { method: 'PUT', body: { title: deck.title, data: deck.data, rev: deck.rev } });
-        deck.rev = r.rev;
+        const r = await api(`/api/slides/${id}/ops`, { method: 'POST', body: { ops } });
+        const server = { title: r.title, slides: r.data.slides, palette: r.data.palette || [], gradients: r.data.gradients || [] };
+        const others = r.rev !== deck.rev + 1;       // zwischendurch hat jemand anderes gespeichert
+        adopt(SlidesSync.rebase(sent, docOf(), server), r.rev, { remote: others });
+        base = SlidesSync.clone(server);
         setState(pending ? 'Ungespeichert …' : '✓ Gespeichert', pending ? '' : 'ok');
       } catch (err) {
         pending = true;
-        if (/woanders/.test(err.message)) { conflict = true; setState('Woanders geändert – bitte neu laden', 'warn'); } else setState(`Nicht gespeichert: ${err.message}`, 'warn');
+        setState(`Nicht gespeichert: ${err.message}`, 'warn');
       } finally {
         saving = false;
-        if (pending && !conflict) saveTimer = setTimeout(save, 1500);
+        if (pending) saveTimer = setTimeout(save, 1500);
       }
     }
     addEventListener('beforeunload', (e) => { if (pending || saving) { e.preventDefault(); e.returnValue = ''; } });
+
+    // ---------------- Zusammenarbeit: Live-Abgleich und Anwesenheit ----------------
+    let peers = [];
+    const peerColor = (name) => { let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) % 360; return `hsl(${h} 70% 45%)`; };
+    async function tick() {
+      if (!deck || document.hidden && false) return;
+      try {
+        const q = new URLSearchParams({ rev: deck.rev, slide: slide().id, el: selId || '' });
+        const r = await api(`/api/slides/${id}/live?${q}`);
+        peers = r.presence;
+        renderPeers();
+        if (r.data && !saving && r.rev > deck.rev) {
+          const server = { title: r.title, slides: r.data.slides, palette: r.data.palette || [], gradients: r.data.gradients || [] };
+          adopt(SlidesSync.rebase(base, docOf(), server), r.rev, { remote: true });
+          base = SlidesSync.clone(server);
+        }
+      } catch { /* kurzer Verbindungsfehler: nächster Takt */ }
+    }
+    function startLive() {
+      setInterval(tick, 2500);
+      api('/api/config').then((cfg) => {
+        if (!cfg.supabaseUrl || !cfg.supabaseKey || !window.supabase) return;
+        window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey).channel(`game:d${id}`).on('broadcast', { event: 'update' }, () => tick()).subscribe();
+      }).catch(() => {});
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+    }
+    function renderPeers() {
+      const others = peers.filter((p) => !p.me);
+      $('#peers').innerHTML = others.map((p) => {
+        const idx = deck.data.slides.findIndex((x) => x.id === p.slide);
+        return `<span class="peer" style="--pc:${peerColor(p.username)}" title="${escapeHtml(p.username)}${idx >= 0 ? ` · Folie ${idx + 1}` : ''}">${avatarHtml(p.username, '1.7rem')}<span class="peer-name">${escapeHtml(p.username)}${idx >= 0 && idx !== cur ? ` <small>F${idx + 1}</small>` : ''}</span></span>`;
+      }).join('');
+      document.querySelectorAll('#slides .thumb').forEach((t) => {
+        const sid = deck.data.slides[Number(t.dataset.i)].id;
+        t.querySelector('.dots')?.remove();
+        const here = others.filter((p) => p.slide === sid);
+        if (here.length) { const d = document.createElement('span'); d.className = 'dots'; d.innerHTML = here.map((p) => `<i style="background:${peerColor(p.username)}" title="${escapeHtml(p.username)}"></i>`).join(''); t.appendChild(d); }
+      });
+      renderOverlay();
+    }
 
     // ---------------- Verlauf (Rückgängig) ----------------
     const snap = () => JSON.stringify({ d: deck.data, cur });
@@ -330,6 +435,16 @@
     function renderOverlay() {
       const ov = $('#overlay');
       ov.innerHTML = '';
+      // Elemente, an denen andere gerade arbeiten
+      peers.filter((p) => !p.me && p.el && p.slide === slide().id).forEach((p) => {
+        const pe = elOf(p.el);
+        if (!pe) return;
+        const b = document.createElement('div');
+        b.className = 'peer-box';
+        b.style.cssText = `--pc:${peerColor(p.username)};left:${pe.x * zoom}px;top:${pe.y * zoom}px;width:${pe.w * zoom}px;height:${pe.h * zoom}px`;
+        b.innerHTML = `<span>${escapeHtml(p.username)}</span>`;
+        ov.appendChild(b);
+      });
       const e = sel();
       if (!e) return;
       const box = document.createElement('div');
@@ -353,7 +468,7 @@
       gx.forEach((x) => { const g = document.createElement('div'); g.className = 'guide'; Object.assign(g.style, { left: `${x * zoom}px`, top: 0, width: '1px', height: '100%' }); ov.appendChild(g); });
       gy.forEach((y) => { const g = document.createElement('div'); g.className = 'guide'; Object.assign(g.style, { top: `${y * zoom}px`, left: 0, height: '1px', width: '100%' }); ov.appendChild(g); });
     }
-    function renderAll() { renderSlides(); renderStage(); renderProps(); updateHistButtons(); }
+    function renderAll() { renderSlides(); renderStage(); renderProps(); updateHistButtons(); renderPeers(); }
     function afterChange({ props = false, thumb = true } = {}) {
       if (editing) { if (thumb) refreshThumb(); dirty(); return; }   // beim Tippen nicht die Bühne neu aufbauen
       renderStage();
@@ -520,7 +635,7 @@
       box.style.whiteSpace = 'pre-wrap';
       box.style.overflow = 'auto';
       dom.classList.add('editing');
-      beginEditable(box, eid, (t) => { e.text = t; });
+      beginEditable(box, eid, (t) => { const x = elOf(eid); if (x) x.text = t; });
       box.onkeydown = (ev) => {
         if (ev.key === 'Escape') { ev.preventDefault(); box.blur(); }
         const mod = ev.metaKey || ev.ctrlKey;
@@ -539,7 +654,7 @@
       const td = $('#stagehost').querySelector(`[data-id="${eid}"] [data-r="${r}"][data-c="${c}"]`);
       if (!td) return;
       td.classList.add('cell-editing');
-      beginEditable(td, eid, (t) => { e.rows[r][c] = t; });
+      beginEditable(td, eid, (t) => { const x = elOf(eid); if (x && x.rows[r]) x.rows[r][c] = t; });
       td.onkeydown = (ev) => {
         if (ev.key === 'Escape') { ev.preventDefault(); td.blur(); }
         else if (ev.key === 'Tab') {
@@ -564,6 +679,7 @@
       editing = null;
       editEl = null;
       if (dom) { dom.onblur = null; dom.oninput = null; dom.onkeydown = null; }
+      if (staleRender && !drag) { staleRender = false; renderAll(); return; }
       if (!silent) { renderStage(); refreshThumb(); renderProps(); }
     }
 
@@ -662,6 +778,7 @@
       const moved = drag.moved;
       drag = null;
       document.querySelectorAll('.guide').forEach((g) => g.remove());
+      if (staleRender && !editing) { staleRender = false; renderAll(); }
       if (moved) { refreshThumb(); dirty(); }
     };
     host.addEventListener('pointerup', endDrag);
@@ -1075,6 +1192,61 @@
     $('#ask-one').onclick = () => { $('#ask').hidden = true; };
     $('#ask').addEventListener('click', (ev) => { if (ev.target === $('#ask')) $('#ask').hidden = true; });
 
+    // ---------------- Teilen ----------------
+    let friendsCache = null;
+    const shareUrl = () => `${location.origin}/slides-present?t=${deck.shareToken}`;
+    async function refreshDeckMeta() { const m = await api(`/api/slides/${id}`); deck.collaborators = m.collaborators; deck.shareToken = m.shareToken; deck.owner = m.owner; deck.isOwner = m.isOwner; }
+    async function renderShare() {
+      const people = [`<span class="chip">👑 ${escapeHtml(deck.owner)}${deck.isOwner ? ' (du)' : ''}</span>`].concat(deck.collaborators.map((n) => {
+        const mine = n.toLowerCase() === window.__me.username.toLowerCase();
+        return `<span class="chip">${escapeHtml(n)}${mine ? ' (du)' : ''}${deck.isOwner || mine ? `<button type="button" data-remove="${escapeHtml(n)}" aria-label="${mine ? 'Verlassen' : 'Entfernen'}" title="${mine ? 'Präsentation verlassen' : 'Entfernen'}">✕</button>` : ''}</span>`;
+      }));
+      $('#share-people').innerHTML = people.join('');
+      $('#share-info').textContent = deck.isOwner ? 'Mitbearbeiter dürfen alles ändern, aber die Präsentation nicht löschen oder teilen.' : `Diese Präsentation gehört ${deck.owner}. Du darfst sie bearbeiten.`;
+      $('#share-invite').hidden = !deck.isOwner;
+      $('#share-link-box').hidden = !deck.isOwner;
+      if (deck.isOwner) {
+        if (!friendsCache) { try { friendsCache = (await api('/api/friends')).friends; } catch { friendsCache = []; } }
+        const taken = new Set([deck.owner, ...deck.collaborators].map((n) => n.toLowerCase()));
+        const free = friendsCache.filter((f) => !taken.has(f.username.toLowerCase()));
+        $('#share-friends').innerHTML = free.length ? free.map((f) => `<button type="button" class="chip" data-invite="${escapeHtml(f.username)}" style="border:0;cursor:pointer">＋ ${escapeHtml(f.username)}</button>`).join('')
+          : `<span class="muted" style="font-size:.85rem">${friendsCache.length ? 'Alle deine Freunde sind schon dabei.' : 'Du hast noch keine Freunde. <a href="/friends">Freunde hinzufügen →</a>'}</span>`;
+        $('#share-on').checked = Boolean(deck.shareToken);
+        $('#share-url-row').hidden = !deck.shareToken;
+        if (deck.shareToken) $('#share-url').value = shareUrl();
+        $('#share-native').hidden = !navigator.share;
+      }
+    }
+    $('#share-btn').onclick = async () => {
+      $('#share-error').textContent = '';
+      $('#share').hidden = false;
+      try { await refreshDeckMeta(); await renderShare(); } catch (err) { $('#share-error').textContent = err.message; }
+    };
+    $('#share-close').onclick = () => { $('#share').hidden = true; };
+    $('#share').addEventListener('click', async (ev) => {
+      if (ev.target === $('#share')) { $('#share').hidden = true; return; }
+      const t = ev.target.closest('button');
+      if (!t) return;
+      $('#share-error').textContent = '';
+      try {
+        if (t.dataset.invite) { await api(`/api/slides/${id}/collaborators`, { method: 'POST', body: { username: t.dataset.invite } }); await refreshDeckMeta(); await renderShare(); }
+        else if (t.dataset.remove) {
+          const self = t.dataset.remove.toLowerCase() === window.__me.username.toLowerCase();
+          if (self && !confirm('Diese Präsentation verlassen? Du siehst sie danach nicht mehr in deiner Liste.')) return;
+          await api(`/api/slides/${id}/collaborators/${encodeURIComponent(t.dataset.remove)}`, { method: 'DELETE' });
+          if (self) { location.href = '/slides'; return; }
+          await refreshDeckMeta(); await renderShare();
+        }
+        else if (t.id === 'share-copy') { try { await navigator.clipboard.writeText(shareUrl()); t.textContent = '✓ Kopiert'; } catch { $('#share-url').select(); } setTimeout(() => { t.textContent = 'Kopieren'; }, 1500); }
+        else if (t.id === 'share-native') await navigator.share({ title: deck.title, url: shareUrl() }).catch(() => {});
+        else if (t.id === 'share-renew') { if (confirm('Der alte Link funktioniert danach nicht mehr. Neuen Link erzeugen?')) { deck.shareToken = (await api(`/api/slides/${id}/share`, { method: 'POST', body: { enabled: true, renew: true } })).token; await renderShare(); } }
+      } catch (err) { $('#share-error').textContent = err.message; }
+    });
+    $('#share-on').onchange = async (ev) => {
+      try { deck.shareToken = (await api(`/api/slides/${id}/share`, { method: 'POST', body: { enabled: ev.target.checked } })).token; await renderShare(); }
+      catch (err) { $('#share-error').textContent = err.message; ev.target.checked = !ev.target.checked; }
+    };
+
     // ---------------- Folienleiste: Klicks, Ziehen ----------------
     $('#slides').addEventListener('click', (ev) => {
       const add = ev.target.closest('#add-slide');
@@ -1158,10 +1330,15 @@
     requireLogin().then(async () => {
       try {
         deck = await api(`/api/slides/${id}`);
+        if (!deck.data.palette) deck.data.palette = [];
+        if (!deck.data.gradients) deck.data.gradients = [];
+        base = SlidesSync.clone(docOf());
         $('#title').value = deck.title;
         document.title = `${deck.title} – Folien`;
         renderAll();
         setState('✓ Gespeichert', 'ok');
+        startLive();
+        tick();
       } catch (err) {
         $('#props').innerHTML = `<p class="error">${escapeHtml(err.message)}</p>`;
       }

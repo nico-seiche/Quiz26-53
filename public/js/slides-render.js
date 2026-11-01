@@ -21,12 +21,16 @@ const SlideRender = (() => {
     return 0.2126 * f((n >> 16) & 255) + 0.7152 * f((n >> 8) & 255) + 0.0722 * f(n & 255);
   }
 
+  // Beim Ansehen per Link müssen Bilder mit dem Link-Schlüssel geladen werden (?t=…)
+  let assetQuery = '';
+  const setAssetQuery = (q) => { assetQuery = q || ''; };
+
   function bgCss(slide) {
     const bg = slide.bg;
     if (bg && typeof bg === 'object' && bg.image) {
       const a = Math.abs(Number(bg.overlay) || 0);
       const veil = a > 0.001 ? `linear-gradient(${bg.overlay > 0 ? `rgba(0,0,0,${a})` : `rgba(255,255,255,${a})`}, ${bg.overlay > 0 ? `rgba(0,0,0,${a})` : `rgba(255,255,255,${a})`}), ` : '';
-      return `${veil}url(${/^\/api\/slides\/assets\/\d+$/.test(bg.image) ? bg.image : ''}) center / ${bg.fit === 'contain' ? 'contain' : 'cover'} no-repeat, ${HEX.test(bg.color) ? bg.color : '#ffffff'}`;
+      return `${veil}url(${/^\/api\/slides\/assets\/\d+$/.test(bg.image) ? bg.image + assetQuery : ''}) center / ${bg.fit === 'contain' ? 'contain' : 'cover'} no-repeat, ${HEX.test(bg.color) ? bg.color : '#ffffff'}`;
     }
     if (bg && typeof bg === 'object') return `linear-gradient(${Number(bg.angle) || 0}deg, ${HEX.test(bg.from) ? bg.from : '#fff'}, ${HEX.test(bg.to) ? bg.to : '#fff'})`;
     return HEX.test(bg) ? bg : '#ffffff';
@@ -147,7 +151,7 @@ const SlideRender = (() => {
       el.append(icon, label);
     } else if (e.type === 'image') {
       const img = document.createElement('img');
-      img.src = e.src;
+      img.src = e.src + assetQuery;
       img.alt = '';
       img.draggable = false;
       img.style.objectFit = e.fit === 'cover' ? 'cover' : 'contain';
@@ -195,6 +199,6 @@ const SlideRender = (() => {
   style.textContent = css;
   document.head.appendChild(style);
 
-  return { W, H, FONTS, mount, slideEl, elementEl, bgCss, isDark, autoColor, resolve, luminance };
+  return { W, H, FONTS, setAssetQuery, mount, slideEl, elementEl, bgCss, isDark, autoColor, resolve, luminance };
 })();
 if (typeof module !== 'undefined') module.exports = SlideRender;

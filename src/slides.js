@@ -1,6 +1,9 @@
 const express = require('express');
 const db = require('./db');
 const { requireAuth } = require('./auth');
+const crypto = require('crypto');
+const { areFriends, findUser } = require('./friends');
+const SlidesSync = require('../public/js/slides-sync.js');
 
 // Folien. Eine Präsentation ist ein JSON-Dokument (siehe cleanDeck),
 // Bilder liegen als Zeilen in slide_assets und werden über /api/slides/assets/:id ausgeliefert.
@@ -20,7 +23,6 @@ const FITS = ['contain', 'cover'];
 const TRANSITIONS = ['none', 'fade', 'slide'];
 
 const router = express.Router();
-router.use(requireAuth);
 
 const isId = (v) => /^\d{1,15}$/.test(String(v));
 const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
@@ -142,11 +144,54 @@ const blankDeck = () => ({
   }],
 });
 
+const COLLAB = (deckCol, userParam) => `EXISTS (SELECT 1 FROM quiz.slide_collaborators c WHERE c.deck_id = ${deckCol} AND c.user_id = ${userParam})`;
+const PRESENCE_SECONDS = 8;
+const notifyDeck = (id) => db.query('SELECT quiz.notify($1)', [`d${id}`]).catch(() => {});
+
+// ---------- öffentlich: Ansehen-Link und Bilder ----------
+const validToken = (t) => typeof t === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(t);
+
+router.get('/shared/:token', async (req, res) => {
+  if (!validToken(req.params.token)) return res.status(404).json({ error: 'Dieser Link ist ungültig oder wurde beendet.' });
+  const d = await db.one('SELECT id, title, data FROM quiz.slide_decks WHERE share_token = $1', [req.params.token]);
+  if (!d) return res.status(404).json({ error: 'Dieser Link ist ungültig oder wurde beendet.' });
+  res.set('Cache-Control', 'no-store').json({ id: Number(d.id), title: d.title, data: d.data });
+});
+
+// Bilder: Besitzer und Mitbearbeiter, oder mit dem Ansehen-Link (?t=…)
+router.get('/assets/:aid', async (req, res) => {
+  if (!isId(req.params.aid)) return res.status(404).end();
+  const t = validToken(req.query.t) ? req.query.t : null;
+  const a = await db.one(`SELECT a.mime, a.data FROM quiz.slide_assets a JOIN quiz.slide_decks d ON d.id = a.deck_id
+                          WHERE a.id = $1 AND ((d.share_token IS NOT NULL AND d.share_token = $3) OR d.owner_id = $2 OR ${COLLAB('d.id', '$2')})`,
+  [req.params.aid, req.user ? req.user.id : 0, t]);
+  if (!a) return res.status(404).end();
+  res.set({ 'Content-Type': a.mime, 'Cache-Control': t ? 'public, max-age=3600' : 'private, max-age=86400', 'X-Content-Type-Options': 'nosniff' }).send(a.data);
+});
+
+router.use(requireAuth);
+
+// ---------- Zugriff ----------
+// Besitzer oder Mitbearbeiter; ownerOnly: nur der Besitzer
+async function accessDeck(req, { ownerOnly = false } = {}) {
+  if (!isId(req.params.id)) return null;
+  const d = await db.one(`
+    SELECT d.id, d.owner_id, d.title, d.data, d.rev, d.share_token, d.updated_at, u.username AS owner
+    FROM quiz.slide_decks d JOIN quiz.users u ON u.id = d.owner_id
+    WHERE d.id = $1 AND (d.owner_id = $2 ${ownerOnly ? '' : `OR ${COLLAB('d.id', '$2')}`})`, [req.params.id, req.user.id]);
+  if (d) { d.id = Number(d.id); d.owner_id = Number(d.owner_id); d.isOwner = d.owner_id === req.user.id; }
+  return d;
+}
+const notFound = (res) => res.status(404).json({ error: 'Präsentation nicht gefunden' });
+
+const listRow = (r) => ({ id: Number(r.id), title: r.title, updatedAt: r.updated_at, slides: r.slides, first: r.first, owner: r.owner });
+
 router.get('/', async (req, res) => {
   const rows = await db.query(`
-    SELECT id, title, updated_at, jsonb_array_length(data->'slides') AS slides, data->'slides'->0 AS first
-    FROM quiz.slide_decks WHERE owner_id = $1 ORDER BY updated_at DESC`, [req.user.id]);
-  res.json(rows.map((r) => ({ id: Number(r.id), title: r.title, updatedAt: r.updated_at, slides: r.slides, first: r.first })));
+    SELECT d.id, d.title, d.updated_at, jsonb_array_length(d.data->'slides') AS slides, d.data->'slides'->0 AS first, u.username AS owner, (d.owner_id = $1) AS mine
+    FROM quiz.slide_decks d JOIN quiz.users u ON u.id = d.owner_id
+    WHERE d.owner_id = $1 OR ${COLLAB('d.id', '$1')} ORDER BY d.updated_at DESC`, [req.user.id]);
+  res.json({ mine: rows.filter((r) => r.mine).map(listRow), shared: rows.filter((r) => !r.mine).map(listRow) });
 });
 
 router.post('/', async (req, res) => {
@@ -155,50 +200,71 @@ router.post('/', async (req, res) => {
   res.json({ id: Number(row.id) });
 });
 
-// Bilder: roher Upload (Content-Type = Bildtyp), siehe express.raw in app.js
-router.get('/assets/:aid', async (req, res) => {
-  if (!isId(req.params.aid)) return res.status(404).end();
-  const a = await db.one(`SELECT a.mime, a.data FROM quiz.slide_assets a JOIN quiz.slide_decks d ON d.id = a.deck_id
-                          WHERE a.id = $1 AND d.owner_id = $2`, [req.params.aid, req.user.id]);
-  if (!a) return res.status(404).end();
-  res.set({ 'Content-Type': a.mime, 'Cache-Control': 'private, max-age=86400', 'X-Content-Type-Options': 'nosniff' }).send(a.data);
-});
-
-async function ownDeck(req) {
-  if (!isId(req.params.id)) return null;
-  return db.one('SELECT id, owner_id, title, data, rev, updated_at FROM quiz.slide_decks WHERE id = $1 AND owner_id = $2', [req.params.id, req.user.id]);
+async function people(deckId) {
+  return (await db.query(`SELECT u.username FROM quiz.slide_collaborators c JOIN quiz.users u ON u.id = c.user_id WHERE c.deck_id = $1 ORDER BY lower(u.username)`, [deckId])).map((r) => r.username);
 }
 
 router.get('/:id', async (req, res) => {
-  const d = await ownDeck(req);
-  if (!d) return res.status(404).json({ error: 'Präsentation nicht gefunden' });
-  res.json({ id: Number(d.id), title: d.title, data: d.data, rev: d.rev, updatedAt: d.updated_at });
+  const d = await accessDeck(req);
+  if (!d) return notFound(res);
+  res.json({
+    id: d.id, title: d.title, data: d.data, rev: d.rev, updatedAt: d.updated_at,
+    isOwner: d.isOwner, owner: d.owner, collaborators: await people(d.id), shareToken: d.isOwner ? d.share_token : null,
+  });
 });
 
-// Speichern; rev schützt davor, dass ein zweiter Tab/Gerät unbemerkt überschrieben wird
-router.put('/:id', async (req, res) => {
-  const d = await ownDeck(req);
-  if (!d) return res.status(404).json({ error: 'Präsentation nicht gefunden' });
-  let data;
-  try { data = cleanDeck(req.body.data); } catch (err) { return res.status(400).json({ error: err.message }); }
-  const row = await db.one(`
-    UPDATE quiz.slide_decks SET title = $1, data = $2, rev = rev + 1, updated_at = now()
-    WHERE id = $3 AND owner_id = $4 AND rev = $5 RETURNING rev`,
-  [cleanTitle(req.body.title), JSON.stringify(data), d.id, req.user.id, Number(req.body.rev)]);
-  if (!row) return res.status(409).json({ error: 'Die Präsentation wurde woanders geändert – bitte neu laden.' });
-  res.json({ rev: row.rev });
+// ---------- gemeinsames Bearbeiten ----------
+// Änderungen als Operationen (siehe public/js/slides-sync.js): werden unter Zeilensperre auf den aktuellen Stand angewendet,
+// dadurch gehen gleichzeitige Änderungen anderer nicht verloren. Antwort: der neue Gesamtstand.
+router.post('/:id/ops', async (req, res) => {
+  const ops = req.body && req.body.ops;
+  if (!Array.isArray(ops) || ops.length > 3000) return res.status(400).json({ error: 'Ungültige Änderungen' });
+  const probe = await accessDeck(req);
+  if (!probe) return notFound(res);
+  let result;
+  try {
+    result = await db.tx(async (client) => {
+      const { rows: [d] } = await client.query('SELECT title, data FROM quiz.slide_decks WHERE id = $1 FOR UPDATE', [probe.id]);
+      const doc = { title: d.title, slides: d.data.slides, palette: d.data.palette || [], gradients: d.data.gradients || [] };
+      SlidesSync.apply(doc, ops);
+      if (!doc.slides.length) doc.slides.push(blankDeck().slides[0]);      // alle Folien gleichzeitig gelöscht: eine leere bleibt
+      const data = cleanDeck({ slides: doc.slides, palette: doc.palette, gradients: doc.gradients });
+      const title = cleanTitle(doc.title);
+      const { rows: [row] } = await client.query('UPDATE quiz.slide_decks SET title = $1, data = $2, rev = rev + 1, updated_at = now() WHERE id = $3 RETURNING rev',
+        [title, JSON.stringify(data), probe.id]);
+      return { rev: row.rev, title, data };
+    });
+  } catch (err) { return res.status(400).json({ error: err.message || 'Änderungen konnten nicht gespeichert werden' }); }
+  await notifyDeck(probe.id);
+  res.json(result);
+});
+
+// Alle paar Sekunden (und bei Realtime-Hinweis): Anwesenheit melden und prüfen, ob es einen neuen Stand gibt
+router.get('/:id/live', async (req, res) => {
+  const d = await accessDeck(req);
+  if (!d) return notFound(res);
+  const slideId = typeof req.query.slide === 'string' ? req.query.slide.slice(0, 24) : null;
+  const elId = typeof req.query.el === 'string' && req.query.el ? req.query.el.slice(0, 24) : null;
+  await db.query(`INSERT INTO quiz.slide_presence (deck_id, user_id, slide_id, element_id, seen_at) VALUES ($1, $2, $3, $4, now())
+                  ON CONFLICT (deck_id, user_id) DO UPDATE SET slide_id = $3, element_id = $4, seen_at = now()`, [d.id, req.user.id, slideId, elId]);
+  const presence = await db.query(`
+    SELECT u.username, p.slide_id, p.element_id, (p.user_id = $2) AS me FROM quiz.slide_presence p JOIN quiz.users u ON u.id = p.user_id
+    WHERE p.deck_id = $1 AND p.seen_at > now() - make_interval(secs => $3) ORDER BY lower(u.username)`, [d.id, req.user.id, PRESENCE_SECONDS]);
+  const out = { rev: d.rev, presence: presence.map((p) => ({ username: p.username, slide: p.slide_id, el: p.element_id, me: p.me })) };
+  if (Number(req.query.rev) !== d.rev) { out.title = d.title; out.data = d.data; }
+  res.json(out);
 });
 
 router.delete('/:id', async (req, res) => {
-  const d = await ownDeck(req);
-  if (!d) return res.status(404).json({ error: 'Präsentation nicht gefunden' });
+  const d = await accessDeck(req, { ownerOnly: true });
+  if (!d) return notFound(res);
   await db.query('DELETE FROM quiz.slide_decks WHERE id = $1', [d.id]);
   res.json({ ok: true });
 });
 
 router.post('/:id/duplicate', async (req, res) => {
-  const d = await ownDeck(req);
-  if (!d) return res.status(404).json({ error: 'Präsentation nicht gefunden' });
+  const d = await accessDeck(req);
+  if (!d) return notFound(res);
   const id = await db.tx(async (client) => {
     const { rows: [n] } = await client.query('INSERT INTO quiz.slide_decks (owner_id, title, data) VALUES ($1, $2, $3) RETURNING id', [req.user.id, `${d.title} (Kopie)`.slice(0, 120), JSON.stringify(d.data)]);
     // Bilder mitkopieren und die Verweise im Dokument umschreiben
@@ -216,8 +282,8 @@ router.post('/:id/duplicate', async (req, res) => {
 });
 
 router.post('/:id/assets', async (req, res) => {
-  const d = await ownDeck(req);
-  if (!d) return res.status(404).json({ error: 'Präsentation nicht gefunden' });
+  const d = await accessDeck(req);
+  if (!d) return notFound(res);
   const mime = String(req.headers['content-type'] || '').split(';')[0];
   if (!ASSET_TYPES.includes(mime) || !Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'Nur Bilder (JPEG, PNG, WebP, GIF)' });
   if (req.body.length > MAX_ASSET_BYTES) return res.status(413).json({ error: 'Das Bild ist zu groß' });
@@ -225,6 +291,45 @@ router.post('/:id/assets', async (req, res) => {
   if (n >= MAX_ASSETS_PER_DECK) return res.status(400).json({ error: `Höchstens ${MAX_ASSETS_PER_DECK} Bilder pro Präsentation` });
   const row = await db.one('INSERT INTO quiz.slide_assets (deck_id, mime, data) VALUES ($1, $2, $3) RETURNING id', [d.id, mime, req.body]);
   res.json({ id: Number(row.id), url: `/api/slides/assets/${row.id}` });
+});
+
+// ---------- Teilen ----------
+// Mitbearbeiter einladen (nur Freunde), wie bei Quiz und Lernsets
+router.post('/:id/collaborators', async (req, res) => {
+  const d = await accessDeck(req, { ownerOnly: true });
+  if (!d) return notFound(res);
+  const input = String(req.body.username || '').trim();
+  if (!input) return res.status(400).json({ error: 'Nutzername oder #ID fehlt' });
+  const user = await findUser(input);
+  if (!user) return res.status(404).json({ error: `Spieler „${input}“ nicht gefunden.` });
+  if (Number(user.id) === req.user.id) return res.status(400).json({ error: 'Die Präsentation gehört dir bereits.' });
+  if (!(await areFriends(req.user.id, user.id))) return res.status(403).json({ error: `${user.username} ist noch nicht dein Freund. Schicke zuerst unter Profil → Freunde eine Anfrage.` });
+  await db.query('INSERT INTO quiz.slide_collaborators (deck_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [d.id, user.id]);
+  await notifyDeck(d.id);
+  res.json({ username: user.username });
+});
+
+// Entfernen: der Besitzer jeden, ein Mitbearbeiter sich selbst
+router.delete('/:id/collaborators/:username', async (req, res) => {
+  const d = await accessDeck(req);
+  if (!d) return notFound(res);
+  const user = await db.one('SELECT id FROM quiz.users WHERE lower(username) = lower($1)', [String(req.params.username).normalize('NFC')]);
+  if (!user) return res.status(404).json({ error: 'Nutzer nicht gefunden' });
+  if (!d.isOwner && Number(user.id) !== req.user.id) return res.status(403).json({ error: 'Nur der Besitzer kann andere entfernen' });
+  await db.query('DELETE FROM quiz.slide_collaborators WHERE deck_id = $1 AND user_id = $2', [d.id, user.id]);
+  await db.query('DELETE FROM quiz.slide_presence WHERE deck_id = $1 AND user_id = $2', [d.id, user.id]);
+  await notifyDeck(d.id);
+  res.json({ ok: true });
+});
+
+// Link zum Ansehen (ohne Anmeldung, nur lesen): ein-/ausschalten oder neu erzeugen
+router.post('/:id/share', async (req, res) => {
+  const d = await accessDeck(req, { ownerOnly: true });
+  if (!d) return notFound(res);
+  const enabled = req.body.enabled !== false;
+  const token = enabled ? (req.body.renew || !d.share_token ? crypto.randomBytes(18).toString('base64url') : d.share_token) : null;
+  await db.query('UPDATE quiz.slide_decks SET share_token = $1 WHERE id = $2', [token, d.id]);
+  res.json({ token });
 });
 
 module.exports = { router, cleanDeck };

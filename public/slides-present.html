@@ -57,6 +57,7 @@
   <script>
     const params = new URLSearchParams(location.search);
     const id = params.get('id');
+    const token = params.get('t');       // Ansehen-Link: ohne Anmeldung, nur lesen
     let deck = null;
     let idx = 0;
     let busy = false;
@@ -83,7 +84,7 @@
       $('#next').disabled = idx === slides().length - 1;
       const notes = slides()[idx].notes || '';
       $('#notes').textContent = notes || 'Keine Notizen zu dieser Folie.';
-      history.replaceState(null, '', `?id=${id}&n=${idx + 1}`);
+      history.replaceState(null, '', token ? `?t=${token}&n=${idx + 1}` : `?id=${id}&n=${idx + 1}`);
     }
 
     function go(to) {
@@ -121,7 +122,7 @@
     }
 
     // --- Bedienung ---
-    const exit = () => { location.href = `/slides-edit?id=${id}`; };
+    const exit = () => { location.href = token ? '/' : `/slides-edit?id=${id}`; };
     const toggleFull = () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.().catch(() => {}); };
     document.addEventListener('keydown', (e) => {
       if (!deck || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -167,11 +168,12 @@
       setTimeout(() => print(), 300);
     }
 
-    requireLogin().then(async () => {
+    (token ? Promise.resolve() : requireLogin()).then(async () => {
       try {
-        deck = await api(`/api/slides/${id}`);
+        if (token) SlideRender.setAssetQuery(`?t=${encodeURIComponent(token)}`);
+        deck = await api(token ? `/api/slides/shared/${encodeURIComponent(token)}` : `/api/slides/${id}`);
         document.title = `${deck.title} – Präsentation`;
-        if (params.get('print')) { $('#stage').hidden = true; $('#bar').hidden = true; $('#error').style.color = '#fff'; $('#error').textContent = 'Der Druckdialog öffnet sich – wähle dort „Als PDF speichern“. Danach kannst du diesen Tab schließen.'; return printAll(); }
+        if (params.get('print') && !token) { $('#stage').hidden = true; $('#bar').hidden = true; $('#error').style.color = '#fff'; $('#error').textContent = 'Der Druckdialog öffnet sich – wähle dort „Als PDF speichern“. Danach kannst du diesen Tab schließen.'; return printAll(); }
         show(Math.max(0, Number(params.get('n') || 1) - 1));
         wake();
       } catch (err) { $('#error').textContent = err.message; }
