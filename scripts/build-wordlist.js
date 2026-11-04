@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Wortschatz aus den Gesetzestexten (src/gesetze/*.json) → public/data/wortschatz.json
+// Wortschatz aus den Gesetzestexten (src/gesetze/*.json) → public/wortschatz.json
 // Die Rechtschreibprüfung der Lernsets kennt damit Fachwörter („Gefahrenabwehr“, „Ordnungsbehörde“ …), die in normalen Wörterbüchern fehlen.
 //   node scripts/build-wordlist.js
 const fs = require('fs');
@@ -16,6 +16,5 @@ for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json') && x !== '
 }
 // Wörter, die nur einmal in den Gesetzen stehen, sind häufiger Tippfehler/Sonderfälle als Wortschatz: nur ab 2 Vorkommen aufnehmen
 const words = [...counts].filter(([w, n]) => n >= 2 && w.length <= 40).map(([w]) => w).sort((a, b) => a.localeCompare(b, 'de'));
-fs.mkdirSync(path.join(__dirname, '..', 'public', 'data'), { recursive: true });
-fs.writeFileSync(path.join(__dirname, '..', 'public', 'data', 'wortschatz.json'), JSON.stringify(words));
+fs.writeFileSync(path.join(__dirname, '..', 'public', 'wortschatz.json'), JSON.stringify(words));
 console.log(`${words.length} Wörter (von ${counts.size} verschiedenen)`);

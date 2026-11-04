@@ -9,7 +9,7 @@ async function init() {
   const [aff, dic, words, mod] = await Promise.all([
     fetch(`${DICT}/index.aff`).then((r) => { if (!r.ok) throw new Error('Wörterbuch nicht erreichbar'); return r.text(); }),
     fetch(`${DICT}/index.dic`).then((r) => { if (!r.ok) throw new Error('Wörterbuch nicht erreichbar'); return r.text(); }),
-    fetch('/data/wortschatz.json').then((r) => r.json()),
+    fetch('/wortschatz.json').then((r) => r.json()),
     import('https://cdn.jsdelivr.net/npm/nspell@2.1.5/+esm'),
   ]);
   const sp = mod.default(aff, dic);
