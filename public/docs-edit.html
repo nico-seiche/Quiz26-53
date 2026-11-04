@@ -115,19 +115,16 @@
     <button type="button" id="d-link" title="Link">🔗</button>
     <button type="button" id="d-image" title="Bild einfügen">🖼️</button>
     <button type="button" id="d-table" title="Tabelle">⊞</button>
-    <button type="button" id="d-scribble" title="Mit dem Apple Pencil Text schreiben (wird in Schrift umgewandelt)">✍️ Text schreiben</button>
-    <button type="button" id="d-ink" title="Handschrift-Feld einfügen (Apple Pencil)">✍️ Handschrift</button>
     <button type="button" data-act="clean" title="Formatierung entfernen">Tx</button>
   </div>
   <div class="d-scroll" id="scroll">
     <div class="paper"><div id="editor"></div></div>
   </div>
-  <div class="doc-foot"><span id="count"></span><span>✍️ Mit dem Apple Pencil direkt in den Text schreiben (Scribble) oder ein Handschrift-Feld einfügen.</span></div>
+  <div class="doc-foot"><span id="count"></span><span></span></div>
   <input type="file" id="file" accept="image/*" hidden>
   <script src="/js/changelog.js"></script>
   <script src="/js/common.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
-  <script src="/js/docs-ink.js"></script>
   <script>
     const id = new URLSearchParams(location.search).get('id');
     let doc = null;
@@ -233,8 +230,6 @@
       else if (b.id === 'd-link') linkDialog(r);
       else if (b.id === 'd-image') $('#file').click();
       else if (b.id === 'd-table') tablePop(b);
-      else if (b.id === 'd-ink') insertInk(r);
-      else if (b.id === 'd-scribble') scribbleBox(r);
       refreshTools();
     });
     $('#d-block').onchange = (e) => {
@@ -297,42 +292,9 @@
     }
     document.addEventListener('pointerdown', (e) => { if (tpop && !e.target.closest('.tbl-pop, #d-table')) closeTablePop(); });
 
-    // ---------- Text per Pencil (Scribble) ----------
-    // Scribble funktioniert zuverlässig in normalen Textfeldern, nicht in jedem Editor: darum ein Schreibfeld, dessen Text an der Cursorstelle eingefügt wird
-    function scribbleBox(r) {
-      const box = document.createElement('div');
-      box.style.cssText = 'position:fixed;inset:0;z-index:100;background:rgba(20,22,50,.45);display:flex;align-items:center;justify-content:center;padding:1rem';
-      box.innerHTML = '<div class="card" style="width:min(640px,100%);margin:0"><h3 style="margin:0 0 .5rem">✍️ Mit dem Pencil schreiben</h3><p class="muted" style="margin:0 0 .5rem">Schreibe mit dem Apple Pencil in das Feld – iPadOS wandelt es in Text um. „Einfügen“ setzt ihn an die Cursorstelle.</p><textarea rows="6" style="width:100%;font-size:18px" id="scr-t"></textarea><div class="row" style="justify-content:flex-end;gap:.5rem;margin-top:.6rem"><button type="button" id="scr-x">Abbrechen</button><button type="button" class="primary" id="scr-ok">Einfügen</button></div></div>';
-      document.body.appendChild(box);
-      const t = box.querySelector('#scr-t');
-      t.focus();
-      const close = () => box.remove();
-      box.querySelector('#scr-x').onclick = close;
-      box.querySelector('#scr-ok').onclick = () => {
-        const v = t.value;
-        close();
-        if (!v) return;
-        quill.focus();
-        const at = r.index + r.length;
-        if (r.length) quill.deleteText(r.index, r.length, 'user');
-        quill.insertText(r.index, v, 'user');
-        quill.setSelection(r.index + v.length, 0, 'silent');
-        dirty();
-      };
-    }
-
-    // ---------- Handschrift ----------
-    function insertInk(r) {
-      if (quill.getFormat(r).table) { alert('Handschrift-Felder gehen nicht in Tabellenzellen – setze den Cursor unter oder über die Tabelle.'); return; }
-      const at = r.index + r.length;
-      quill.insertEmbed(at, 'ink', { h: 360, strokes: [] }, 'user');
-      quill.setSelection(at + 1, 0, 'silent');
-      dirty();
-    }
 
     // ---------- Start ----------
     function startEditor() {
-      DocsInk.register(Quill);
       const Size = Quill.import('attributors/style/size');
       Size.whitelist = ['10px', '12px', '14px', '18px', '20px', '24px', '28px', '32px', '40px'];
       Quill.register(Size, true);
@@ -341,18 +303,13 @@
       Quill.register(Font, true);
       quill = new Quill('#editor', {
         modules: { toolbar: false, table: true, history: { delay: 800, maxStack: 200, userOnly: true } },
-        formats: ['bold', 'italic', 'underline', 'strike', 'color', 'background', 'font', 'size', 'script', 'header', 'blockquote', 'code-block', 'list', 'indent', 'align', 'link', 'image', 'table', 'ink'],
-        placeholder: 'Hier schreiben – mit der Tastatur oder direkt mit dem Apple Pencil …',
+        formats: ['bold', 'italic', 'underline', 'strike', 'color', 'background', 'font', 'size', 'script', 'header', 'blockquote', 'code-block', 'list', 'indent', 'align', 'link', 'image', 'table'],
+        placeholder: 'Hier schreiben …',
       });
       quill.setContents(doc.delta, 'silent');
       quill.history.clear();
       quill.on('text-change', (delta, old, source) => { if (source !== 'silent') dirty(); refreshTools(); });
       quill.on('selection-change', (r) => { if (r) lastRange = r; refreshTools(); });
-      $('#editor').addEventListener('ink-change', dirty);
-      $('#editor').addEventListener('ink-delete', (e) => {
-        const blot = Quill.find(e.target.closest('.ql-ink'));
-        if (blot && confirm('Dieses Handschrift-Feld mit allem Geschriebenen entfernen?')) { quill.deleteText(quill.getIndex(blot), 1, 'user'); }
-      });
       // Bilder aus der Zwischenablage / per Ziehen
       quill.root.addEventListener('paste', (e) => { const f = [...(e.clipboardData?.files || [])].find((x) => /^image\//.test(x.type)); if (f) { e.preventDefault(); e.stopPropagation(); uploadImage(f); } }, true);
       quill.root.addEventListener('drop', (e) => { const f = [...(e.dataTransfer?.files || [])].find((x) => /^image\//.test(x.type)); if (f) { e.preventDefault(); e.stopPropagation(); uploadImage(f); } }, true);

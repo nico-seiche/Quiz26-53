@@ -224,7 +224,7 @@ Beim Kopieren merkt sich die Kopie ihr Original (`study_sets.copied_from`, `sync
 
 ## Dokumente
 
-Word-Alternative unter `/docs` (Liste) und `/docs-edit?id=…` (Editor). Quill 2 (jsdelivr) mit Überschriften, Listen, Checklisten, Tabellen, Bildern, Links, Farben, Schrift und Größe; automatisches Speichern (1 s, `rev`-Prüfung gegen Überschreiben, 409 bei Konflikt). Handschrift-Felder (`public/js/docs-ink.js`) sind eigene Blöcke im Text: Striche werden als Zahlen gespeichert (Druck des Apple Pencil → Strichstärke), Finger scrollt nur, außer „☝️“ ist aktiv. Der Server (`src/docs.js`) prüft das Delta mit einer Whitelist. Bilder liegen in `quiz.doc_assets`. Druck/PDF über `window.print()`. Migration `027_docs.sql`.
+Word-Alternative unter `/docs` (Liste) und `/docs-edit?id=…` (Editor). Quill 2 (jsdelivr) mit Überschriften, Listen, Checklisten, Tabellen, Bildern, Links, Farben, Schrift und Größe; automatisches Speichern (1 s, `rev`-Prüfung gegen Überschreiben, 409 bei Konflikt). Handschrift/Pencil ist vorerst ausgebaut (`public/js/docs-ink.js` und die Whitelist im Server bleiben für später). Der Server (`src/docs.js`) prüft das Delta mit einer Whitelist. Bilder liegen in `quiz.doc_assets`. Druck/PDF über `window.print()`. Migration `027_docs.sql`.
 
 ## Folien
 

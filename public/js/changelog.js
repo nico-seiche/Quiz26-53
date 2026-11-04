@@ -6,7 +6,6 @@ const CHANGELOG = [
     title: 'Neu: Dokumente',
     items: [
       ['📝', 'Texte wie in Word', 'Überschriften, Listen, Tabellen, Bilder, Links und Farben – alles wird automatisch gespeichert.'],
-      ['✍️', 'Mit dem Apple Pencil schreiben', 'Setze ein Handschrift-Feld in den Text und schreibe oder zeichne darin – der Druck des Stifts bestimmt die Strichstärke. Im Text selbst funktioniert Scribble.'],
       ['🖨️', 'Als PDF speichern', 'Über „PDF / Drucken“ wird das Dokument sauber ausgegeben.'],
     ],
   },
