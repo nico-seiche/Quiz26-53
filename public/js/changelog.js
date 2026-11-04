@@ -2,6 +2,15 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-07',
+    title: 'Neu: PowerPoint-Dateien importieren',
+    items: [
+      ['📥', 'PowerPoint hochladen', 'Unter „Folien“ eine .pptx-Datei wählen: Sie wird in eine eigene Präsentation umgewandelt, die du direkt bearbeiten kannst.'],
+      ['🧩', 'Was übernommen wird', 'Texte mit Schrift, Größe und Farbe, Aufzählungen, Formen, Bilder, Tabellen, Hintergründe und deine Notizen.'],
+      ['➕', 'Auch in bestehende Präsentationen', 'Im Editor fügt „📥 PowerPoint“ die Folien einer Datei hinter der aktuellen Folie ein.'],
+    ],
+  },
+  {
     id: '2026-11-06',
     title: 'Neu: Präsentationen gemeinsam bearbeiten und teilen',
     items: [

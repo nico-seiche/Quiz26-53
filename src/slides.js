@@ -10,7 +10,7 @@ const SlidesSync = require('../public/js/slides-sync.js');
 const MAX_SLIDES = 200;
 const MAX_ELEMENTS = 300;
 const MAX_JSON_BYTES = 1500000;
-const MAX_ASSETS_PER_DECK = 40;
+const MAX_ASSETS_PER_DECK = 100;
 const MAX_ASSET_BYTES = 1500000;
 const ASSET_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 

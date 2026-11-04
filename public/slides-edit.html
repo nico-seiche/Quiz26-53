@@ -112,6 +112,9 @@
     .chip button { padding: 0 .35rem; border: 0; background: transparent; box-shadow: none; font-size: .95rem; color: var(--muted); cursor: pointer; margin: 0; }
     .share-link { display: flex; gap: .4rem; }
     .share-link input { flex: 1; min-width: 0; margin: 0; font-size: .85rem; }
+    .import-note { padding: .6rem .9rem; background: #fef3c7; color: #78350f; border-bottom: 1px solid #fcd34d; font-size: .9rem; display: flex; gap: .8rem; align-items: flex-start; }
+    .import-note ul { margin: .2rem 0 0; padding-left: 1.1rem; }
+    .import-note button { margin-left: auto; flex: none; padding: .2rem .6rem; font-size: .85rem; }
     .drop-hint { outline: 3px dashed var(--primary); outline-offset: -6px; }
     @media (max-width: 700px) { .blocks-pop { column-count: 1; } }
     @media (max-width: 1000px) {
@@ -138,9 +141,11 @@
     <span class="peers" id="peers" aria-label="Wer gerade mitarbeitet"></span>
     <span class="muted" id="state" aria-live="polite"></span>
     <button type="button" id="share-btn" title="Teilen und zusammen bearbeiten">👥 Teilen</button>
+    <button type="button" id="pptx-btn" title="Folien aus einer PowerPoint-Datei (.pptx) hinter der aktuellen Folie einfügen">📥 PowerPoint</button>
     <button type="button" id="pdf" title="Präsentation als PDF herunterladen">⬇ PDF</button>
     <button type="button" class="primary" id="present">▶ Präsentieren</button>
   </div>
+  <div class="import-note" id="import-note" role="status" hidden></div>
   <div class="ed">
     <aside class="ed-slides" id="slides" aria-label="Folien"></aside>
     <section class="ed-main">
@@ -165,6 +170,7 @@
   </div>
   <input type="file" id="file" accept="image/*" hidden>
   <input type="file" id="bgfile" accept="image/*" hidden>
+  <input type="file" id="pptx" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden>
   <div class="pop" id="pop" hidden></div>
   <div class="ask-backdrop" id="share" hidden>
     <div class="ask card share-card" role="dialog" aria-modal="true" aria-labelledby="share-title" style="max-height:90vh;overflow-y:auto">
@@ -205,6 +211,8 @@
   <script src="/js/slides-render.js"></script>
   <script src="/js/slides-sync.js"></script>
   <script src="/js/slides-pdf.js"></script>
+  <script src="/js/slides-images.js"></script>
+  <script src="/js/slides-pptx.js"></script>
   <script>
     const W = SlideRender.W;
     const H = SlideRender.H;
@@ -1192,6 +1200,35 @@
     $('#ask-one').onclick = () => { $('#ask').hidden = true; };
     $('#ask').addEventListener('click', (ev) => { if (ev.target === $('#ask')) $('#ask').hidden = true; });
 
+    // ---------------- PowerPoint-Import ----------------
+    function showImportNote(r) {
+      const box = $('#import-note');
+      if (!r) { box.hidden = true; return; }
+      box.innerHTML = `<div><strong>PowerPoint importiert:</strong> ${r.slides} ${r.slides === 1 ? 'Folie' : 'Folien'}${r.images ? `, ${r.images} ${r.images === 1 ? 'Bild' : 'Bilder'}` : ''}. Alles ist jetzt bearbeitbar.${r.notes.length ? `<ul>${r.notes.map((n) => `<li>${escapeHtml(n)}</li>`).join('')}</ul>` : ''}</div><button type="button" id="import-note-x">OK</button>`;
+      box.hidden = false;
+      $('#import-note-x').onclick = () => { box.hidden = true; };
+    }
+    $('#pptx-btn').onclick = () => $('#pptx').click();
+    $('#pptx').onchange = async (ev) => {
+      const file = ev.target.files[0];
+      ev.target.value = '';
+      if (!file) return;
+      if (!/\.pptx$/i.test(file.name)) { setState('Bitte eine .pptx-Datei wählen (ältere .ppt-Dateien in PowerPoint als .pptx speichern).', 'warn'); return; }
+      const btn = $('#pptx-btn');
+      btn.disabled = true;
+      try {
+        endEdit();
+        const result = await PptxImport.parse(file, { upload: (blob, o) => SlidesImages.upload(id, blob, { crop: o.crop, maxSide: 1920 }), onProgress: (t) => { btn.textContent = t; } });
+        pushHist();
+        deck.data.slides.splice(cur + 1, 0, ...result.slides);
+        cur += 1; selId = null;
+        renderAll(); dirty();
+        showImportNote(result.report);
+      } catch (err) { setState(err.message, 'warn'); }
+      btn.disabled = false; btn.textContent = '📥 PowerPoint';
+    };
+    try { const r = JSON.parse(sessionStorage.getItem('pptx-report') || 'null'); if (r) { sessionStorage.removeItem('pptx-report'); window.__pendingImportReport = r; } } catch { /* egal */ }
+
     // ---------------- Teilen ----------------
     let friendsCache = null;
     const shareUrl = () => `${location.origin}/slides-present?t=${deck.shareToken}`;
@@ -1339,6 +1376,7 @@
         setState('✓ Gespeichert', 'ok');
         startLive();
         tick();
+        if (window.__pendingImportReport) showImportNote(window.__pendingImportReport);
       } catch (err) {
         $('#props').innerHTML = `<p class="error">${escapeHtml(err.message)}</p>`;
       }

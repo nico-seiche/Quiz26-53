@@ -24,7 +24,11 @@
   <main style="max-width:1000px">
     <div class="row spread section-head">
       <h1 style="margin:0">🖥️ Folien</h1>
-      <button type="button" class="primary" id="new">+ Neue Präsentation</button>
+      <div class="row">
+        <button type="button" id="import" title="Eine PowerPoint-Datei (.pptx) hochladen und im Editor bearbeiten">📥 PowerPoint importieren</button>
+        <button type="button" class="primary" id="new">+ Neue Präsentation</button>
+      </div>
+      <input type="file" id="pptx" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden>
     </div>
     <p class="muted">Erstelle Präsentationen für die Vorlesung, arbeite mit Freunden gleichzeitig daran und teile sie per Link.</p>
     <p class="error" id="error"></p>
@@ -44,6 +48,8 @@
   <script src="/js/common.js"></script>
   <script src="/js/slides-render.js"></script>
   <script src="/js/slides-pdf.js"></script>
+  <script src="/js/slides-images.js"></script>
+  <script src="/js/slides-pptx.js"></script>
   <script>
     const fmt = (d) => new Date(d).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' });
 
@@ -72,6 +78,36 @@
         if (thumb && d.first) SlideRender.mount(thumb, d.first, thumb.clientWidth || 260);
       });
     }
+
+    // PowerPoint-Datei → neue, bearbeitbare Präsentation
+    $('#import').onclick = () => { $('#error').textContent = ''; $('#pptx').click(); };
+    $('#pptx').onchange = async (e) => {
+      const file = e.target.files[0];
+      e.target.value = '';
+      if (!file) return;
+      const btn = $('#import');
+      const label = btn.textContent;
+      if (!/\.pptx$/i.test(file.name)) { $('#error').textContent = 'Bitte eine PowerPoint-Datei im Format .pptx wählen (ältere .ppt-Dateien in PowerPoint als .pptx speichern).'; return; }
+      btn.disabled = true;
+      let deckId = null;
+      try {
+        btn.textContent = 'Lese Datei …';
+        ({ id: deckId } = await api('/api/slides', { method: 'POST', body: { title: 'Import' } }));
+        const result = await PptxImport.parse(file, { upload: (blob, o) => SlidesImages.upload(deckId, blob, { crop: o.crop, maxSide: 1920 }), onProgress: (t) => { btn.textContent = t; } });
+        btn.textContent = 'Speichere …';
+        // die leere Startfolie der neuen Präsentation durch die importierten Folien ersetzen
+        const ops = [{ t: 'title', v: result.title }];
+        result.slides.forEach((s, i) => ops.push({ t: 'slideAdd', slide: s, after: i ? result.slides[i - 1].id : 's1' }));
+        ops.push({ t: 'slideDel', id: 's1' });
+        await api(`/api/slides/${deckId}/ops`, { method: 'POST', body: { ops } });
+        try { sessionStorage.setItem('pptx-report', JSON.stringify({ slides: result.report.slides, images: result.report.images, notes: result.report.notes })); } catch { /* egal */ }
+        location.href = `/slides-edit?id=${deckId}`;
+      } catch (err) {
+        if (deckId) api(`/api/slides/${deckId}`, { method: 'DELETE' }).catch(() => {});
+        $('#error').textContent = err.message;
+        btn.disabled = false; btn.textContent = label;
+      }
+    };
 
     $('#new').onclick = async () => {
       try { const { id } = await api('/api/slides', { method: 'POST', body: { title: 'Neue Präsentation' } }); location.href = `/slides-edit?id=${id}`; }
