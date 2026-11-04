@@ -73,7 +73,7 @@ const DocsInk = (() => {
       <canvas class="ink-canvas" aria-label="Zeichenfläche"></canvas>`.replace(/>\s+</g, '><').trim();
     const canvas = node.querySelector('canvas');
     const bar = node.querySelector('.ink-bar');
-    const fit = () => { canvas.style.aspectRatio = `${LW} / ${ink.h}`; canvas.style.touchAction = state.finger ? 'none' : 'pan-y'; redraw(node); };
+    const fit = () => { canvas.style.aspectRatio = `${LW} / ${ink.h}`; canvas.style.touchAction = 'none'; redraw(node); };
     fit();
     if (window.ResizeObserver) new ResizeObserver(() => redraw(node)).observe(canvas);
 
@@ -104,7 +104,11 @@ const DocsInk = (() => {
       if (e.pointerType === 'touch') return state.finger;        // mit Finger nur auf Wunsch; sonst scrollt die Seite
       return e.button === 0;                                       // Maus
     };
+    // Die Fläche sperrt das Scrollen (sonst scrollt die Seite unter dem Pencil weg); ein Finger-Wisch scrollt hier von Hand
+    let pan = null;
+    const scroller = () => node.closest('.d-scroll') || document.scrollingElement;
     canvas.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'touch' && !state.finger) { pan = { y: e.clientY, top: scroller().scrollTop, id: e.pointerId }; canvas.setPointerCapture(e.pointerId); return; }
       if (!accepts(e)) return;
       e.preventDefault();
       canvas.setPointerCapture(e.pointerId);
@@ -122,6 +126,7 @@ const DocsInk = (() => {
       if (ink.strokes.length !== before) { current.removed = true; redraw(node); }
     }
     canvas.addEventListener('pointermove', (e) => {
+      if (pan && e.pointerId === pan.id) { scroller().scrollTop = pan.top - (e.clientY - pan.y); return; }
       if (!current || (current.id !== undefined && e.pointerId !== current.id)) return;
       e.preventDefault();
       const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
@@ -135,6 +140,7 @@ const DocsInk = (() => {
       if (!current.erase) redraw(node);
     });
     const end = (e) => {
+      if (pan && e.pointerId === pan.id) { pan = null; return; }
       if (!current) return;
       const c = current;
       current = null;
