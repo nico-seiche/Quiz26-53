@@ -52,12 +52,14 @@
         <a class="pick" href="/edit?kind=poll"><span class="pick-ico" aria-hidden="true">📊</span><span><strong>Umfrage</strong><small>Mit Diagramm</small></span></a>
         <a class="pick" href="/study-edit"><span class="pick-ico" aria-hidden="true">🃏</span><span><strong>Lernset</strong><small>Karteikarten</small></span></a>
         <button class="pick" type="button" id="new-deck"><span class="pick-ico" aria-hidden="true">🖥️</span><span><strong>Präsentation</strong><small>Folien</small></span></button>
+        <button class="pick" type="button" id="new-doc"><span class="pick-ico" aria-hidden="true">📝</span><span><strong>Dokument</strong><small>Text &amp; Handschrift</small></span></button>
       </div>
       <div class="card split-half split-view">
         <h2>👀 Ansehen</h2>
         <a class="pick" href="/quizzes"><span class="pick-ico" aria-hidden="true">🗂️</span><span><strong>Meine Quiz</strong><small>Starten &amp; bearbeiten</small></span></a>
         <a class="pick" href="/study"><span class="pick-ico" aria-hidden="true">📚</span><span><strong>Lernen</strong><small>Lernsets &amp; Battles</small></span></a>
         <a class="pick" href="/slides"><span class="pick-ico" aria-hidden="true">🎞️</span><span><strong>Präsentationen</strong><small>Meine Folien</small></span></a>
+        <a class="pick" href="/docs"><span class="pick-ico" aria-hidden="true">📄</span><span><strong>Dokumente</strong><small>Meine Texte</small></span></a>
         <a class="pick" href="/gesetze"><span class="pick-ico" aria-hidden="true">⚖️</span><span><strong>Gesetze</strong><small>Paragraphen lesen</small></span></a>
       </div>
     </section>
@@ -102,6 +104,11 @@
 
     $('#new-deck').onclick = async () => {
       try { const { id } = await api('/api/slides', { method: 'POST', body: { title: 'Neue Präsentation' } }); location.href = `/slides-edit?id=${id}`; }
+      catch (err) { alert(err.message); }
+    };
+
+    $('#new-doc').onclick = async () => {
+      try { const { id } = await api('/api/docs', { method: 'POST', body: { title: 'Neues Dokument' } }); location.href = `/docs-edit?id=${id}`; }
       catch (err) { alert(err.message); }
     };
 

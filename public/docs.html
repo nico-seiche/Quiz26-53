@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <script>try{var d=document.documentElement,t=localStorage.getItem("theme"),m=localStorage.getItem("motion");if(t)d.dataset.theme=t;if(m==="off"||(m==="auto"&&matchMedia("(prefers-reduced-motion: reduce)").matches))d.classList.add("reduce-motion")}catch(e){}</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Quiz">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png?v=2">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2">
+  <title>Quiz – Dokumente</title>
+  <link rel="stylesheet" href="/style.css?v=12">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/dashboard">← Start</a>
+    <strong>Dokumente</strong>
+    <span id="me"></span>
+  </header>
+  <main style="max-width:1000px">
+    <div class="row spread section-head">
+      <h1 style="margin:0">📝 Dokumente</h1>
+      <button type="button" class="primary" id="new">+ Neues Dokument</button>
+    </div>
+    <p class="muted">Schreibe Texte mit Überschriften, Listen, Tabellen und Bildern – und mit dem Apple Pencil: direkt in den Text (Scribble) oder in Handschrift-Feldern. Als PDF speichern über „PDF / Drucken“.</p>
+    <p class="error" id="error"></p>
+    <div class="deck-grid" id="docs"></div>
+  </main>
+  <style>
+    .deck-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }
+    .doc-card { padding: .9rem; margin: 0; display: flex; flex-direction: column; gap: .6rem; }
+    .doc-paper { height: 9rem; overflow: hidden; border-radius: 8px; border: 1px solid var(--border); background: #fff; color: #4b5170; padding: .8rem; font-size: .78rem; line-height: 1.5; text-align: left; cursor: pointer; box-shadow: none; width: 100%; display: block; white-space: normal; overflow-wrap: anywhere; }
+    .doc-title { font-weight: 800; overflow-wrap: anywhere; }
+    .doc-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+    .doc-actions button, .doc-actions a { padding: .4rem .7rem; font-size: .9rem; }
+  </style>
+  <script src="/js/changelog.js"></script>
+  <script src="/js/common.js"></script>
+  <script>
+    const fmt = (d) => new Date(d).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' });
+    async function load() {
+      const docs = await api('/api/docs');
+      $('#docs').innerHTML = docs.length ? docs.map((d) => `
+        <div class="card doc-card">
+          <button type="button" class="doc-paper" data-open="${d.id}" aria-label="${escapeHtml(d.title)} öffnen">${escapeHtml(d.preview) || '<span class="muted">Leeres Dokument</span>'}</button>
+          <div><div class="doc-title">${escapeHtml(d.title)}</div><span class="muted">${fmt(d.updatedAt)}</span></div>
+          <div class="doc-actions">
+            <a class="btn primary" href="/docs-edit?id=${d.id}">Öffnen</a>
+            <button type="button" data-dup="${d.id}">Duplizieren</button>
+            <button type="button" class="danger" data-del="${d.id}" data-title="${escapeHtml(d.title)}">Löschen</button>
+          </div>
+        </div>`).join('') : '<div class="card muted">Noch kein Dokument – lege mit „Neues Dokument“ dein erstes an.</div>';
+    }
+    $('#new').onclick = async () => {
+      try { const { id } = await api('/api/docs', { method: 'POST', body: { title: 'Neues Dokument' } }); location.href = `/docs-edit?id=${id}`; }
+      catch (err) { $('#error').textContent = err.message; }
+    };
+    document.querySelector('main').onclick = async (e) => {
+      const t = e.target.closest('button');
+      if (!t) return;
+      try {
+        if (t.dataset.open) location.href = `/docs-edit?id=${t.dataset.open}`;
+        else if (t.dataset.dup) { await api(`/api/docs/${t.dataset.dup}/duplicate`, { method: 'POST' }); load(); }
+        else if (t.dataset.del && confirm(`„${t.dataset.title}“ wirklich löschen?`)) { await api(`/api/docs/${t.dataset.del}`, { method: 'DELETE' }); load(); }
+      } catch (err) { $('#error').textContent = err.message; }
+    };
+    requireLogin().then((me) => { mountNav('home', me); load().catch((err) => { $('#error').textContent = err.message; }); });
+  </script>
+</body>
+</html>

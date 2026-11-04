@@ -222,6 +222,10 @@ Die Bestenliste (und der Platz im Profil) zählt nur Spiele ab dem Stichtag `lea
 
 Beim Kopieren merkt sich die Kopie ihr Original (`study_sets.copied_from`, `synced_to`; Karten tragen `source_card_id`). Das Original verschwindet aus „Von anderen geteilt“, solange die Kopie aktuell ist. Wird es danach geändert, erscheint es mit „Update verfügbar“ und dem Knopf „Kopie aktualisieren“ (`POST /api/study/:id/sync`): neue Karten kommen dazu, geänderte werden übernommen, im Original gelöschte entfallen, eigene Zusatzkarten und der Lernfortschritt bleiben. Kopien, die vor Migration 023 entstanden sind, kennen ihr Original nicht und bleiben unverändert sichtbar.
 
+## Dokumente
+
+Word-Alternative unter `/docs` (Liste) und `/docs-edit?id=…` (Editor). Quill 2 (jsdelivr) mit Überschriften, Listen, Checklisten, Tabellen, Bildern, Links, Farben, Schrift und Größe; automatisches Speichern (1 s, `rev`-Prüfung gegen Überschreiben, 409 bei Konflikt). Handschrift-Felder (`public/js/docs-ink.js`) sind eigene Blöcke im Text: Striche werden als Zahlen gespeichert (Druck des Apple Pencil → Strichstärke), Finger scrollt nur, außer „☝️“ ist aktiv. Der Server (`src/docs.js`) prüft das Delta mit einer Whitelist. Bilder liegen in `quiz.doc_assets`. Druck/PDF über `window.print()`. Migration `027_docs.sql`.
+
 ## Folien
 
 Präsentationen wie in PowerPoint: Link im Profil → `/slides` (Liste), `/slides-edit?id=` (Editor), `/slides-present?id=` (Präsentation; `&print=1` öffnet den Druckdialog als zweite Möglichkeit für ein PDF mit auswählbarem Text).

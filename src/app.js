@@ -13,6 +13,7 @@ const users = require('./users');
 const polls = require('./polls');
 const gesetze = require('./gesetze');
 const slides = require('./slides');
+const docs = require('./docs');
 const db = require('./db');
 
 // Die API; lokal von server.js gestartet, auf Vercel als Serverless-Funktion (api/index.js)
@@ -20,6 +21,7 @@ const app = express();
 app.set('trust proxy', true);
 // Profilbild: rohes JPEG (kleiner als 150 kB), muss vor dem JSON-Parser stehen
 app.use('/api/me/avatar', express.raw({ type: 'image/jpeg', limit: '200kb' }));
+app.use('/api/docs', express.raw({ type: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'], limit: '2mb' }));
 app.use('/api/slides', express.raw({ type: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'], limit: '2mb' }));
 app.use(express.json({ limit: '2mb' }));
 app.use(auth.loadUser);
@@ -62,6 +64,7 @@ app.use('/api/users', users.router);
 app.use('/api/polls', polls.router);
 app.use('/api/gesetze', gesetze.router);
 app.use('/api/slides', slides.router);
+app.use('/api/docs', docs.router);
 app.use('/api/me/avatar', avatars.meRouter);
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Nicht gefunden' }));
