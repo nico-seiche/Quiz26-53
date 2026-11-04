@@ -2,6 +2,15 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-08',
+    title: 'Neu: Text in Folien einzeln formatieren',
+    items: [
+      ['🖋️', 'Wörter einzeln formatieren', 'Markiere im Textfeld ein Wort oder einen Satz: Eine Leiste erscheint mit Fett, Kursiv, Unterstrichen, Farbe und Schriftgröße – nur für die Auswahl.'],
+      ['⌨️', 'Tastenkürzel', 'Strg+B, Strg+I und Strg+U (am Mac Cmd) gelten für den markierten Text.'],
+      ['📥', 'PowerPoint behält die Formatierung', 'Beim Import bleiben fette, kursive, farbige und größere Wörter erhalten.'],
+    ],
+  },
+  {
     id: '2026-11-07',
     title: 'Neu: PowerPoint-Dateien importieren',
     items: [

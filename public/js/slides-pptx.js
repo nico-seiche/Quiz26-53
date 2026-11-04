@@ -99,6 +99,7 @@ const PptxImport = (() => {
     return 'sans';
   };
   const px = (v) => Math.round(v * 10) / 10;
+  const mergeRuns = (runs) => runs.reduce((out, r) => { const last = out[out.length - 1]; if (last && ['b', 'i', 'u', 'c', 'sz', 'f'].every((k) => last[k] === r[k])) last.t += r.t; else out.push({ ...r }); return out; }, []);
 
   // ---------- Hauptfunktion ----------
   // file: .pptx-Datei; opts.upload(blob, { crop }) → Promise<url>; opts.onProgress(text)
@@ -272,27 +273,54 @@ const PptxImport = (() => {
       const fontScale = auto && attr(auto, 'fontScale') ? num(attr(auto, 'fontScale')) / 100000 : 1;
       // Reihenfolge: Lauf → Absatz-Vorgabe (defRPr) → Layout/Master
       const defRPrs = [first.pPr && kid(first.pPr, 'defRPr'), ...inherit.map((p) => kid(p, 'defRPr'))].filter(Boolean);
-      const pick = (get) => { for (const n of [first.rPr, ...defRPrs]) { const v = n && get(n); if (v !== null && v !== undefined && v !== '') return v; } return null; };
-      const sizePt = (pick((n) => (attr(n, 'sz') ? num(attr(n, 'sz')) / 100 : null)) || 18) * fontScale;
-      const bold = pick((n) => (attr(n, 'b') !== null ? attr(n, 'b') === '1' || attr(n, 'b') === 'true' : null));
-      const italic = pick((n) => (attr(n, 'i') !== null ? attr(n, 'i') === '1' || attr(n, 'i') === 'true' : null));
-      const underline = pick((n) => (attr(n, 'u') !== null ? attr(n, 'u') !== 'none' : null));
-      let color = 'auto';
-      for (const n of [first.rPr, ...defRPrs]) {
-        const f = n && kid(n, 'solidFill');
-        const c = f && readColor(f, ctx);
-        if (c) { color = c.scheme === 'tx1' || c.scheme === 'dk1' ? 'auto' : c.hex; break; }   // Standard-Textfarbe = automatisch passend zum Hintergrund
-      }
-      let face = pick((n) => attr(kid(n, 'latin'), 'typeface'));
-      if (face === '+mj-lt') face = fonts.major; else if (face === '+mn-lt' || !face) face = fonts.minor;
+      const styleOf = (rPr) => {
+        const pick = (get) => { for (const n of [rPr, ...defRPrs]) { const v = n && get(n); if (v !== null && v !== undefined && v !== '') return v; } return null; };
+        const flag = (name) => pick((n) => (attr(n, name) !== null ? attr(n, name) === '1' || attr(n, name) === 'true' || (name === 'u' && attr(n, name) !== 'none') : null));
+        let color = 'auto';
+        for (const n of [rPr, ...defRPrs]) {
+          const f = n && kid(n, 'solidFill');
+          const c = f && readColor(f, ctx);
+          if (c) { color = c.scheme === 'tx1' || c.scheme === 'dk1' ? 'auto' : c.hex; break; }   // Standard-Textfarbe = automatisch passend zum Hintergrund
+        }
+        let face = pick((n) => attr(kid(n, 'latin'), 'typeface'));
+        if (face === '+mj-lt') face = fonts.major; else if (face === '+mn-lt' || !face) face = fonts.minor;
+        return {
+          size: Math.min(240, Math.max(8, Math.round((pick((n) => (attr(n, 'sz') ? num(attr(n, 'sz')) / 100 : null)) || 18) * fontScale * ptUnit))),
+          bold: Boolean(flag('b')), italic: Boolean(flag('i')), underline: Boolean(flag('u')), color, font: fontKind(face),
+        };
+      };
+      const base = styleOf(first.rPr);
       const algn = (first.pPr && attr(first.pPr, 'algn')) || inherit.map((p) => attr(p, 'algn')).find(Boolean) || 'l';
       const anchor = (bodyPr && attr(bodyPr, 'anchor')) || chain.map((ch) => attr(path(ch, 'txBody', 'bodyPr'), 'anchor')).find(Boolean);
       const valign = anchor === 'ctr' ? 'middle' : anchor === 'b' ? 'bottom' : anchor === 't' ? 'top' : (!ph && !isTextBox ? 'middle' : (phType === 'title' || phType === 'ctrTitle' || phType === 'subTitle') ? 'middle' : 'top');
+      // Textabschnitte mit eigener Formatierung (nur Abweichungen vom ersten Abschnitt werden gemerkt)
+      const raw = [];
+      paras.forEach((p, pi) => {
+        kids(p).forEach((n) => {
+          if (n.localName === 'r' || n.localName === 'fld') { const t = kid(n, 't'); if (t && t.textContent) raw.push({ t: t.textContent, rPr: kid(n, 'rPr') }); }
+          else if (n.localName === 'br') raw.push({ t: '\n' });
+        });
+        if (pi < paras.length - 1) raw.push({ t: '\n' });
+      });
+      while (raw.length && !raw[raw.length - 1].t.trim()) raw.pop();
+      const runs = raw.map((r) => {
+        const o = { t: r.t };
+        if (r.rPr && r.t.trim()) {
+          const st = styleOf(r.rPr);
+          if (st.bold !== base.bold) o.b = st.bold;
+          if (st.italic !== base.italic) o.i = st.italic;
+          if (st.underline !== base.underline) o.u = st.underline;
+          if (st.color !== base.color) o.c = st.color;
+          if (st.size !== base.size) o.sz = st.size;
+          if (st.font !== base.font) o.f = st.font;
+        }
+        return o;
+      });
+      const mixed = runs.some((r) => ['b', 'i', 'u', 'c', 'sz', 'f'].some((k) => r[k] !== undefined));
       return {
-        text: lines.join('\n').replace(/\n{3,}/g, '\n\n').slice(0, 5000),
-        size: Math.min(240, Math.max(8, Math.round(sizePt * ptUnit))),
-        bold: Boolean(bold), italic: Boolean(italic), underline: Boolean(underline), color,
-        font: fontKind(face),
+        text: runs.map((r) => r.t).join('').slice(0, 5000),
+        ...(mixed ? { runs: mergeRuns(runs) } : {}),
+        size: base.size, bold: base.bold, italic: base.italic, underline: base.underline, color: base.color, font: base.font,
         align: algn === 'ctr' ? 'center' : algn === 'r' ? 'right' : 'left',
         valign,
         list: listVotes > textParas / 2 ? (first.kind === 'number' ? 'number' : 'bullet') : 'none',

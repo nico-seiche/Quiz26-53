@@ -44,8 +44,32 @@ function cleanRows(rows) {
   return out.length ? out : [['']];
 }
 
+// Formatierter Text: Läufe { t, b, i, u, c, sz, f }; text ergibt sich aus den Läufen
+const MAX_TEXT = 5000;
+function cleanRuns(list) {
+  const runs = [];
+  let total = 0;
+  for (const r of (Array.isArray(list) ? list : []).slice(0, 600)) {
+    if (!r || typeof r.t !== 'string' || !r.t || total >= MAX_TEXT) continue;
+    const t = r.t.slice(0, MAX_TEXT - total);
+    total += t.length;
+    const o = { t };
+    for (const k of ['b', 'i', 'u']) if (r[k] === true || r[k] === false) o[k] = r[k];
+    if (r.c === 'auto') o.c = 'auto'; else if (typeof r.c === 'string' && /^#[0-9a-f]{6}$/i.test(r.c)) o.c = r.c.toLowerCase();
+    if (Number.isFinite(r.sz)) o.sz = num(r.sz, 8, 240, 32);
+    if (FONTS.includes(r.f)) o.f = r.f;
+    runs.push(o);
+  }
+  return runs;
+}
+
 function cleanTextProps(e, out) {
-  out.text = str(e.text, 5000);
+  out.text = str(e.text, MAX_TEXT);
+  const runs = cleanRuns(e.runs);
+  if (runs.length) {
+    out.text = runs.map((r) => r.t).join('');
+    if (runs.some((r) => ['b', 'i', 'u', 'c', 'sz', 'f'].some((k) => r[k] !== undefined))) out.runs = runs;
+  }
   out.size = num(e.size, 8, 240, 32);
   out.color = color(e.color, 'auto');
   out.bold = bool(e.bold);

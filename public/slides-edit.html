@@ -58,6 +58,12 @@
     .selbox { position: absolute; border: 2px solid #4f6cf5; box-sizing: border-box; pointer-events: none; }
     .handle { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; background: #fff; border: 2px solid #4f6cf5; border-radius: 3px; pointer-events: auto; touch-action: none; }
     .guide { position: absolute; background: #ff3b81; pointer-events: none; }
+    .fmtbar { position: fixed; z-index: 75; display: flex; align-items: center; gap: .25rem; padding: .3rem; background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 30px rgba(30, 30, 80, .3); }
+    .fmtbar button, .fmtbar select { margin: 0; padding: .3rem .55rem; min-width: 2.2rem; height: 2.2rem; font-size: .95rem; box-shadow: none; }
+    .fmtbar select { padding: .2rem .3rem; min-width: 4.2rem; }
+    .fmtbar button[aria-pressed="true"] { background: var(--primary-grad); color: #fff; border-color: transparent; }
+    .fmtbar .colorbtn { width: 2.2rem; padding: 0; border-width: 2px; }
+    .sl-edit { outline: none; min-height: 1em; white-space: pre-wrap; overflow-wrap: anywhere; }
     .editing { outline: 2px dashed #4f6cf5; cursor: text !important; }
     .editing .sl-text { -webkit-user-select: text; user-select: text; }
     .ed-props { overflow-y: auto; padding: .8rem; background: var(--card); border-left: 1px solid var(--border); }
@@ -172,6 +178,14 @@
   <input type="file" id="bgfile" accept="image/*" hidden>
   <input type="file" id="pptx" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden>
   <div class="pop" id="pop" hidden></div>
+  <div class="fmtbar" id="fmtbar" role="toolbar" aria-label="Textformat" hidden>
+    <button type="button" data-fmt="b" aria-pressed="false" title="Fett (Strg+B)"><b>B</b></button>
+    <button type="button" data-fmt="i" aria-pressed="false" title="Kursiv (Strg+I)"><i>I</i></button>
+    <button type="button" data-fmt="u" aria-pressed="false" title="Unterstrichen (Strg+U)"><u>U</u></button>
+    <button type="button" class="colorbtn" id="fmt-color" title="Textfarbe der Auswahl" aria-label="Textfarbe der Auswahl"></button>
+    <select id="fmt-size" aria-label="Schriftgröße der Auswahl"></select>
+    <button type="button" data-fmt="clear" title="Formatierung der Auswahl zurücksetzen">Tx</button>
+  </div>
   <div class="ask-backdrop" id="share" hidden>
     <div class="ask card share-card" role="dialog" aria-modal="true" aria-labelledby="share-title" style="max-height:90vh;overflow-y:auto">
       <button type="button" class="changelog-x" id="share-close" aria-label="Schließen"></button>
@@ -614,20 +628,32 @@
     stageWrap.addEventListener('drop', (e) => { stageWrap.classList.remove('drop-hint'); const f = e.dataTransfer?.files?.[0]; if (f) { e.preventDefault(); const t = document.elementsFromPoint(e.clientX, e.clientY).find((n) => n.classList && n.classList.contains('sl-placeholder')); uploadImage(f, t ? t.dataset.id : selectedPlaceholder()); } });
 
     // ---------------- Text bearbeiten ----------------
-    let editEl = null;       // das gerade bearbeitete DOM-Element (Textbox oder Tabellenzelle)
-    function beginEditable(box, eid, onText) {
+    const Rich = SlideRender.Rich;
+    let editEl = null;       // das gerade bearbeitete DOM-Element (Textfeld-Innenteil oder Tabellenzelle)
+    let editRich = false;    // Textfeld mit formatierbarem Text (Tabellenzellen bleiben einfacher Text)
+    let lastSel = null;      // Auswahl im Text als Zeichenpositionen { start, end }
+    let pointerInFmt = false;
+    function beginEditable(box, eid, onInput, rich) {
       pushHist();
-      try { box.contentEditable = 'plaintext-only'; } catch { /* ältere Browser */ }
-      if (box.contentEditable !== 'plaintext-only') box.contentEditable = 'true';
+      try { box.contentEditable = rich ? 'true' : 'plaintext-only'; } catch { /* ältere Browser */ }
+      if (box.contentEditable !== (rich ? 'true' : 'plaintext-only')) box.contentEditable = 'true';
       editing = eid;
       editEl = box;
+      editRich = Boolean(rich);
       box.focus();
       const range = document.createRange();
       range.selectNodeContents(box);
       range.collapse(false);
       const sel2 = getSelection(); sel2.removeAllRanges(); sel2.addRange(range);
-      box.oninput = () => { onText(box.innerText.replace(/\u200b/g, '').replace(/\n$/, '')); refreshThumb(); dirty(); };
-      box.onblur = () => endEdit();
+      box.oninput = () => { onInput(); refreshThumb(); dirty(); updateFmtBar(); };
+      box.onblur = (ev) => { if (editRich && fmtLock(ev)) return; endEdit(); };
+    }
+    // Während Format-Leiste oder Farbauswahl benutzt werden, bleibt der Text im Bearbeiten-Modus
+    const fmtLock = (ev) => pointerInFmt || (popState && popState.custom) || (ev && ev.relatedTarget && ev.relatedTarget.closest && ev.relatedTarget.closest('#fmtbar, #pop'));
+    function setRichFromDom(x, box) {
+      let runs = Rich.tidy(Rich.fromDom(box), x);
+      x.text = Rich.plain(runs);
+      if (Rich.hasOverrides(runs)) x.runs = runs; else delete x.runs;
     }
     function startEdit(eid) {
       const e = elOf(eid);
@@ -639,19 +665,122 @@
       const dom = $('#stagehost').querySelector(`[data-id="${eid}"]`);
       const box = dom && dom.querySelector('.sl-text');
       if (!box) return;
-      box.textContent = e.text === '\u200b' ? '' : e.text;
-      box.style.whiteSpace = 'pre-wrap';
+      const inner = document.createElement('div');
+      inner.className = 'sl-edit';
+      box.replaceChildren(inner);
+      Rich.fill(inner, e, slide());
       box.style.overflow = 'auto';
       dom.classList.add('editing');
-      beginEditable(box, eid, (t) => { const x = elOf(eid); if (x) x.text = t; });
-      box.onkeydown = (ev) => {
-        if (ev.key === 'Escape') { ev.preventDefault(); box.blur(); }
+      box.onpointerdown = (ev) => { if (ev.target === box) { ev.preventDefault(); inner.focus(); Rich.select(inner, lastSel ? lastSel.end : Infinity, lastSel ? lastSel.end : Infinity); } };
+      beginEditable(inner, eid, () => { const x = elOf(eid); if (x) setRichFromDom(x, inner); }, true);
+      inner.onkeydown = (ev) => {
         const mod = ev.metaKey || ev.ctrlKey;
-        if (mod && ['b', 'i', 'u'].includes(ev.key.toLowerCase())) { ev.preventDefault(); toggleProp({ b: 'bold', i: 'italic', u: 'underline' }[ev.key.toLowerCase()], true); }
+        const key = ev.key.toLowerCase();
+        if (ev.key === 'Escape') { ev.preventDefault(); inner.blur(); }
+        else if (mod && ['b', 'i', 'u'].includes(key)) { ev.preventDefault(); formatSelection({ toggle: key }); }
+        else if (ev.key === 'Enter' && !ev.shiftKey && !mod) { ev.preventDefault(); document.execCommand('insertLineBreak'); }
+        else if (ev.key === 'Enter') { ev.preventDefault(); document.execCommand('insertLineBreak'); }
         ev.stopPropagation();
       };
+      // Einfügen immer als reiner Text (fremde Formatierung bringt sonst Durcheinander)
+      inner.onpaste = (ev) => {
+        ev.preventDefault();
+        const t = (ev.clipboardData || window.clipboardData).getData('text/plain').replace(/\r/g, '');
+        t.split('\n').forEach((line, i) => { if (i) document.execCommand('insertLineBreak'); if (line) document.execCommand('insertText', false, line); });
+      };
+      inner.ondrop = (ev) => ev.preventDefault();
+      showFmtBar(dom);
       renderOverlay();
     }
+
+    // ----- Format-Leiste für markierten Text -----
+    const SIZES = [12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72, 96, 120];
+    $('#fmt-size').innerHTML = `<option value="">Größe</option>${SIZES.map((v) => `<option value="${v}">${v}</option>`).join('')}`;
+    function showFmtBar(dom) {
+      const bar = $('#fmtbar');
+      bar.hidden = false;
+      const r = dom.getBoundingClientRect();
+      const bw = bar.offsetWidth; const bh = bar.offsetHeight;
+      bar.style.left = `${clamp(r.left, 8, innerWidth - bw - 8)}px`;
+      bar.style.top = `${r.top - bh - 8 >= 8 ? r.top - bh - 8 : Math.min(innerHeight - bh - 8, r.bottom + 8)}px`;
+      updateFmtBar();
+    }
+    function hideFmtBar() { $('#fmtbar').hidden = true; lastSel = null; pointerInFmt = false; }
+    // Auswahl (oder, ohne Auswahl, der ganze Text), auf den sich die Leiste bezieht
+    function rangeForFormat(e) {
+      const len = Rich.plain(Rich.runsOf(e)).length;
+      const s = lastSel || { start: 0, end: 0 };
+      return s.start === s.end ? { start: 0, end: len, whole: true } : { start: Math.min(s.start, s.end), end: Math.max(s.start, s.end), whole: false };
+    }
+    function updateFmtBar() {
+      const e = editing && editRich ? elOf(editing) : null;
+      if (!e || $('#fmtbar').hidden) return;
+      const { start, end } = rangeForFormat(e);
+      const runs = Rich.runsOf(e);
+      ['b', 'i', 'u'].forEach((k) => { $('#fmtbar').querySelector(`[data-fmt="${k}"]`).setAttribute('aria-pressed', String(Rich.stateOf(runs, start, end, e, k) === true)); });
+      // Größe und Farbe: einheitlich → anzeigen, gemischt → leer
+      const vals = (k) => { const out = new Set(); let pos = 0; runs.forEach((r) => { const rs = pos; pos += r.t.length; if (pos > start && rs < end) out.add(Rich.effective(r, e, k)); }); return [...out]; };
+      const sizes = vals('sz');
+      $('#fmt-size').value = sizes.length === 1 && SIZES.includes(sizes[0]) ? String(sizes[0]) : '';
+      const colors = vals('c');
+      const cb = $('#fmt-color');
+      cb.style.background = colors.length === 1 ? SlideRender.resolve(colors[0], slide(), '#000000') : 'linear-gradient(135deg,#e11d48,#facc15,#16a34a,#4f6cf5)';
+    }
+    function formatSelection(spec) {
+      const e = editing && editRich ? elOf(editing) : null;
+      if (!e || !editEl) return;
+      const { start, end, whole } = rangeForFormat(e);
+      let runs = Rich.runsOf(e).map((r) => ({ ...r }));
+      let patch = spec.patch;
+      if (spec.toggle) {
+        const k = spec.toggle;
+        patch = { [k]: Rich.stateOf(runs, start, end, e, k) !== true };
+      }
+      pushHist(`fmt:${Object.keys(patch).join(',')}`);
+      runs = Rich.tidy(Rich.applyStyle(runs, start, end, patch), e);
+      e.text = Rich.plain(runs);
+      if (Rich.hasOverrides(runs)) e.runs = runs; else delete e.runs;
+      const keep = lastSel;
+      Rich.fill(editEl, e, slide());
+      editEl.focus();
+      lastSel = keep;
+      if (keep) Rich.select(editEl, keep.start, keep.end);
+      refreshThumb(); dirty(); updateFmtBar();
+      void whole;
+    }
+    $('#fmtbar').addEventListener('pointerdown', (ev) => {
+      if (ev.target.closest('select')) { pointerInFmt = true; return; }    // das Auswahlfeld muss den Fokus bekommen
+      ev.preventDefault();                                                 // Knöpfe nehmen dem Text nicht den Fokus (Auswahl bleibt)
+    });
+    $('#fmtbar').addEventListener('click', (ev) => {
+      const b = ev.target.closest('button');
+      if (!b) return;
+      if (b.dataset.fmt === 'clear') formatSelection({ patch: { b: undefined, i: undefined, u: undefined, c: undefined, sz: undefined, f: undefined } });
+      else if (b.dataset.fmt) formatSelection({ toggle: b.dataset.fmt });
+      else if (b.id === 'fmt-color') {
+        const e = elOf(editing);
+        const { start, end } = rangeForFormat(e);
+        const cs = Rich.runsOf(e).filter((r, i, arr) => { let pos = 0; for (let j = 0; j < i; j++) pos += arr[j].t.length; return pos + r.t.length > start && pos < end; }).map((r) => Rich.effective(r, e, 'c'));
+        const cur = SlideRender.resolve(cs[0] || e.color, slide(), '#000000');
+        openColorPop(b, null, { value: cur, auto: true, apply: (v) => { formatSelection({ patch: { c: v === 'auto' || v === 'none' ? undefined : v } }); } });
+      }
+    });
+    $('#fmt-size').addEventListener('change', (ev) => {
+      const v = Number(ev.target.value);
+      pointerInFmt = false;
+      if (v) formatSelection({ patch: { sz: v } });
+      if (editEl) { editEl.focus(); if (lastSel) Rich.select(editEl, lastSel.start, lastSel.end); }
+    });
+    $('#fmt-size').addEventListener('blur', () => { pointerInFmt = false; });
+    document.addEventListener('selectionchange', () => {
+      if (!editing || !editRich || !editEl) return;
+      const sel2 = getSelection();
+      if (!sel2.rangeCount || !editEl.contains(sel2.anchorNode)) return;
+      const r = sel2.getRangeAt(0);
+      lastSel = { start: Rich.offsetOf(editEl, r.startContainer, r.startOffset), end: Rich.offsetOf(editEl, r.endContainer, r.endOffset) };
+      updateFmtBar();
+    });
+    addEventListener('resize', () => { if (!$('#fmtbar').hidden && editEl) { const dom = editEl.closest('.sl-el'); if (dom) showFmtBar(dom); } });
     // Tabellenzelle bearbeiten; Tab springt zur nächsten Zelle
     function startCellEdit(eid, r, c) {
       const e = elOf(eid);
@@ -662,7 +791,7 @@
       const td = $('#stagehost').querySelector(`[data-id="${eid}"] [data-r="${r}"][data-c="${c}"]`);
       if (!td) return;
       td.classList.add('cell-editing');
-      beginEditable(td, eid, (t) => { const x = elOf(eid); if (x && x.rows[r]) x.rows[r][c] = t; });
+      beginEditable(td, eid, () => { const x = elOf(eid); if (x && x.rows[r]) x.rows[r][c] = td.innerText.replace(/\u200b/g, '').replace(/\n$/, ''); }, false);
       td.onkeydown = (ev) => {
         if (ev.key === 'Escape') { ev.preventDefault(); td.blur(); }
         else if (ev.key === 'Tab') {
@@ -686,7 +815,9 @@
       const dom = editEl;
       editing = null;
       editEl = null;
-      if (dom) { dom.onblur = null; dom.oninput = null; dom.onkeydown = null; }
+      if (dom) { dom.onblur = null; dom.oninput = null; dom.onkeydown = null; dom.onpaste = null; dom.ondrop = null; }
+      hideFmtBar();
+      editRich = false;
       if (staleRender && !drag) { staleRender = false; renderAll(); return; }
       if (!silent) { renderStage(); refreshThumb(); renderProps(); }
     }
@@ -929,6 +1060,8 @@
       if (!e) return;
       pushHist(key || `p:${name}`);
       e[name] = value;
+      const RUNKEY = { bold: 'b', italic: 'i', underline: 'u', color: 'c', size: 'sz', font: 'f' };
+      if (RUNKEY[name] && e.runs) Rich.stripProp(e, RUNKEY[name]);   // gilt für den ganzen Text: einzelne Abweichungen entfallen
       afterChange({ props: ['kind', 'align', 'valign', 'list', 'font'].includes(name) });
     }
     function toggleProp(name) { const e = sel(); if (e) setProp(name, !e[name], null); if (editing) { /* Stil im Text sofort sichtbar */ const dom = $('#stagehost').querySelector(`[data-id="${selId}"] .sl-text`); if (dom) { const f = SlideRender.elementEl(sel(), slide()).querySelector('.sl-text'); Object.assign(dom.style, { fontWeight: f.style.fontWeight, fontStyle: f.style.fontStyle, textDecoration: f.style.textDecoration }); } } }
@@ -1049,6 +1182,7 @@
       popState = null;
       pop.hidden = true;
       pop.classList.remove('editing');
+      if (st.custom && editEl) { editEl.focus(); if (lastSel) Rich.select(editEl, lastSel.start, lastSel.end); }
       if (st.kind === 'bg' && JSON.stringify(slide().bg) !== st.before && deck.data.slides.length > 1) askAll();
     }
     const swatch = (c, cur, extra = '') => `<button type="button" class="sw ${extra} ${c.toLowerCase() === String(cur).toLowerCase() ? 'on' : ''}" data-sw="${c}" style="background:${c}" aria-label="${c}"></button>`;
@@ -1061,13 +1195,14 @@
         <div class="row-inline" style="margin-top:.5rem"><input type="text" data-hex placeholder="#rrggbb" maxlength="7" style="width:6.5rem" aria-label="Hex-Farbe"><button type="button" class="mini" data-hex-ok>Übernehmen</button></div>`;
     }
     // Farbe eines Elements (Text-, Füll-, Rahmenfarbe …)
-    function openColorPop(anchor, prop) {
+    function openColorPop(anchor, prop, custom) {
       if (popState) closePop();
       const e = sel();
-      const apply = (v, key) => { setProp(prop, v, key || `pick:${prop}`); anchor.style.background = colorBg(v); anchor.classList.toggle('none', v === 'none'); };
-      popState = { kind: 'color', anchor, apply, prop };
-      const cur = SlideRender.resolve(e[prop], slide(), '#000000');
-      pop.innerHTML = `${colorsHtml(cur)}<div class="row-inline" style="margin-top:.6rem">${anchor.dataset.auto ? '<button type="button" class="mini" data-sw="auto">Automatisch</button>' : ''}${anchor.dataset.none ? '<button type="button" class="mini" data-sw="none">Keine</button>' : ''}<button type="button" class="mini" data-pop-close style="margin-left:auto">Fertig</button></div>`;
+      const apply = custom ? custom.apply : (v, key) => { setProp(prop, v, key || `pick:${prop}`); anchor.style.background = colorBg(v); anchor.classList.toggle('none', v === 'none'); };
+      popState = { kind: 'color', anchor, apply, prop, custom };
+      const cur = custom ? custom.value : SlideRender.resolve(e[prop], slide(), '#000000');
+      const wantAuto = custom ? custom.auto : anchor.dataset.auto;
+      pop.innerHTML = `${colorsHtml(cur)}<div class="row-inline" style="margin-top:.6rem">${wantAuto ? `<button type="button" class="mini" data-sw="auto">${custom ? 'Wie das Textfeld' : 'Automatisch'}</button>` : ''}${!custom && anchor.dataset.none ? '<button type="button" class="mini" data-sw="none">Keine</button>' : ''}<button type="button" class="mini" data-pop-close style="margin-left:auto">Fertig</button></div>`;
       placePop(anchor);
     }
     // Hintergrund der Folie: Farbe, Verlauf oder Bild
@@ -1123,7 +1258,7 @@
       if (d.editCustom !== undefined) { pop.classList.toggle('editing'); return; }
       if (d.sw !== undefined) {
         const c = d.sw;
-        if (pop.classList.contains('editing') && t.classList.contains('custom')) { palette().splice(palette().indexOf(c), 1); dirty(); return popState.kind === 'bg' ? renderBgPop() : openColorPop(popState.anchor, popState.prop); }
+        if (pop.classList.contains('editing') && t.classList.contains('custom')) { palette().splice(palette().indexOf(c), 1); dirty(); return popState.kind === 'bg' ? renderBgPop() : openColorPop(popState.anchor, popState.prop, popState.custom); }
         if (popState.kind === 'color') { popState.apply(c); return; }
         applyBg(c, null); popState.tab = 'color'; return renderBgPop();
       }
@@ -1140,7 +1275,7 @@
         if (!gradientsList().some((x) => x.from === g.from && x.to === g.to && Math.round(x.angle) === g.angle)) { gradientsList().unshift(g); if (gradientsList().length > 12) gradientsList().length = 12; dirty(); }
         return renderBgPop();
       }
-      if (d.hexOk !== undefined) { const v = hexPick(pop.querySelector('[data-hex]').value); if (v) { addCustomColor(v); if (popState.kind === 'color') { popState.apply(v); openColorPop(popState.anchor, popState.prop); } else { applyBg(v); renderBgPop(); } } return; }
+      if (d.hexOk !== undefined) { const v = hexPick(pop.querySelector('[data-hex]').value); if (v) { addCustomColor(v); if (popState.kind === 'color') { popState.apply(v); openColorPop(popState.anchor, popState.prop, popState.custom); } else { applyBg(v); renderBgPop(); } } return; }
       if (d.bgPick !== undefined) return $('#bgfile').click();
       if (d.bgRemove !== undefined) { applyBg(slide().bg.color || '#ffffff'); popState.tab = 'color'; return renderBgPop(); }
     });
@@ -1162,7 +1297,7 @@
     pop.addEventListener('change', (ev) => {
       const t = ev.target;
       if (!popState) return;
-      if (t.dataset.native !== undefined) { addCustomColor(t.value); if (popState.kind === 'color') openColorPop(popState.anchor, popState.prop); else { popState.tab = 'color'; renderBgPop(); } }
+      if (t.dataset.native !== undefined) { addCustomColor(t.value); if (popState.kind === 'color') openColorPop(popState.anchor, popState.prop, popState.custom); else { popState.tab = 'color'; renderBgPop(); } }
       else if (t.dataset.hex !== undefined) { const v = hexPick(t.value); if (v) pop.querySelector('[data-hex-ok]').click(); }
       else if (t.dataset.bgimg === 'fit') { applyBg({ ...slide().bg, fit: t.value }, 'bgimg'); renderBgPop(); }
     });
@@ -1179,7 +1314,7 @@
         setState('');
       } catch (err) { setState(err.message, 'warn'); }
     };
-    document.addEventListener('pointerdown', (ev) => { if (popState && !pop.hidden && !ev.target.closest('#pop, .colorbtn, .bgbtn, #bg-open2')) closePop(); });
+    document.addEventListener('pointerdown', (ev) => { if (popState && !pop.hidden && !ev.target.closest('#pop, .colorbtn, .bgbtn, #bg-open2, #fmtbar')) closePop(); });
     addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && popState) closePop(); }, true);
     addEventListener('resize', () => { if (popState) closePop(); });
 
