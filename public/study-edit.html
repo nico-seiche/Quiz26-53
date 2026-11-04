@@ -13,7 +13,7 @@
   <link rel="icon" href="/icons/icon-192.png?v=2">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2">
   <title>Quiz – Lernset bearbeiten</title>
-  <link rel="stylesheet" href="/style.css?v=11">
+  <link rel="stylesheet" href="/style.css?v=12">
 </head>
 <body>
   <header class="top">
@@ -52,7 +52,7 @@
       <p class="muted">Pro Karte eine Zeile im Format <code>Begriff - Definition</code> (auch <code>–</code> oder <code>:</code>).
         Zeilen ohne Trenner werden an die vorige Definition angehängt, Zeilenumbrüche aus PDFs stören also nicht.
         Danach kannst du jede Karte prüfen und anpassen.</p>
-      <textarea id="import" rows="8" placeholder="Abstrakte Gefahr - Eine abstrakte Gefahr liegt vor, wenn bei ungehindertem Geschehensablauf …"></textarea>
+      <textarea id="import" rows="8" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" placeholder="Abstrakte Gefahr - Eine abstrakte Gefahr liegt vor, wenn bei ungehindertem Geschehensablauf …"></textarea>
       <button type="button" id="do-import" style="margin-top:.6rem">Karten erzeugen</button>
       <p class="muted" id="import-info" style="margin-bottom:0"></p>
     </details>
@@ -63,6 +63,7 @@
   </main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   <script src="/js/cloze.js"></script>
+  <script src="/js/spellcheck.js"></script>
   <script src="/js/common.js"></script>
   <script>
     const id = new URLSearchParams(location.search).get('id');
@@ -94,12 +95,56 @@
       const locked = Boolean(c.lockedBy);
       return `
         <div class="row">
-          <input type="text" data-field="term" maxlength="200" value="${escapeHtml(c.term)}" placeholder="Begriff, z. B. Abstrakte Gefahr" aria-label="Begriff ${i + 1}" ${locked ? 'disabled' : ''}>
+          <input type="text" data-field="term" maxlength="200" value="${escapeHtml(c.term)}" placeholder="Begriff, z. B. Abstrakte Gefahr" aria-label="Begriff ${i + 1}" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" ${locked ? 'disabled' : ''}>
           ${locked ? `<span class="tag lock-tag">✏️ ${escapeHtml(c.lockedBy)} bearbeitet</span>` : ''}
           <button type="button" class="danger icon-btn" data-action="remove" aria-label="Karte entfernen" title="Karte entfernen" ${locked ? 'disabled' : ''}>${TRASH}</button>
         </div>
-        <textarea rows="3" data-field="definition" placeholder="Definition" aria-label="Definition ${i + 1}" ${locked ? 'disabled' : ''}>${escapeHtml(c.definition)}</textarea>`;
+        <div class="spell-hints" data-spell="term" aria-live="polite"></div>
+        <textarea rows="3" data-field="definition" placeholder="Definition" aria-label="Definition ${i + 1}" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" ${locked ? 'disabled' : ''}>${escapeHtml(c.definition)}</textarea>
+        <div class="spell-hints" data-spell="definition" aria-live="polite"></div>`;
     }
+    // --- Rechtschreibprüfung: Tippfehler und unbekannte Wörter unter dem Feld anzeigen (Vorschlag per Tipp übernehmen) ---
+    const spellTimers = new WeakMap();
+    function spellLater(el) { clearTimeout(spellTimers.get(el)); spellTimers.set(el, setTimeout(() => refreshSpell(el), 700)); }
+    async function refreshSpell(el) {
+      for (const field of ['term', 'definition']) {
+        const input = el.querySelector(`[data-field="${field}"]`);
+        const box = el.querySelector(`[data-spell="${field}"]`);
+        if (!input || !box) continue;
+        const text = input.value;
+        const issues = await Spell.check(text);
+        if (input.value !== text) continue;               // inzwischen weitergetippt: das nächste Ergebnis zählt
+        box.innerHTML = issues.map((it) => it.suggestions.length
+          ? `<span class="spell-chip typo">⚠️ <strong>${escapeHtml(it.word)}</strong> → ${it.suggestions.map((sg) => `<button type="button" data-fix="${escapeHtml(sg)}" data-start="${it.start}" data-word="${escapeHtml(it.word)}" data-field="${field}">${escapeHtml(sg)}</button>`).join('')}<button type="button" class="ok" data-accept="${escapeHtml(it.word)}" title="Das Wort ist richtig – nicht mehr melden" aria-label="Stimmt so">✓ stimmt so</button></span>`
+          : `<span class="spell-chip unknown">❔ <strong>${escapeHtml(it.word)}</strong> ist unbekannt <button type="button" class="ok" data-accept="${escapeHtml(it.word)}" title="Das Wort ist richtig – nicht mehr melden">✓ stimmt so</button></span>`).join('');
+      }
+    }
+    $('#cards').addEventListener('click', (e) => {
+      const fix = e.target.closest('[data-fix]');
+      const acc = e.target.closest('[data-accept]');
+      const el = e.target.closest('[data-key]');
+      if (!el || (!fix && !acc)) return;
+      if (acc) { Spell.accept(acc.dataset.accept); refreshSpell(el); return; }
+      const input = el.querySelector(`[data-field="${fix.dataset.field}"]`);
+      const start = Number(fix.dataset.start);
+      if (!input || input.value.slice(start, start + fix.dataset.word.length) !== fix.dataset.word) { refreshSpell(el); return; }
+      input.value = input.value.slice(0, start) + fix.dataset.fix + input.value.slice(start + fix.dataset.word.length);
+      input.dispatchEvent(new Event('input', { bubbles: true }));      // speichert wie eine Eingabe
+      refreshSpell(el);
+    });
+    // Tastatur-Autokorrektur ist ein häufiger Fehlerverursacher: auf Touchgeräten einmalig darauf hinweisen
+    if (matchMedia('(pointer: coarse)').matches) {
+      let hidden = false; try { hidden = localStorage.getItem('autocorrect-tip') === 'x'; } catch { /* egal */ }
+      if (!hidden) {
+        const tip = document.createElement('div');
+        tip.className = 'card spell-tip';
+        tip.innerHTML = '<span>💡 Tipp: Schalte die <strong>Autokorrektur</strong> deiner Tastatur aus (Einstellungen → Tastatur). Sie verändert Fachwörter oft unbemerkt. Die Seite meldet verdächtige Wörter unter dem Feld.</span><button type="button" aria-label="Hinweis schließen">OK</button>';
+        tip.querySelector('button').onclick = () => { tip.remove(); try { localStorage.setItem('autocorrect-tip', 'x'); } catch { /* egal */ } };
+        $('#cards').before(tip);
+      }
+    }
+    Spell.preload();
+
     function render() {
       const box = $('#cards');
       const existing = new Map([...box.querySelectorAll(':scope > [data-key]')].map((el) => [el.dataset.key, el]));
@@ -117,6 +162,7 @@
           el.innerHTML = cardHtml(c, i);
           const ta = el.querySelector('textarea');
           if (ta) requestAnimationFrame(() => autosize(ta));
+          refreshSpell(el);
         }
         existing.delete(c.key);
         if (box.children[i] !== el) box.insertBefore(el, box.children[i] || null);
@@ -226,7 +272,7 @@
       const c = el && byKey(el.dataset.key);
       if (!c || c.lockedBy) return;
       if (e.target.tagName === 'TEXTAREA') autosize(e.target);
-      if (e.target.dataset.field) { c[e.target.dataset.field] = e.target.value; scheduleSave(); }
+      if (e.target.dataset.field) { c[e.target.dataset.field] = e.target.value; scheduleSave(); spellLater(el); }
     });
     $('#cards').addEventListener('click', async (e) => {
       const btn = e.target.closest('[data-action=remove]');

@@ -2,6 +2,15 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-09',
+    title: 'Neu: Rechtschreibprüfung bei Lernsets',
+    items: [
+      ['🔎', 'Tippfehler werden gemeldet', 'Beim Schreiben von Karten markiert die Seite verdächtige Wörter unter dem Feld und schlägt die richtige Schreibweise vor – ein Tipp übernimmt sie.'],
+      ['⚖️', 'Kennt Fachwörter', 'Begriffe wie „Gefahrenabwehr“ oder „Ordnungsbehörde“ kennt die Prüfung aus den Gesetzestexten und meldet sie nicht fälschlich.'],
+      ['📱', 'Weniger Handy-Autokorrektur', 'Die Kartenfelder schalten die Autokorrektur der Tastatur aus, und auf dem Handy gibt es einen Tipp, sie in den Tastatur-Einstellungen ganz abzuschalten.'],
+    ],
+  },
+  {
     id: '2026-11-08',
     title: 'Neu: Text in Folien einzeln formatieren',
     items: [
