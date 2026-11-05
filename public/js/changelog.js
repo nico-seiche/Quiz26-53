@@ -2,6 +2,14 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-11',
+    title: 'Neu: Favoriten bei den Gesetzen',
+    items: [
+      ['⭐', 'Paragraphen merken', 'Bei jedem Paragraphen oben rechts auf „☆ Merken“ tippen.'],
+      ['📋', 'Eigene Übersicht', 'Der Tab „⭐ Favoriten“ zeigt alle markierten Paragraphen, nach Gesetz sortiert – ein Tipp öffnet sie.'],
+    ],
+  },
+  {
     id: '2026-11-10',
     title: 'Neu: Dokumente',
     items: [

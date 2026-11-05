@@ -22,6 +22,14 @@
     .law-top { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: 1rem; }
     .law-top h1 { margin: 0; font-size: 1.5rem; }
     #error:empty { display: none; }
+    .fav-btn { border: 1px solid var(--border); background: var(--card); color: var(--text); border-radius: 999px; padding: .3rem .8rem; font-weight: 800; cursor: pointer; margin: 0 0 0 auto; box-shadow: none; white-space: nowrap; }
+    .fav-btn[aria-pressed="true"] { background: #fff4c7; border-color: #f2c94c; color: #8a6100; }
+    .fav-law { margin: 1.1rem 0 .4rem; font-size: 1rem; }
+    .fav-row { display: flex; align-items: center; gap: .6rem; padding: .55rem .7rem; border: 1px solid var(--border); border-radius: 12px; margin-bottom: .4rem; background: var(--card); }
+    .fav-row a { flex: 1; color: var(--text); text-decoration: none; font-weight: 700; overflow-wrap: anywhere; }
+    .fav-row a b { color: var(--primary); margin-right: .4rem; }
+    .fav-row button { margin: 0; padding: .25rem .6rem; box-shadow: none; background: #fff4c7; color: #8a6100; border: 1px solid #f2c94c; }
+    .law-tab.fav { border-color: #f2c94c; }
     .law-tabs { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
     .law-tab { padding: .45rem .9rem; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: var(--text); font-weight: 800; cursor: pointer; }
     .law-tab[aria-pressed="true"] { background: var(--primary-grad); color: #fff; border-color: transparent; box-shadow: var(--glow); }
@@ -132,6 +140,7 @@
       </aside>
       <section class="card law-read" id="read" aria-live="polite"></section>
     </div>
+    <section class="card" id="favs" hidden></section>
   </main>
   <script src="/js/changelog.js"></script>
   <script src="/js/common.js"></script>
@@ -144,6 +153,8 @@
     let pane = 'grid';         // rechts: 'grid' (Übersicht) oder 'read' (Paragraph)
     let query = '';
     const openGroups = new Set();
+    let favs = [];             // { law, num, title }
+    let favMode = false;       // Favoritenseite offen
     const cache = new Map();
 
     const store = {
@@ -371,10 +382,41 @@
           <button type="button" data-num="${next ? next.num : ''}" ${next ? '' : 'disabled'}><span class="small">Weiter ›</span><span class="tt">${next ? `${U()} ${next.num} ${escapeHtml(lt(next))}` : '–'}</span></button>
         </div>
         <div class="law-crumb">${escapeHtml(law.short)} › ${escapeHtml(crumbOf(current.num))}</div>
-        <div class="par-head"><span class="par-num">${U()} ${current.num}</span>${current.title ? `<h2 class="par-title">${highlight(escapeHtml(current.title))}</h2>` : ''}</div>
+        <div class="par-head"><span class="par-num">${U()} ${current.num}</span>${current.title ? `<h2 class="par-title">${highlight(escapeHtml(current.title))}</h2>` : ''}<button type="button" class="fav-btn" data-fav aria-pressed="${isFav(law.slug, current.num)}">${isFav(law.slug, current.num) ? '★ Favorit' : '☆ Merken'}</button></div>
         ${relatedHtml(current)}
         ${linesHtml(current.text)}
         ${current.notes.length ? `<details class="notes"><summary>Änderungshistorie (${current.notes.length})</summary>${current.notes.map((n) => `<p>${escapeHtml(n)}</p>`).join('')}</details>` : ''}`;
+    }
+
+    const isFav = (slug, num) => favs.some((f) => f.law === slug && f.num === num);
+    async function toggleFav(slug, num, title) {
+      const was = isFav(slug, num);
+      favs = was ? favs.filter((f) => !(f.law === slug && f.num === num)) : [{ law: slug, num, title }, ...favs];
+      if (favMode) renderFavs(); else renderRead();
+      try {
+        await api(`/api/gesetze/favorites/${slug}/${num}`, was ? { method: 'DELETE' } : { method: 'PUT', body: { title } });
+      } catch (err) {
+        favs = was ? [{ law: slug, num, title }, ...favs] : favs.filter((f) => !(f.law === slug && f.num === num));
+        if (favMode) renderFavs(); else renderRead();
+        $('#error').textContent = err.message;
+      }
+    }
+
+    function renderFavs() {
+      const box = $('#favs');
+      const order = laws.map((l) => l.slug);
+      const byLaw = order.map((slug) => ({ l: laws.find((x) => x.slug === slug), items: favs.filter((f) => f.law === slug).sort((a, b) => parseInt(a.num, 10) - parseInt(b.num, 10) || a.num.localeCompare(b.num)) })).filter((g) => g.items.length);
+      box.innerHTML = `<h2 style="margin:0 0 .3rem">⭐ Meine Favoriten</h2><p class="muted" style="margin:0 0 .6rem">${favs.length ? `${favs.length} markiert – tippe auf einen Eintrag, um ihn zu lesen.` : 'Noch nichts markiert. Öffne einen Paragraphen und tippe auf „☆ Merken“.'}</p>`
+        + byLaw.map((g) => `<h3 class="fav-law">${escapeHtml(g.l.short)} <span class="muted">· ${escapeHtml(g.l.title)}</span></h3>`
+          + g.items.map((f) => `<div class="fav-row"><a href="#${f.law}/${f.num}" data-open-fav="${f.law}/${f.num}"><b>${g.l.short === 'GG' ? 'Art.' : '§'} ${escapeHtml(f.num)}</b>${escapeHtml(f.title)}</a><button type="button" data-unfav="${f.law}/${f.num}" title="Aus Favoriten entfernen" aria-label="Aus Favoriten entfernen">★</button></div>`).join('')).join('');
+    }
+    function openFavs() {
+      favMode = true;
+      $('#layout').hidden = true;
+      $('#favs').hidden = false;
+      document.querySelectorAll('.law-tab').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.slug === '__fav')));
+      history.replaceState(null, '', '#favoriten');
+      renderFavs();
     }
 
     function show(num, { push = true, scroll = true } = {}) {
@@ -413,6 +455,8 @@
 
     async function openLaw(slug, num) {
       $('#error').textContent = '';
+      favMode = false;
+      $('#favs').hidden = true;
       if (!cache.has(slug)) cache.set(slug, await api(`/api/gesetze/${slug}`));
       law = cache.get(slug);
       pars = law.items.filter((i) => i.type === 'par');
@@ -435,7 +479,12 @@
     }
 
     // --- Ereignisse ----------------------------------------------------------
-    document.addEventListener('click', (e) => {
+    document.addEventListener('click', async (e) => {
+      const unfav = e.target.closest('[data-unfav]');
+      if (unfav) { const [slug, num] = unfav.dataset.unfav.split('/'); toggleFav(slug, num, ''); return; }
+      const openFav = e.target.closest('[data-open-fav]');
+      if (openFav) { e.preventDefault(); const [slug, num] = openFav.dataset.openFav.split('/'); openLaw(slug, num).catch((err) => { $('#error').textContent = err.message; }); return; }
+      if (law && e.target.closest('[data-fav]')) { toggleFav(law.slug, current.num, lt(current)); return; }
       if (!law) return;
       const group = e.target.closest('.toc-group');
       if (group) {
@@ -473,6 +522,7 @@
     window.addEventListener('hashchange', () => {
       const [slug, num] = location.hash.slice(1).split('/');
       if (slug && law && slug === law.slug) { if (num && byNum.has(num) && (!current || current.num !== num)) show(num, { push: false }); }
+      else if (slug === 'favoriten') openFavs();
       else if (slug && laws.some((l) => l.slug === slug)) openLaw(slug, num);
     });
 
@@ -481,11 +531,12 @@
       noAutoFocus($('#search'));
       try {
         laws = await api('/api/gesetze');
-        $('#tabs').innerHTML = laws.map((l) => `<button type="button" class="law-tab" data-slug="${l.slug}" aria-pressed="false" title="${escapeHtml(l.title)}">${escapeHtml(l.short)}</button>`).join('');
-        $('#tabs').addEventListener('click', (e) => { const b = e.target.closest('.law-tab'); if (b) openLaw(b.dataset.slug).catch((err) => { $('#error').textContent = err.message; }); });
+        favs = await api('/api/gesetze/favorites/all').catch(() => []);
+        $('#tabs').innerHTML = `<button type="button" class="law-tab fav" data-slug="__fav" aria-pressed="false">⭐ Favoriten</button>` + laws.map((l) => `<button type="button" class="law-tab" data-slug="${l.slug}" aria-pressed="false" title="${escapeHtml(l.title)}">${escapeHtml(l.short)}</button>`).join('');
+        $('#tabs').addEventListener('click', (e) => { const b = e.target.closest('.law-tab'); if (b) (b.dataset.slug === '__fav' ? Promise.resolve(openFavs()) : openLaw(b.dataset.slug)).catch((err) => { $('#error').textContent = err.message; }); });
         const [hs, hn] = location.hash.slice(1).split('/');
         const slug = laws.some((l) => l.slug === hs) ? hs : (laws.some((l) => l.slug === store.get('law:last')) ? store.get('law:last') : laws[0].slug);
-        await openLaw(slug, hn && hs === slug ? hn : null);
+        if (hs === 'favoriten') openFavs(); else await openLaw(slug, hn && hs === slug ? hn : null);
       } catch (err) {
         $('#error').textContent = err.message;
       }
