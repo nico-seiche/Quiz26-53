@@ -8,6 +8,7 @@ const INDEX = require('./gesetze/index.json');
 const LOADERS = {
   'polg-nrw': () => require('./gesetze/polg-nrw.json'),
   'obg-nrw': () => require('./gesetze/obg-nrw.json'),
+  'pog-nrw': () => require('./gesetze/pog-nrw.json'),
   stgb: () => require('./gesetze/stgb.json'),
   stpo: () => require('./gesetze/stpo.json'),
   owig_1968: () => require('./gesetze/owig_1968.json'),

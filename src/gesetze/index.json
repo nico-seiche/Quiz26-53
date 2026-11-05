@@ -16,6 +16,14 @@
   "count": 73
  },
  {
+  "slug": "pog-nrw",
+  "short": "POG NRW",
+  "title": "Polizeiorganisationsgesetz Nordrhein-Westfalen",
+  "unit": "§",
+  "validFrom": "01.10.2020",
+  "count": 20
+ },
+ {
   "slug": "stgb",
   "short": "StGB",
   "title": "Strafgesetzbuch",
