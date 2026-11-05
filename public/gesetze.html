@@ -30,6 +30,13 @@
     .fav-row a b { color: var(--primary); margin-right: .4rem; }
     .fav-row button { margin: 0; padding: .25rem .6rem; box-shadow: none; background: #fff4c7; color: #8a6100; border: 1px solid #f2c94c; }
     .law-tab.fav { border-color: #f2c94c; }
+    .form-sec { margin-top: 1.4rem; }
+    .form-sec h3 { margin: 1rem 0 .3rem; font-size: 1.02rem; }
+    .form-sec .form-note { font-size: .88rem; margin: 0 0 .6rem; }
+    .form-item { border: 1px solid var(--border); border-radius: 12px; padding: .5rem .75rem; margin-bottom: .4rem; background: var(--card); }
+    .form-item a.ref-head { font-weight: 800; color: var(--primary); text-decoration: none; }
+    .form-item q { display: block; quotes: none; margin-top: .15rem; overflow-wrap: anywhere; }
+    .form-item mark { background: #fff0a8; color: inherit; border-radius: 3px; padding: 0 .1rem; }
     .law-tabs { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
     .law-tab { padding: .45rem .9rem; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: var(--text); font-weight: 800; cursor: pointer; }
     .law-tab[aria-pressed="true"] { background: var(--primary-grad); color: #fff; border-color: transparent; box-shadow: var(--glow); }
@@ -366,10 +373,50 @@
       </div>`;
     }
 
+    // Formvorschriften: Sätze mit Schriftform, Begründung, Belehrung/Benachrichtigung, Dokumentation, Anordnungsvorbehalten – Wortlaut unverändert aus dem Gesetz
+    const FORM_LAWS = ['polg-nrw', 'pog-nrw'];
+    const FORM_CATS = [
+      ['✍️ Schriftform und Textform', /schriftlich|Schriftform|Textform|in elektronischer Form/i, /schriftlich\w*|Schriftform|Textform|elektronischer Form/gi],
+      ['📝 Begründung und notwendiger Inhalt', /zu begründen|Begründung|ist\w* .{0,25}begründet|anzugeben|zu bezeichnen/i, /zu begründen|Begründung|begründet\w*|anzugeben|zu bezeichnen/gi],
+      ['📣 Belehrung, Unterrichtung und Benachrichtigung', /belehr|zu unterrichten|unterrichtet|benachrichtig|bekannt ?zu ?geben|bekanntzugeben|aushändig|Abschrift/i, /belehr\w*|unterricht\w*|benachrichtig\w*|bekannt ?zu ?geben|bekanntzugeben|aushändig\w*|Abschrift/gi],
+      ['🗂️ Dokumentation und Protokollierung', /dokumentier|protokollier|Protokoll|aktenkundig|Niederschrift|aufzuzeichnen|aufgezeichnet/i, /dokumentier\w*|protokollier\w*|Protokoll\w*|aktenkundig|Niederschrift|aufzuzeichnen|aufgezeichnet/gi],
+      ['⚖️ Anordnung und Richtervorbehalt', /bedürfen? der Anordnung|Anordnung durch|Anordnung des Gerichts|Anordnung ergeht|richterlich|durch (?:den |die )?Richter|Amtsgericht/i, /bedürfen? der Anordnung|Anordnung durch|Anordnung des Gerichts|Anordnung ergeht|richterlich\w*|Richter\w*|Amtsgericht/gi],
+    ];
+    const sentences = (t) => t.split(/(?<=[.;:])\s+(?=(?:[A-ZÄÖÜ(]|\d+\.))/).map((x) => x.trim()).filter(Boolean);
+    function formHtml() {
+      if (!FORM_LAWS.includes(law.slug)) return '';
+      const groups = FORM_CATS.map(([title, test, mark]) => ({ title, mark, items: [] }));
+      for (const p of pars) {
+        let abs = '';
+        const seen = new Set();
+        for (const raw of p.text) {
+          const m = raw.match(/^\((\d+[a-z]?)\)/);
+          if (m) abs = m[1];
+          for (const sent of sentences(raw)) {
+            FORM_CATS.forEach(([, test], i) => {
+              if (!test.test(sent) || sent.length < 25) return;
+              const key = `${i}|${sent}`;
+              if (seen.has(key)) return;
+              if (groups[i].items.filter((x) => x.num === p.num).length >= 3) return;
+              seen.add(key);
+              groups[i].items.push({ num: p.num, abs, title: lt(p), sent });
+            });
+          }
+        }
+      }
+      const total = groups.reduce((n, g) => n + g.items.length, 0);
+      if (!total) return '';
+      const body = groups.filter((g) => g.items.length).map((g) => `<h3>${g.title} <span class="muted">(${g.items.length})</span></h3>` + g.items.map((x) => {
+        const sent = escapeHtml(x.sent.length > 420 ? `${x.sent.slice(0, 400).trim()} …` : x.sent).replace(new RegExp(g.mark.source, 'gi'), (w) => `<mark>${w}</mark>`);
+        return `<div class="form-item"><a class="ref-head" data-go="${x.num}" href="#${law.slug}/${x.num}">${U()} ${x.num}${x.abs ? ` Abs. ${x.abs}` : ''} ${escapeHtml(x.title)}</a><q>${sent}</q></div>`;
+      }).join('')).join('');
+      return `<details class="form-sec" open><summary><strong>📑 Formvorschriften im ${escapeHtml(law.short)}</strong></summary><p class="muted form-note">${law.slug === 'pog-nrw' ? 'Das POG regelt Organisation und Zuständigkeit; Formvorschriften wie Schriftform oder Dokumentation enthält es kaum. Die wenigen Treffer: ' : ''}Automatisch aus dem Gesetzestext zusammengestellt (Stichwortsuche nach Schriftform, Begründung, Belehrung, Dokumentation, Anordnung). Der Wortlaut ist unverändert, die Liste ist nicht abschließend – im Zweifel den ganzen Paragraphen lesen.</p>${body}</details>`;
+    }
+
     function renderRead() {
       const box = $('#read');
       if (pane === 'grid' || !current) {
-        box.innerHTML = `${viewsHtml()}<h2 class="grid-head">${escapeHtml(law.short)} · ${pars.length} ${U() === "§" ? "Paragraphen" : "Artikel"}</h2><p class="muted" style="margin:0 0 .8rem">${escapeHtml(law.title)} – tippe auf eine Zahl.</p>${gridHtml()}<details class="notes" style="margin-top:1.2rem"><summary>Fassung &amp; Quelle</summary>${intro()}</details>`;
+        box.innerHTML = `${viewsHtml()}<h2 class="grid-head">${escapeHtml(law.short)} · ${pars.length} ${U() === "§" ? "Paragraphen" : "Artikel"}</h2><p class="muted" style="margin:0 0 .8rem">${escapeHtml(law.title)} – tippe auf eine Zahl.</p>${gridHtml()}${formHtml()}<details class="notes" style="margin-top:1.2rem"><summary>Fassung &amp; Quelle</summary>${intro()}</details>`;
         return;
       }
       const i = pars.indexOf(current);
@@ -493,7 +540,7 @@
         renderToc();
         return;
       }
-      const ref = e.target.closest('a.ref');
+      const ref = e.target.closest('a.ref, a.ref-head');
       if (ref) { e.preventDefault(); query = ''; $('#search').value = ''; show(ref.dataset.go); return; }
       const hit = e.target.closest('[data-num]');
       if (hit && hit.dataset.num) { show(hit.dataset.num); return; }
