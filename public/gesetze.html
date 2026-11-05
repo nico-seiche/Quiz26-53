@@ -36,7 +36,7 @@
     .form-item { border: 1px solid var(--border); border-radius: 12px; padding: .5rem .75rem; margin-bottom: .4rem; background: var(--card); }
     .form-item a.ref-head { font-weight: 800; color: var(--primary); text-decoration: none; }
     .form-item q { display: block; quotes: none; margin-top: .15rem; overflow-wrap: anywhere; }
-    .form-item mark { background: #fff0a8; color: inherit; border-radius: 3px; padding: 0 .1rem; }
+    .form-item mark { background: #ffe27a; color: #1b1d3a; font-weight: 800; border-radius: 3px; padding: 0 .15rem; }
     .law-tabs { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
     .law-tab { padding: .45rem .9rem; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: var(--text); font-weight: 800; cursor: pointer; }
     .law-tab[aria-pressed="true"] { background: var(--primary-grad); color: #fff; border-color: transparent; box-shadow: var(--glow); }
@@ -407,7 +407,7 @@
         const sent = escapeHtml(x.sent.length > 420 ? `${x.sent.slice(0, 400).trim()} …` : x.sent).replace(new RegExp(g.mark.source, 'gi'), (w) => `<mark>${w}</mark>`);
         return `<div class="form-item">${x.abs ? `<span class="muted">Abs. ${x.abs}</span>` : ''}<q>${sent}</q></div>`;
       }).join('')).join('');
-      return `<details class="form-sec" open><summary><strong>📑 Formvorschriften in diesem Paragraphen</strong></summary><p class="muted form-note">Automatisch per Stichwortsuche aus dem Text oben zusammengestellt (Wortlaut unverändert, nicht abschließend).</p>${body}</details>`;
+      return `<details class="form-sec"><summary><strong>📑 Formvorschriften in diesem Paragraphen</strong></summary><p class="muted form-note">Automatisch per Stichwortsuche aus dem Text oben zusammengestellt (Wortlaut unverändert, nicht abschließend).</p>${body}</details>`;
     }
 
     function renderRead() {
