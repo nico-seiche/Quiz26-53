@@ -612,7 +612,7 @@ button.tw.bad:hover:not(:disabled) { transform: none; }
 .reduce-motion .reaction { animation: reaction-rise 3s linear forwards; }
 @media (max-width: 640px) { .lobby-qr { width: 150px; height: 150px; } .lobby-top .pin { font-size: 2.6rem; } }
 /* Reaktionen auf dem Handy */
-.react-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: .6rem; margin-top: 1rem; }
+.react-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: .6rem; margin-top: 1rem; }
 .react-row button { font-size: 2.2rem; line-height: 1; padding: .7rem 0; border-radius: 16px; }
 .react-row button:active { transform: scale(.9); }
 .react-row button.sent { animation: react-pop .4s ease-out; }

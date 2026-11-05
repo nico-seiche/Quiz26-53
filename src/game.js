@@ -459,7 +459,7 @@ router.get('/:pin/qr', requireAuth, requireHost, async (req, res) => {
 });
 
 // Die vier Reaktionen, die Teilnehmer in der Lobby schicken können
-const REACTIONS = ['👋', '🔥', '😂', '🎉'];
+const REACTIONS = ['👋', '🔥', '😂', '🎉', '👮'];
 
 router.get('/:pin/host', requireAuth, requireHost, async (req, res) => {
   const data = await loadGame(req.params.pin);
