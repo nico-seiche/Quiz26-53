@@ -226,7 +226,7 @@ Beim Kopieren merkt sich die Kopie ihr Original (`study_sets.copied_from`, `sync
 
 ## Dokumente
 
-Word-Alternative unter `/docs` (Liste) und `/docs-edit?id=…` (Editor). Quill 2 (jsdelivr) mit Überschriften, Listen, Checklisten, Tabellen, Bildern, Links, Farben, Schrift und Größe; automatisches Speichern (1 s, `rev`-Prüfung gegen Überschreiben, 409 bei Konflikt). Handschrift/Pencil ist vorerst ausgebaut (`public/js/docs-ink.js` und die Whitelist im Server bleiben für später). Der Server (`src/docs.js`) prüft das Delta mit einer Whitelist. Bilder liegen in `quiz.doc_assets`. Druck/PDF über `window.print()`. Migration `027_docs.sql`.
+Word-Alternative unter `/docs` (Liste) und `/docs-edit?id=…` (Editor). Quill 2 (jsdelivr) mit Überschriften, Listen, Checklisten, Tabellen, Bildern, Links, Farben, Schrift und Größe; automatisches Speichern (1 s, `rev`-Prüfung gegen Überschreiben, 409 bei Konflikt). Handschrift/Pencil ist vorerst ausgebaut (`public/js/docs-ink.js` und die Whitelist im Server bleiben für später). Der Server (`src/docs.js`) prüft das Delta mit einer Whitelist. Bilder liegen in `quiz.doc_assets`. Druck/PDF über `window.print()`. **Word-Import** (.docx): `public/js/docs-import.js` liest die Datei im Browser mit mammoth.js (cdnjs) zu HTML (Überschrift 4–6 → Überschrift 3), Bilder werden verkleinert und als Dokument-Bilder hochgeladen; die Liste legt ein Dokument an und übergibt das HTML per `sessionStorage` (`docimport:<id>`) an den Editor, der es mit Quill umwandelt; im Editor fügt „📥 Word“ an der Cursorstelle ein (in Tabellen: ans Ende). Nicht übernommen: Kopf-/Fußzeilen, Seitenränder, Textfelder, Formen, Kommentare; Schriftarten/-größen/-farben je nach Mammoth-Umsetzung. Migration `027_docs.sql`.
 
 ## Folien
 

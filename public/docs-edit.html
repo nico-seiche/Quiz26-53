@@ -114,6 +114,7 @@
     <span class="sep"></span>
     <button type="button" id="d-link" title="Link">🔗</button>
     <button type="button" id="d-image" title="Bild einfügen">🖼️</button>
+    <button type="button" id="d-word" title="Word-Datei (.docx) an der Cursorstelle einfügen">📥 Word</button>
     <button type="button" id="d-table" title="Tabelle">⊞</button>
     <button type="button" data-act="clean" title="Formatierung entfernen">Tx</button>
   </div>
@@ -122,6 +123,8 @@
   </div>
   <div class="doc-foot"><span id="count"></span><span></span></div>
   <input type="file" id="file" accept="image/*" hidden>
+  <input type="file" id="wordfile" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+  <script src="/js/docs-import.js"></script>
   <script src="/js/changelog.js"></script>
   <script src="/js/common.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
@@ -229,6 +232,7 @@
       else if (d.indent) quill.format('indent', Number(d.indent) > 0 ? '+1' : '-1', 'user');
       else if (b.id === 'd-link') linkDialog(r);
       else if (b.id === 'd-image') $('#file').click();
+      else if (b.id === 'd-word') $('#wordfile').click();
       else if (b.id === 'd-table') tablePop(b);
       refreshTools();
     });
@@ -308,6 +312,9 @@
       });
       quill.setContents(doc.delta, 'silent');
       quill.history.clear();
+      let handoff = null;
+      try { handoff = sessionStorage.getItem(`docimport:${id}`); sessionStorage.removeItem(`docimport:${id}`); } catch { /* egal */ }
+      if (handoff) { quill.clipboard.dangerouslyPasteHTML(0, handoff, 'silent'); setTimeout(dirty, 0); }
       quill.on('text-change', (delta, old, source) => { if (source !== 'silent') dirty(); refreshTools(); });
       quill.on('selection-change', (r) => { if (r) lastRange = r; refreshTools(); });
       // Bilder aus der Zwischenablage / per Ziehen
@@ -315,6 +322,22 @@
       quill.root.addEventListener('drop', (e) => { const f = [...(e.dataTransfer?.files || [])].find((x) => /^image\//.test(x.type)); if (f) { e.preventDefault(); e.stopPropagation(); uploadImage(f); } }, true);
       refreshTools();
     }
+    // Word-Datei einfügen (an der Cursorstelle bzw. am Ende)
+    $('#wordfile').addEventListener('change', async (e) => {
+      const f = e.target.files[0];
+      e.target.value = '';
+      if (!f) return;
+      try {
+        setState('Word-Datei wird gelesen …');
+        const { html, images, skipped } = await DocsImport.docxToHtml(f, id, setState);
+        // in Tabellen nicht einfügen (zerstört die Tabelle): dann ans Ende des Dokuments
+        const inTable = lastRange && quill.getFormat(lastRange).table;
+        const at = lastRange && !inTable ? lastRange.index + lastRange.length : Math.max(0, quill.getLength() - 1);
+        quill.clipboard.dangerouslyPasteHTML(at, html, 'user');
+        dirty();
+        setState(skipped ? `Eingefügt – ${skipped} Bild(er) nicht übernommen` : '✓ Eingefügt');
+      } catch (err) { setState(`Word-Datei: ${err.message}`, 'warn'); }
+    });
     $('#title').addEventListener('input', () => { document.title = `${$('#title').value || 'Dokument'} – Dokumente`; dirty(); });
     $('#print').onclick = async () => { await save(); print(); };
 

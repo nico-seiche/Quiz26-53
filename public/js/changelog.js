@@ -2,6 +2,14 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-12',
+    title: 'Neu: Word-Dateien in Dokumenten',
+    items: [
+      ['📥', 'Word-Datei importieren', 'In der Dokumentenliste „📥 Word-Datei importieren“ wählen – aus der .docx wird ein neues, bearbeitbares Dokument mit Überschriften, Listen, Tabellen, Links und Bildern.'],
+      ['➕', 'In ein Dokument einfügen', 'Im Editor fügt „📥 Word“ den Inhalt einer .docx an der Cursorstelle ein.'],
+    ],
+  },
+  {
     id: '2026-11-11',
     title: 'Neu: Favoriten bei den Gesetzen',
     items: [
