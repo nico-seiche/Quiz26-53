@@ -212,6 +212,23 @@ Aktuell einfache Wertung: richtige Antwort = 500–1000 Punkte, je schneller des
 - Nach dem Import `node scripts/build-gesetze-index.js` ausführen (schreibt `src/gesetze/index.json`, dort steht auch die Tab-Reihenfolge) und das Gesetz in `LOADERS` (`src/gesetze.js`) eintragen. Die Texte werden erst beim Öffnen geladen.
 - Aktuell enthalten: PolG NRW (gültig ab 13.12.2025), OBG NRW (ab 01.07.2026), POG NRW (ab 01.10.2020), StGB, StPO, OWiG, StVO, StVZO, GG (Artikel statt Paragraphen) und BGB (z. B. `import-gii.js stgb StGB`, `owig_1968 OWiG`, `stvo_2013 StVO`, `stvzo_2012 StVZO`; Anlagen wie die Verkehrszeichen-Kataloge der StVO sind nicht dabei).
 
+## Quiz-Import (z. B. von einer KI erstellt)
+
+Im Quiz-Editor (neu und bestehend) öffnet „🤖 Import“ einen Dialog: Anleitung für die KI kopieren (enthält die Fächerliste, optional mit Thema), KI-Antwort einfügen, Vorschau mit Fehlern, „Übernehmen“. Parser und Anleitung: `public/js/quiz-import.js` (`QuizImport.prompt/parse/finalize`), reine Textverarbeitung im Browser, keine KI im Programm. Format:
+
+```
+TITEL: Grundrechte
+FACH: Politik            (Name aus der Fächerliste, optional)
+ART: Quiz                (oder Umfrage, optional)
+
+FRAGE: Welcher Artikel schützt die Menschenwürde?
+ZEIT: 20                 (5–120 s, optional)
+[x] Art. 1 GG
+[ ] Art. 2 GG
+```
+
+Mehrere `[x]` = Mehrfachauswahl; 2–4 Antworten; Umfragen ohne `[x]`. Tolerant gegenüber Markdown-Sternen, Codeblöcken, „Frage 3:“, „- [x]“ und „A)“ vor Antworten. Neues Quiz: Fragen landen im Editor (Titel/Fach nur, wenn leer), bestehendes Quiz: Fragen werden über `POST /api/quizzes/:id/questions` angehängt.
+
 ## Rangliste zurücksetzen
 
 Die Bestenliste (und der Platz im Profil) zählt nur Spiele ab dem Stichtag `leaderboard_since` in `quiz.app_settings` (Migration `022_leaderboard_reset.sql`). Gespeicherte Spielergebnisse, Level, Profil-Statistik und Erfolge bleiben unberührt. Neuer Reset: `UPDATE quiz.app_settings SET value = now()::text WHERE key = 'leaderboard_since';`

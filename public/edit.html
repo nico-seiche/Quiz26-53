@@ -57,10 +57,14 @@
     </div>
     <div class="card" id="presence-card" hidden><div class="row" id="presence"></div></div>
     <div id="questions"></div>
-    <button type="button" id="add">+ Frage hinzufügen</button>
+    <div class="row" style="gap:.5rem;flex-wrap:wrap">
+      <button type="button" id="add">+ Frage hinzufügen</button>
+      <button type="button" id="ai-import">🤖 Import (z. B. von KI)</button>
+    </div>
     <p class="error" id="error"></p>
   </main>
   <script src="/js/common.js"></script>
+  <script src="/js/quiz-import.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   <script>
     const id = new URLSearchParams(location.search).get('id');
@@ -77,6 +81,7 @@
     let saving = null;                 // laufende Speicherung (Promise)
     let metaTimer = null;
     let notice = '';
+    let subjectList = [];
 
     const blank = () => ({ key: `new-${++draftSeq}`, id: null, rev: 0, text: '', answers: ['', '', '', ''], correct: 0, multi: false, correctSet: [], timeLimit: 20, lockedBy: null });
     const fromServer = (q) => ({ key: String(q.id), id: q.id, rev: q.rev, text: q.text, answers: [...q.answers, '', '', ''].slice(0, 4), correct: q.correct, multi: Boolean(q.multi), correctSet: q.correctSet || [], timeLimit: q.timeLimit, lockedBy: null });
@@ -352,6 +357,77 @@
       card.querySelector('textarea').focus({ preventScroll: true });
     };
 
+    // --- Import aus Text (KI) ---
+    $('#ai-import').onclick = () => {
+      const box = document.createElement('div');
+      box.style.cssText = 'position:fixed;inset:0;z-index:100;background:rgba(20,22,50,.5);display:flex;align-items:center;justify-content:center;padding:1rem;overflow:auto';
+      box.innerHTML = `<div class="card" style="width:min(720px,100%);margin:auto;max-height:92vh;overflow:auto">
+        <h2 style="margin:0 0 .4rem">🤖 Quiz importieren</h2>
+        <p class="muted" style="margin:0 0 .6rem"><strong>1.</strong> Kopiere die Anleitung, gib sie einer KI (z. B. ChatGPT oder Claude) und ergänze Thema und Anzahl der Fragen. <strong>2.</strong> Füge die Antwort der KI unten ein.</p>
+        <button type="button" id="imp-copy">📋 Anleitung für die KI kopieren</button>
+        <label for="imp-topic" style="margin-top:.6rem">Thema (optional, wird in die Anleitung eingesetzt)</label>
+        <input type="text" id="imp-topic" placeholder="z. B. Grundrechte im Grundgesetz, 15 Fragen, mittelschwer">
+        <label for="imp-text" style="margin-top:.6rem">Antwort der KI einfügen</label>
+        <textarea id="imp-text" rows="9" style="width:100%" placeholder="TITEL: …&#10;FRAGE: …&#10;[x] …&#10;[ ] …" spellcheck="false"></textarea>
+        <div id="imp-result" style="margin:.6rem 0"></div>
+        <div class="row" style="justify-content:flex-end;gap:.5rem"><button type="button" id="imp-x">Abbrechen</button><button type="button" class="primary" id="imp-ok" disabled>Übernehmen</button></div>
+      </div>`;
+      document.body.appendChild(box);
+      const ta = box.querySelector('#imp-text');
+      let ready = null;
+      const check = () => {
+        const parsed = QuizImport.parse(ta.value);
+        const useKind = live ? kind : (parsed.kind || kind);
+        const fin = QuizImport.finalize(parsed, useKind);
+        const notes = [...parsed.warnings];
+        if (live && parsed.kind && parsed.kind !== kind) notes.push(`Die Datei sagt „${parsed.kind === 'poll' ? 'Umfrage' : 'Quiz'}“, dieses ist ${kind === 'poll' ? 'eine Umfrage' : 'ein Quiz'} – es wird nach der Art dieses Quiz geprüft.`);
+        let subject = null;
+        if (parsed.subjectName) {
+          subject = subjectList.find((x) => x.name.toLowerCase() === parsed.subjectName.toLowerCase()) || subjectList.find((x) => x.name.toLowerCase().includes(parsed.subjectName.toLowerCase()) || parsed.subjectName.toLowerCase().includes(x.name.toLowerCase()));
+          if (!subject && !live) notes.push(`Fach „${parsed.subjectName}“ gibt es nicht – bitte selbst wählen.`);
+        }
+        ready = fin.questions.length ? { parsed, fin, useKind, subject } : null;
+        box.querySelector('#imp-ok').disabled = !ready;
+        box.querySelector('#imp-result').innerHTML = ta.value.trim() ? `
+          <p style="margin:0"><strong>${fin.questions.length} Frage${fin.questions.length === 1 ? '' : 'n'}</strong> erkannt${parsed.title ? ` · Titel „${escapeHtml(parsed.title)}“` : ''}${subject ? ` · Fach ${escapeHtml(subject.name)}` : ''}${useKind === 'poll' ? ' · Umfrage' : ''}</p>
+          ${fin.errors.length ? `<ul class="error" style="margin:.4rem 0 0 1.1rem">${fin.errors.map((x) => `<li>${escapeHtml(x)}</li>`).join('')}</ul><p class="muted" style="margin:.2rem 0 0">Fehlerhafte Fragen werden übersprungen.</p>` : ''}
+          ${notes.length ? `<ul class="muted" style="margin:.4rem 0 0 1.1rem">${notes.map((x) => `<li>${escapeHtml(x)}</li>`).join('')}</ul>` : ''}` : '';
+      };
+      ta.addEventListener('input', check);
+      box.querySelector('#imp-copy').onclick = async (e) => {
+        const text = QuizImport.prompt(subjectList, box.querySelector('#imp-topic').value.trim());
+        try { await navigator.clipboard.writeText(text); e.target.textContent = '✓ Kopiert – jetzt in die KI einfügen'; }
+        catch { ta.value = text; ta.select(); e.target.textContent = 'Anleitung steht unten im Feld – kopieren (Strg+C)'; }
+      };
+      box.querySelector('#imp-x').onclick = () => box.remove();
+      box.querySelector('#imp-ok').onclick = async () => {
+        if (!ready) return;
+        const { parsed, fin, useKind, subject } = ready;
+        const btn = box.querySelector('#imp-ok');
+        btn.disabled = true;
+        if (!live) {
+          if (parsed.title && !$('#title').value.trim()) $('#title').value = parsed.title;
+          if (subject && !$('#subject').value) $('#subject').value = subject.id;
+          if (parsed.kind && !questions.some((q) => q.text.trim())) { kind = useKind; $('#kind').value = kind; applyKind(); }
+          const fresh = fin.questions.map((q) => ({ ...blank(), ...q, answers: [...q.answers, '', '', ''].slice(0, 4) }));
+          questions = [...questions.filter((q) => q.text.trim() || q.answers.some((a) => a.trim())), ...fresh];
+          openKey = null;
+          render();
+          box.remove();
+          return;
+        }
+        try {
+          if (openKey && !(await closeOpen({ release: false }))) { btn.disabled = false; return; }
+          let done = 0;
+          for (const q of fin.questions) {
+            btn.textContent = `Importiere ${++done}/${fin.questions.length} …`;
+            await api(`/api/quizzes/${id}/questions`, { method: 'POST', body: { text: q.text, answers: q.answers, correct: q.correct, multi: q.multi, correctSet: q.correctSet, timeLimit: q.timeLimit } });
+          }
+          location.reload();
+        } catch (err) { box.querySelector('#imp-result').innerHTML = `<p class="error">${escapeHtml(err.message)} – ${done - 1} Frage(n) sind schon übernommen.</p>`; btn.disabled = false; btn.textContent = 'Übernehmen'; }
+      };
+    };
+
     // --- Live: Lebenszeichen senden und Stand der anderen holen ---
     let ticking = null;
     async function tick(editing) {
@@ -549,6 +625,7 @@
     requireLogin().then(async (user) => {
       me = user;
       const subjects = await api('/api/subjects');
+      subjectList = subjects;
       $('#subject').innerHTML += subjects.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
       if (live) {
         const quiz = await api(`/api/quizzes/${id}`);

@@ -2,6 +2,14 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-13',
+    title: 'Neu: Quiz per KI importieren',
+    items: [
+      ['🤖', 'Quiz aus einer KI übernehmen', 'Im Quiz-Editor auf „🤖 Import“ tippen, die Anleitung kopieren, einer KI geben (Thema und Anzahl ergänzen) und deren Antwort einfügen.'],
+      ['✅', 'Prüfung vor dem Übernehmen', 'Die Seite zeigt, wie viele Fragen erkannt wurden und was fehlerhaft ist – erst „Übernehmen“ legt die Fragen an.'],
+    ],
+  },
+  {
     id: '2026-11-12',
     title: 'Neu: Word-Dateien in Dokumenten',
     items: [
