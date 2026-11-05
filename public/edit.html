@@ -367,7 +367,8 @@
         <button type="button" id="imp-copy">📋 Anleitung für die KI kopieren</button>
         <label for="imp-topic" style="margin-top:.6rem">Thema (optional, wird in die Anleitung eingesetzt)</label>
         <input type="text" id="imp-topic" placeholder="z. B. Grundrechte im Grundgesetz, 15 Fragen, mittelschwer">
-        <label for="imp-text" style="margin-top:.6rem">Antwort der KI einfügen</label>
+        <label for="imp-text" style="margin-top:.6rem">Antwort der KI einfügen – oder eine Textdatei laden</label>
+        <input type="file" id="imp-file" accept=".txt,.md,text/plain" style="margin-bottom:.4rem">
         <textarea id="imp-text" rows="9" style="width:100%" placeholder="TITEL: …&#10;FRAGE: …&#10;[x] …&#10;[ ] …" spellcheck="false"></textarea>
         <div id="imp-result" style="margin:.6rem 0"></div>
         <div class="row" style="justify-content:flex-end;gap:.5rem"><button type="button" id="imp-x">Abbrechen</button><button type="button" class="primary" id="imp-ok" disabled>Übernehmen</button></div>
@@ -394,6 +395,7 @@
           ${notes.length ? `<ul class="muted" style="margin:.4rem 0 0 1.1rem">${notes.map((x) => `<li>${escapeHtml(x)}</li>`).join('')}</ul>` : ''}` : '';
       };
       ta.addEventListener('input', check);
+      box.querySelector('#imp-file').addEventListener('change', async (e) => { const f = e.target.files[0]; if (f) { ta.value = await f.text(); check(); } });
       box.querySelector('#imp-copy').onclick = async (e) => {
         const text = QuizImport.prompt(subjectList, box.querySelector('#imp-topic').value.trim());
         try { await navigator.clipboard.writeText(text); e.target.textContent = '✓ Kopiert – jetzt in die KI einfügen'; }
@@ -655,6 +657,7 @@
       applyKind();
       updateModeHint();
       render();
+      if (new URLSearchParams(location.search).get('import')) $('#ai-import').click();
     });
   </script>
 </body>
