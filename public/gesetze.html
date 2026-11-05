@@ -383,40 +383,37 @@
       ['⚖️ Anordnung und Richtervorbehalt', /bedürfen? der Anordnung|Anordnung durch|Anordnung des Gerichts|Anordnung ergeht|richterlich|durch (?:den |die )?Richter|Amtsgericht/i, /bedürfen? der Anordnung|Anordnung durch|Anordnung des Gerichts|Anordnung ergeht|richterlich\w*|Richter\w*|Amtsgericht/gi],
     ];
     const sentences = (t) => t.split(/(?<=[.;:])\s+(?=(?:[A-ZÄÖÜ(]|\d+\.))/).map((x) => x.trim()).filter(Boolean);
-    function formHtml() {
+    function formHtml(p) {
       if (!FORM_LAWS.includes(law.slug)) return '';
-      const groups = FORM_CATS.map(([title, test, mark]) => ({ title, mark, items: [] }));
-      for (const p of pars) {
-        let abs = '';
-        const seen = new Set();
-        for (const raw of p.text) {
-          const m = raw.match(/^\((\d+[a-z]?)\)/);
-          if (m) abs = m[1];
-          for (const sent of sentences(raw)) {
-            FORM_CATS.forEach(([, test], i) => {
-              if (!test.test(sent) || sent.length < 25) return;
-              const key = `${i}|${sent}`;
-              if (seen.has(key)) return;
-              if (groups[i].items.filter((x) => x.num === p.num).length >= 3) return;
-              seen.add(key);
-              groups[i].items.push({ num: p.num, abs, title: lt(p), sent });
-            });
-          }
+      const groups = FORM_CATS.map(([title, , mark]) => ({ title, mark, items: [] }));
+      let abs = '';
+      const seen = new Set();
+      for (const raw of p.text) {
+        const m = raw.match(/^\((\d+[a-z]?)\)/);
+        if (m) abs = m[1];
+        for (const sent of sentences(raw)) {
+          FORM_CATS.forEach(([, test], i) => {
+            if (!test.test(sent) || sent.length < 25) return;
+            const key = `${i}|${sent}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            groups[i].items.push({ abs, sent });
+          });
         }
       }
-      const total = groups.reduce((n, g) => n + g.items.length, 0);
-      if (!total) return '';
-      const body = groups.filter((g) => g.items.length).map((g) => `<h3>${g.title} <span class="muted">(${g.items.length})</span></h3>` + g.items.map((x) => {
+      const found = groups.filter((g) => g.items.length);
+      if (!found.length) return '';
+      const body = found.map((g) => `<h3>${g.title}</h3>` + g.items.map((x) => {
         const sent = escapeHtml(x.sent.length > 420 ? `${x.sent.slice(0, 400).trim()} …` : x.sent).replace(new RegExp(g.mark.source, 'gi'), (w) => `<mark>${w}</mark>`);
-        return `<div class="form-item"><a class="ref-head" data-go="${x.num}" href="#${law.slug}/${x.num}">${U()} ${x.num}${x.abs ? ` Abs. ${x.abs}` : ''} ${escapeHtml(x.title)}</a><q>${sent}</q></div>`;
+        return `<div class="form-item">${x.abs ? `<span class="muted">Abs. ${x.abs}</span>` : ''}<q>${sent}</q></div>`;
       }).join('')).join('');
-      return `<details class="form-sec" open><summary><strong>📑 Formvorschriften im ${escapeHtml(law.short)}</strong></summary><p class="muted form-note">${law.slug === 'pog-nrw' ? 'Das POG regelt Organisation und Zuständigkeit; Formvorschriften wie Schriftform oder Dokumentation enthält es kaum. Die wenigen Treffer: ' : ''}Automatisch aus dem Gesetzestext zusammengestellt (Stichwortsuche nach Schriftform, Begründung, Belehrung, Dokumentation, Anordnung). Der Wortlaut ist unverändert, die Liste ist nicht abschließend – im Zweifel den ganzen Paragraphen lesen.</p>${body}</details>`;
+      return `<details class="form-sec" open><summary><strong>📑 Formvorschriften in diesem Paragraphen</strong></summary><p class="muted form-note">Automatisch per Stichwortsuche aus dem Text oben zusammengestellt (Wortlaut unverändert, nicht abschließend).</p>${body}</details>`;
     }
 
     function renderRead() {
       const box = $('#read');
       if (pane === 'grid' || !current) {
-        box.innerHTML = `${viewsHtml()}<h2 class="grid-head">${escapeHtml(law.short)} · ${pars.length} ${U() === "§" ? "Paragraphen" : "Artikel"}</h2><p class="muted" style="margin:0 0 .8rem">${escapeHtml(law.title)} – tippe auf eine Zahl.</p>${gridHtml()}${formHtml()}<details class="notes" style="margin-top:1.2rem"><summary>Fassung &amp; Quelle</summary>${intro()}</details>`;
+        box.innerHTML = `${viewsHtml()}<h2 class="grid-head">${escapeHtml(law.short)} · ${pars.length} ${U() === "§" ? "Paragraphen" : "Artikel"}</h2><p class="muted" style="margin:0 0 .8rem">${escapeHtml(law.title)} – tippe auf eine Zahl.</p>${gridHtml()}<details class="notes" style="margin-top:1.2rem"><summary>Fassung &amp; Quelle</summary>${intro()}</details>`;
         return;
       }
       const i = pars.indexOf(current);
@@ -432,6 +429,7 @@
         <div class="par-head"><span class="par-num">${U()} ${current.num}</span>${current.title ? `<h2 class="par-title">${highlight(escapeHtml(current.title))}</h2>` : ''}<button type="button" class="fav-btn" data-fav aria-pressed="${isFav(law.slug, current.num)}">${isFav(law.slug, current.num) ? '★ Favorit' : '☆ Merken'}</button></div>
         ${relatedHtml(current)}
         ${linesHtml(current.text)}
+        ${formHtml(current)}
         ${current.notes.length ? `<details class="notes"><summary>Änderungshistorie (${current.notes.length})</summary>${current.notes.map((n) => `<p>${escapeHtml(n)}</p>`).join('')}</details>` : ''}`;
     }
 
