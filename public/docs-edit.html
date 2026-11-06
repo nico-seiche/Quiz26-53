@@ -50,6 +50,34 @@
     .ql-editor td { border: 1px solid #c9cfe8; padding: .4rem .6rem; vertical-align: top; min-width: 3rem; }
     .ql-editor li[data-list="checked"]::before, .ql-editor li[data-list="unchecked"]::before { cursor: pointer; }
     /* Handschrift (Pencil) über dem ganzen Blatt */
+    /* Flyout-Menü am rechten Rand */
+    .flyout-btn { position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 45; width: 2rem; height: 4.4rem; margin: 0; padding: 0; border: 1px solid var(--border); border-right: 0; border-radius: 14px 0 0 14px; background: var(--card); color: var(--text); font-size: 1.3rem; font-weight: 800; box-shadow: -4px 4px 16px rgba(20, 22, 50, .18); cursor: pointer; transition: right .22s; }
+    .flyout-btn.open { right: min(400px, 92vw); }
+    .flyout { position: fixed; top: 0; right: 0; bottom: 0; width: min(400px, 92vw); z-index: 44; background: var(--card); border-left: 1px solid var(--border); box-shadow: -12px 0 40px rgba(20, 22, 50, .25); transform: translateX(105%); transition: transform .22s; display: flex; flex-direction: column; visibility: hidden; padding-top: env(safe-area-inset-top, 0px); }
+    .flyout.open { transform: none; visibility: visible; }
+    .fly-head { display: flex; align-items: center; gap: .5rem; padding: .7rem .8rem; border-bottom: 1px solid var(--border); }
+    .fly-head strong { flex: 1; }
+    .fly-head button { margin: 0; padding: .25rem .6rem; box-shadow: none; }
+    .fly-body { flex: 1; overflow-y: auto; padding: .8rem; -webkit-overflow-scrolling: touch; }
+    .fly-item { display: flex; align-items: center; gap: .8rem; width: 100%; text-align: left; margin: 0 0 .5rem; padding: .8rem; border-radius: 14px; border: 1px solid var(--border); background: var(--bg); color: var(--text); box-shadow: none; cursor: pointer; }
+    .fly-item .fi { font-size: 1.6rem; }
+    .fly-item small { display: block; color: var(--muted); font-weight: 400; }
+    .fl-list { max-height: 14rem; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; margin: .3rem 0 .6rem; }
+    .fl-list:empty { display: none; }
+    .fl-row { display: block; width: 100%; text-align: left; margin: 0; padding: .5rem .7rem; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; color: var(--text); box-shadow: none; font-weight: 400; overflow-wrap: anywhere; cursor: pointer; }
+    .fl-row b { color: var(--primary); }
+    .fl-sel-head { margin: .3rem 0 .5rem; overflow-wrap: anywhere; }
+    .fl-prev { border: 1px solid var(--border); border-radius: 12px; padding: .6rem .7rem; margin: .3rem 0 .6rem; max-height: 14rem; overflow-y: auto; font-size: .92rem; line-height: 1.5; background: var(--bg); }
+    .fl-prev div { margin-bottom: .3rem; }
+    .fl-off { opacity: .3; text-decoration: line-through; }
+    .fl-range { position: relative; height: 2.2rem; margin: .4rem .2rem 0; }
+    .fl-track { position: absolute; left: 0; right: 0; top: 50%; height: 6px; margin-top: -3px; border-radius: 3px; background: var(--border); }
+    .fl-track span { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: var(--primary-grad); }
+    .fl-range input[type=range] { position: absolute; left: 0; width: 100%; top: 0; height: 2.2rem; margin: 0; background: none; pointer-events: none; -webkit-appearance: none; appearance: none; }
+    .fl-range input[type=range]::-webkit-slider-runnable-track { background: none; height: 6px; }
+    .fl-range input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; pointer-events: auto; width: 1.7rem; height: 1.7rem; margin-top: -.75rem; border-radius: 50%; background: #fff; border: 3px solid var(--primary); box-shadow: 0 2px 8px rgba(20, 22, 50, .3); cursor: pointer; }
+    .fl-range input[type=range]::-moz-range-track { background: none; }
+    .fl-range input[type=range]::-moz-range-thumb { pointer-events: auto; width: 1.4rem; height: 1.4rem; border-radius: 50%; background: #fff; border: 3px solid var(--primary); cursor: pointer; }
     /* Handschrift (alt) */
     .ql-ink { margin: .8rem 0; border: 1.5px dashed #b9c2fb; border-radius: 12px; background: repeating-linear-gradient(#fff 0 31px, #eef1ff 31px 32px); overflow: hidden; user-select: none; -webkit-user-select: none; }
     .ink-canvas { display: block; width: 100%; touch-action: pan-y; cursor: crosshair; }
@@ -69,7 +97,7 @@
     @media print {
       @page { size: A4; margin: 16mm; }
       body.doc-body { display: block; overflow: visible; height: auto; background: #fff; }
-      .d-top, .dtools, .doc-foot, .tbl-pop, .pen-bar { display: none !important; }
+      .d-top, .dtools, .doc-foot, .tbl-pop, .pen-bar, .flyout, .flyout-btn { display: none !important; }
       .d-scroll { overflow: visible; padding: 0; background: #fff; }
       .paper { box-shadow: none; max-width: none; border-radius: 0; min-height: 0; }
       #editor .ql-editor { padding: 0; min-height: 0; }
@@ -130,6 +158,7 @@
   <script src="/js/docs-import.js"></script>
   <script src="/js/docs-pdf.js"></script>
   <script src="/js/docs-pen.js"></script>
+  <script src="/js/docs-flyout.js"></script>
   <script src="/js/changelog.js"></script>
   <script src="/js/common.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
@@ -342,6 +371,7 @@
       // Bilder aus der Zwischenablage / per Ziehen
       quill.root.addEventListener('paste', (e) => { const f = [...(e.clipboardData?.files || [])].find((x) => /^image\//.test(x.type)); if (f) { e.preventDefault(); e.stopPropagation(); uploadImage(f); } }, true);
       pen = DocsPen.attach(quill, { initial: doc.ink || [], onChange: inkChanged });
+      DocsFlyout.mount(quill, { getRange: () => lastRange });
       quill.root.addEventListener('drop', (e) => { const f = [...(e.dataTransfer?.files || [])].find((x) => /^image\//.test(x.type)); if (f) { e.preventDefault(); e.stopPropagation(); uploadImage(f); } }, true);
       refreshTools();
     }

@@ -2,6 +2,14 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-20',
+    title: 'Neu: Gesetz in Dokumente einfügen',
+    items: [
+      ['⚖️', 'Gesetz-Picker', 'Im Dokument am rechten Rand auf den Pfeil tippen: Flyout-Menü → „Gesetz einfügen“. Gesetz und Paragraph wählen, mit den Schiebereglern nur die gewünschten Sätze auswählen und als Zitat mit Quellenangabe einfügen.'],
+      ['📚', 'Deine Gesetze', 'Es erscheinen genau die Gesetze, die du in deiner Bibliothek eingeblendet hast – in deiner Reihenfolge.'],
+    ],
+  },
+  {
     id: '2026-11-19',
     title: 'Neu: Mit dem Pencil im Gesetz markieren',
     items: [
