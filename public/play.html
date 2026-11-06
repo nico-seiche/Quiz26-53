@@ -13,7 +13,7 @@
   <link rel="icon" href="/icons/icon-192.png?v=2">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2">
   <title>Quiz – Mitspielen</title>
-  <link rel="stylesheet" href="/style.css?v=13">
+  <link rel="stylesheet" href="/style.css?v=14">
 </head>
 <body>
   <header class="top">
@@ -114,7 +114,7 @@
           <h2>${escapeHtml(s.question.text)}</h2>
           ${multi ? `<p class="multi-hint">☑️ ${poll ? 'Mehrere Antworten möglich – wähle alle, die für dich passen.' : 'Mehrere Antworten sind richtig – wähle alle richtigen!'}</p>`
             : poll ? '<p class="multi-hint plain">Es gibt kein richtig oder falsch – wähle, was für dich passt.</p>' : ''}
-          <div class="answers">${s.question.answers.map((a, i) => `
+          <div class="answers ${s.question.answers.some((a) => a.length > 28 || /\S{16,}/.test(a)) ? 'long' : ''}">${s.question.answers.map((a, i) => `
             <button type="button" class="answer c${i} ${answered && !picked.has(i) ? 'dim' : ''} ${picked.has(i) ? 'chosen' : ''} ${multi ? 'multi' : ''}"
               ${multi ? `data-toggle="${i}" aria-pressed="${picked.has(i)}"` : `data-choice="${i}"`} ${answered ? 'disabled' : ''}>${multi ? `<span class="box" aria-hidden="true">${picked.has(i) ? '☑' : '☐'}</span> ` : ''}${escapeHtml(a)}</button>`).join('')}
           </div>
