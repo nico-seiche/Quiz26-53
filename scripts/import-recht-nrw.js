@@ -39,7 +39,7 @@ async function main() {
       const own = roman < 0 ? rest : rest.slice(0, roman);
       outline.push({ type: 'head', level, label, title: own.join(' ') });
       if (roman >= 0) outline.push({ type: 'head', level: 4, label: '', title: rest.slice(roman).join(' ') });
-    } else if (cells.length >= 2) outline.push({ type: 'par', num: cells[0].replace(/^§\s*/, '').replace(/\s+/g, ''), title: cells[1] });
+    } else if (cells.length >= 2 && /^§/.test(cells[0])) outline.push({ type: 'par', num: cells[0].replace(/^§\s*/, '').replace(/\s+/g, ''), title: cells[1] });
   }
 
   // Paragraphen (und – für Gesetze ohne Inhaltsübersicht-Tabelle – Überschriften) aus dem Haupttext, in Dokumentreihenfolge

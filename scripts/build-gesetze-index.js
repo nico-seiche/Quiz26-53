@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const ORDER = ['polg-nrw', 'obg-nrw', 'pog-nrw', 'stgb', 'stpo', 'owig_1968', 'stvo_2013', 'stvzo_2012', 'gg', 'bgb'];
+const ORDER = ['polg-nrw', 'obg-nrw', 'pog-nrw', 'vwvg-nrw', 'lbg-nrw', 'stgb', 'stpo', 'owig_1968', 'stvo_2013', 'stvzo_2012', 'stvg', 'fev_2010', 'versammlg', 'waffg_2002', 'btmg_1981', 'jgg', 'gvg', 'vwgo', 'vwvfg', 'beamtstg', 'bdsg_2018', 'aufenthg_2004', 'gg', 'bgb'];
 const dir = path.join(__dirname, '..', 'src', 'gesetze');
 const slugs = fs.readdirSync(dir).filter((f) => f.endsWith('.json') && f !== 'index.json').map((f) => f.slice(0, -5));
 const rest = slugs.filter((s) => !ORDER.includes(s)).sort();

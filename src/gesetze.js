@@ -17,6 +17,20 @@ const LOADERS = {
   stvzo_2012: () => require('./gesetze/stvzo_2012.json'),
   gg: () => require('./gesetze/gg.json'),
   bgb: () => require('./gesetze/bgb.json'),
+  'vwvg-nrw': () => require('./gesetze/vwvg-nrw.json'),
+  'lbg-nrw': () => require('./gesetze/lbg-nrw.json'),
+  stvg: () => require('./gesetze/stvg.json'),
+  fev_2010: () => require('./gesetze/fev_2010.json'),
+  versammlg: () => require('./gesetze/versammlg.json'),
+  waffg_2002: () => require('./gesetze/waffg_2002.json'),
+  btmg_1981: () => require('./gesetze/btmg_1981.json'),
+  jgg: () => require('./gesetze/jgg.json'),
+  gvg: () => require('./gesetze/gvg.json'),
+  vwgo: () => require('./gesetze/vwgo.json'),
+  vwvfg: () => require('./gesetze/vwvfg.json'),
+  beamtstg: () => require('./gesetze/beamtstg.json'),
+  bdsg_2018: () => require('./gesetze/bdsg_2018.json'),
+  aufenthg_2004: () => require('./gesetze/aufenthg_2004.json'),
 };
 
 const router = express.Router();
@@ -24,6 +38,23 @@ router.use(requireAuth);
 
 router.get('/', (req, res) => {
   res.json(INDEX);
+});
+
+// Persönliche Bibliothek: ausgeblendete Gesetze und Reihenfolge
+router.get('/prefs/me', async (req, res) => {
+  const row = await db.one('SELECT hidden, sort_order FROM quiz.law_prefs WHERE user_id = $1', [req.user.id]);
+  res.json({ hidden: row ? row.hidden : [], order: row ? row.sort_order : [] });
+});
+router.put('/prefs/me', async (req, res) => {
+  const list = (v) => [...new Set((Array.isArray(v) ? v : []).filter((x) => typeof x === 'string' && Object.hasOwn(LOADERS, x)))];
+  const hidden = list(req.body && req.body.hidden);
+  const order = list(req.body && req.body.order);
+  await db.query(
+    `INSERT INTO quiz.law_prefs (user_id, hidden, sort_order, updated_at) VALUES ($1, $2, $3, now())
+     ON CONFLICT (user_id) DO UPDATE SET hidden = EXCLUDED.hidden, sort_order = EXCLUDED.sort_order, updated_at = now()`,
+    [req.user.id, hidden, order],
+  );
+  res.json({ hidden, order });
 });
 
 // Favoriten (Paragraphen, die man sich markiert hat)

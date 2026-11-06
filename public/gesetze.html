@@ -29,6 +29,13 @@
     .fav-row a { flex: 1; color: var(--text); text-decoration: none; font-weight: 700; overflow-wrap: anywhere; }
     .fav-row a b { color: var(--primary); margin-right: .4rem; }
     .fav-row button { margin: 0; padding: .25rem .6rem; box-shadow: none; background: #fff4c7; color: #8a6100; border: 1px solid #f2c94c; }
+    .law-tab.cfg { border-style: dashed; }
+    .lib-row { display: flex; align-items: center; gap: .6rem; padding: .45rem .3rem; border-bottom: 1px solid var(--border); }
+    .lib-row label { flex: 1; display: flex; align-items: center; gap: .6rem; margin: 0; cursor: pointer; font-weight: 700; min-width: 0; }
+    .lib-row input[type=checkbox] { width: 1.3rem; height: 1.3rem; flex: none; margin: 0; }
+    .lib-row .t { font-weight: 400; color: var(--muted); font-size: .88rem; overflow-wrap: anywhere; }
+    .lib-row button { margin: 0; padding: .2rem .55rem; box-shadow: none; }
+    .lib-row.off .nm { opacity: .5; text-decoration: line-through; }
     .law-tab.fav { border-color: #f2c94c; }
     .form-sec { margin-top: 1.4rem; }
     .form-sec h3 { margin: 1rem 0 .3rem; font-size: 1.02rem; }
@@ -160,6 +167,7 @@
     let pane = 'grid';         // rechts: 'grid' (Übersicht) oder 'read' (Paragraph)
     let query = '';
     const openGroups = new Set();
+    let prefs = { hidden: [], order: [] };
     let favs = [];             // { law, num, title }
     let favMode = false;       // Favoritenseite offen
     const cache = new Map();
@@ -433,6 +441,57 @@
         ${current.notes.length ? `<details class="notes"><summary>Änderungshistorie (${current.notes.length})</summary>${current.notes.map((n) => `<p>${escapeHtml(n)}</p>`).join('')}</details>` : ''}`;
     }
 
+    // --- Persönliche Bibliothek: Gesetze ein-/ausblenden und sortieren ---
+    function visibleLaws() {
+      const rank = (l) => { const i = prefs.order.indexOf(l.slug); return i < 0 ? 1000 + laws.indexOf(l) : i; };
+      return laws.filter((l) => !prefs.hidden.includes(l.slug)).sort((a, b) => rank(a) - rank(b));
+    }
+    function allLawsOrdered() {
+      const rank = (l) => { const i = prefs.order.indexOf(l.slug); return i < 0 ? 1000 + laws.indexOf(l) : i; };
+      return [...laws].sort((a, b) => rank(a) - rank(b));
+    }
+    function renderTabs() {
+      const cur = law && !favMode ? law.slug : (favMode ? '__fav' : null);
+      const vis = visibleLaws();
+      $('#tabs').innerHTML = `<button type="button" class="law-tab fav" data-slug="__fav" aria-pressed="${cur === '__fav'}">⭐ Favoriten</button>`
+        + vis.map((l) => `<button type="button" class="law-tab" data-slug="${l.slug}" aria-pressed="${l.slug === cur}" title="${escapeHtml(l.title)}">${escapeHtml(l.short)}</button>`).join('')
+        + `<button type="button" class="law-tab cfg" data-cfg title="Gesetze ein- und ausblenden, Reihenfolge ändern">⚙️ Bibliothek${prefs.hidden.length ? ` (${vis.length}/${laws.length})` : ''}</button>`;
+    }
+    let prefsTimer = null;
+    function savePrefs() {
+      clearTimeout(prefsTimer);
+      prefsTimer = setTimeout(() => api('/api/gesetze/prefs/me', { method: 'PUT', body: prefs }).catch((err) => { $('#error').textContent = err.message; }), 400);
+    }
+    function openLibrary() {
+      const box = document.createElement('div');
+      box.style.cssText = 'position:fixed;inset:0;z-index:100;background:rgba(20,22,50,.5);display:flex;align-items:center;justify-content:center;padding:1rem';
+      const body = () => allLawsOrdered().map((l, i, arr) => `<div class="lib-row ${prefs.hidden.includes(l.slug) ? 'off' : ''}">
+          <label><input type="checkbox" data-show="${l.slug}" ${prefs.hidden.includes(l.slug) ? '' : 'checked'}><span style="min-width:0"><span class="nm">${escapeHtml(l.short)}</span><br><span class="t">${escapeHtml(l.title)}</span></span></label>
+          <button type="button" data-up="${l.slug}" ${i === 0 ? 'disabled' : ''} aria-label="Nach oben">↑</button><button type="button" data-down="${l.slug}" ${i === arr.length - 1 ? 'disabled' : ''} aria-label="Nach unten">↓</button></div>`).join('');
+      box.innerHTML = `<div class="card" style="width:min(640px,100%);margin:0;max-height:90vh;display:flex;flex-direction:column">
+        <h2 style="margin:0 0 .3rem">⚙️ Meine Gesetze-Bibliothek</h2>
+        <p class="muted" style="margin:0 0 .6rem">Haken entfernen = Gesetz nicht mehr in der Leiste anzeigen. Mit ↑ ↓ legst du die Reihenfolge fest. Deine Favoriten bleiben immer erhalten.</p>
+        <div class="row" style="gap:.5rem;margin-bottom:.4rem"><button type="button" data-all="1">Alle anzeigen</button><button type="button" data-all="0">Alle ausblenden</button></div>
+        <div id="lib-list" style="overflow:auto;flex:1;min-height:0">${body()}</div>
+        <div class="row" style="justify-content:flex-end;margin-top:.6rem"><button type="button" class="primary" data-done="1">Fertig</button></div></div>`;
+      document.body.appendChild(box);
+      const redraw = () => { const sc = box.querySelector('#lib-list').scrollTop; box.querySelector('#lib-list').innerHTML = body(); box.querySelector('#lib-list').scrollTop = sc; renderTabs(); savePrefs(); };
+      const move = (slug, d) => { const ord = allLawsOrdered().map((l) => l.slug); const i = ord.indexOf(slug); const j = i + d; if (j < 0 || j >= ord.length) return; [ord[i], ord[j]] = [ord[j], ord[i]]; prefs.order = ord; redraw(); };
+      box.addEventListener('change', (e) => {
+        const c = e.target.closest('[data-show]');
+        if (!c) return;
+        prefs.hidden = c.checked ? prefs.hidden.filter((x) => x !== c.dataset.show) : [...prefs.hidden, c.dataset.show];
+        if (!prefs.order.length) prefs.order = allLawsOrdered().map((l) => l.slug);
+        redraw();
+      });
+      box.addEventListener('click', (e) => {
+        if (e.target === box || e.target.closest('[data-done]')) { box.remove(); return; }
+        const up = e.target.closest('[data-up]'); const down = e.target.closest('[data-down]'); const all = e.target.closest('[data-all]');
+        if (up) move(up.dataset.up, -1); else if (down) move(down.dataset.down, 1);
+        else if (all) { prefs.hidden = all.dataset.all === '1' ? [] : laws.map((l) => l.slug); redraw(); }
+      });
+    }
+
     const isFav = (slug, num) => favs.some((f) => f.law === slug && f.num === num);
     async function toggleFav(slug, num, title) {
       const was = isFav(slug, num);
@@ -459,7 +518,7 @@
       favMode = true;
       $('#layout').hidden = true;
       $('#favs').hidden = false;
-      document.querySelectorAll('.law-tab').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.slug === '__fav')));
+      renderTabs();
       history.replaceState(null, '', '#favoriten');
       renderFavs();
     }
@@ -514,7 +573,7 @@
       query = '';
       $('#search').value = '';
       store.set('law:last', slug);
-      document.querySelectorAll('.law-tab').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.slug === slug)));
+      renderTabs();
       $('#layout').hidden = false;
       $('#layout').classList.remove('mobile-toc');
       renderToc();
@@ -577,10 +636,16 @@
       try {
         laws = await api('/api/gesetze');
         favs = await api('/api/gesetze/favorites/all').catch(() => []);
-        $('#tabs').innerHTML = `<button type="button" class="law-tab fav" data-slug="__fav" aria-pressed="false">⭐ Favoriten</button>` + laws.map((l) => `<button type="button" class="law-tab" data-slug="${l.slug}" aria-pressed="false" title="${escapeHtml(l.title)}">${escapeHtml(l.short)}</button>`).join('');
-        $('#tabs').addEventListener('click', (e) => { const b = e.target.closest('.law-tab'); if (b) (b.dataset.slug === '__fav' ? Promise.resolve(openFavs()) : openLaw(b.dataset.slug)).catch((err) => { $('#error').textContent = err.message; }); });
+        prefs = await api('/api/gesetze/prefs/me').catch(() => ({ hidden: [], order: [] }));
+        renderTabs();
+        $('#tabs').addEventListener('click', (e) => {
+          if (e.target.closest('[data-cfg]')) { openLibrary(); return; }
+          const b = e.target.closest('.law-tab');
+          if (b) (b.dataset.slug === '__fav' ? Promise.resolve(openFavs()) : openLaw(b.dataset.slug)).catch((err) => { $('#error').textContent = err.message; });
+        });
         const [hs, hn] = location.hash.slice(1).split('/');
-        const slug = laws.some((l) => l.slug === hs) ? hs : (laws.some((l) => l.slug === store.get('law:last')) ? store.get('law:last') : laws[0].slug);
+        const vis = visibleLaws();
+        const slug = laws.some((l) => l.slug === hs) ? hs : (vis.some((l) => l.slug === store.get('law:last')) ? store.get('law:last') : (vis[0] || laws[0]).slug);
         if (hs === 'favoriten') openFavs(); else await openLaw(slug, hn && hs === slug ? hn : null);
       } catch (err) {
         $('#error').textContent = err.message;

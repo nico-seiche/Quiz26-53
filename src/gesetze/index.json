@@ -24,6 +24,22 @@
   "count": 20
  },
  {
+  "slug": "vwvg-nrw",
+  "short": "VwVG NRW",
+  "title": "Verwaltungsvollstreckungsgesetz Nordrhein-Westfalen",
+  "unit": "§",
+  "validFrom": "01.04.2025",
+  "count": 88
+ },
+ {
+  "slug": "lbg-nrw",
+  "short": "LBG NRW",
+  "title": "Landesbeamtengesetz Nordrhein-Westfalen",
+  "unit": "§",
+  "validFrom": "04.08.2026",
+  "count": 144
+ },
+ {
   "slug": "stgb",
   "short": "StGB",
   "title": "Strafgesetzbuch",
@@ -62,6 +78,102 @@
   "unit": "§",
   "validFrom": "26.09.2025",
   "count": 115
+ },
+ {
+  "slug": "stvg",
+  "short": "StVG",
+  "title": "Straßenverkehrsgesetz",
+  "unit": "§",
+  "validFrom": "29.10.2026",
+  "count": 122
+ },
+ {
+  "slug": "fev_2010",
+  "short": "FeV",
+  "title": "Verordnung über die Zulassung von Personen zum Straßenverkehr",
+  "unit": "§",
+  "validFrom": "26.10.2026",
+  "count": 93
+ },
+ {
+  "slug": "versammlg",
+  "short": "VersG",
+  "title": "Gesetz über Versammlungen und Aufzüge",
+  "unit": "§",
+  "validFrom": "10.08.2021",
+  "count": 36
+ },
+ {
+  "slug": "waffg_2002",
+  "short": "WaffG",
+  "title": "Waffengesetz",
+  "unit": "§",
+  "validFrom": "02.11.2026",
+  "count": 81
+ },
+ {
+  "slug": "btmg_1981",
+  "short": "BtMG",
+  "title": "Gesetz über den Verkehr mit Betäubungsmitteln",
+  "unit": "§",
+  "validFrom": "27.10.2026",
+  "count": 46
+ },
+ {
+  "slug": "jgg",
+  "short": "JGG",
+  "title": "Jugendgerichtsgesetz",
+  "unit": "§",
+  "validFrom": "06.05.2026",
+  "count": 141
+ },
+ {
+  "slug": "gvg",
+  "short": "GVG",
+  "title": "Gerichtsverfassungsgesetz",
+  "unit": "§",
+  "validFrom": "03.11.2026",
+  "count": 201
+ },
+ {
+  "slug": "vwgo",
+  "short": "VwGO",
+  "title": "Verwaltungsgerichtsordnung",
+  "unit": "§",
+  "validFrom": "29.10.2026",
+  "count": 212
+ },
+ {
+  "slug": "vwvfg",
+  "short": "VwVfG",
+  "title": "Verwaltungsverfahrensgesetz",
+  "unit": "§",
+  "validFrom": "28.07.2026",
+  "count": 130
+ },
+ {
+  "slug": "beamtstg",
+  "short": "BeamtStG",
+  "title": "Gesetz zur Regelung des Statusrechts der Beamtinnen und Beamten in den Ländern",
+  "unit": "§",
+  "validFrom": "31.03.2024",
+  "count": 63
+ },
+ {
+  "slug": "bdsg_2018",
+  "short": "BDSG",
+  "title": "Bundesdatenschutzgesetz",
+  "unit": "§",
+  "validFrom": "13.07.2026",
+  "count": 86
+ },
+ {
+  "slug": "aufenthg_2004",
+  "short": "AufenthG",
+  "title": "Gesetz über den Aufenthalt, die Erwerbstätigkeit und die Integration von Ausländern im Bundesgebiet",
+  "unit": "§",
+  "validFrom": "27.10.2026",
+  "count": 200
  },
  {
   "slug": "gg",

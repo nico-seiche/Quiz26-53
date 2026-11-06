@@ -2,6 +2,14 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-14',
+    title: 'Mehr Gesetze und deine eigene Bibliothek',
+    items: [
+      ['⚖️', '14 neue Gesetze', 'VwVG NRW, LBG NRW, StVG, FeV, VersG, WaffG, BtMG, JGG, GVG, VwGO, VwVfG, BeamtStG, BDSG und AufenthG.'],
+      ['⚙️', 'Deine Bibliothek', 'Mit „⚙️ Bibliothek“ blendest du Gesetze aus, die du nicht brauchst, und sortierst die Leiste nach deinem Geschmack. Die Einstellung gilt auf allen deinen Geräten.'],
+    ],
+  },
+  {
     id: '2026-11-13',
     title: 'Neu: Quiz per KI importieren',
     items: [
