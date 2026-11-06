@@ -28,7 +28,8 @@ const DocsPdf = (() => {
     stage.style.cssText = `position:fixed;left:-${W + 400}px;top:0;width:${W}px;background:#fff;pointer-events:none`;
     const holder = document.createElement('div');
     holder.id = 'editor';
-    holder.style.cssText = 'position:relative;background:#fff;box-shadow:none;border:0;margin:0;padding:0;width:100%;max-width:none';
+    // Das Blatt ist immer weiß mit dunkler Schrift – auch wenn die App im Dunkelmodus läuft
+    holder.style.cssText = 'position:relative;background:#fff;color:#1b1d3a;--text:#1b1d3a;--muted:#667085;--border:#e1e5f7;--link:#4338ca;--card:#fff;box-shadow:none;border:0;margin:0;padding:0;width:100%;max-width:none';
     const clone = editorEl.cloneNode(true);
     clone.removeAttribute('contenteditable');
     clone.style.cssText = 'min-height:0;overflow:visible;height:auto;width:100%;box-sizing:border-box';
