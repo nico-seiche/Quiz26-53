@@ -68,6 +68,7 @@ router.get('/', async (req, res) => {
     SELECT st.id, st.owner_id, st.title, st.is_public, st.updated_at, u.username AS owner,
            (st.owner_id = $1 OR ${COLLAB('st.id', '$1')}) AS can_edit,
            s.name AS subject, s.icon AS subject_icon,
+           (SELECT COUNT(*)::int FROM quiz.card_reports r WHERE r.set_id = st.id AND r.status = 'open') AS open_reports,
            COUNT(c.id)::int AS card_count,
            COUNT(c.id) FILTER (WHERE p.card_id IS NULL OR p.due_at <= now())::int AS due_count,
            COUNT(c.id) FILTER (WHERE p.box >= $2)::int AS mastered_count
@@ -159,6 +160,7 @@ router.get('/:id', async (req, res) => {
     collaborators: (await db.query(`SELECT u.username FROM quiz.study_set_collaborators c JOIN quiz.users u ON u.id = c.user_id
                                     WHERE c.set_id = $1 ORDER BY c.added_at`, [set.id])).map((r) => r.username),
     masteredBox: MASTERED_BOX,
+    openReports: set.can_edit ? (await db.one("SELECT COUNT(*)::int AS n FROM quiz.card_reports WHERE set_id = $1 AND status = 'open'", [set.id])).n : 0,
     cards: cards.map((c) => ({ ...c, id: Number(c.id), box: Number(c.box), rev: undefined })),
   });
 });
@@ -439,6 +441,47 @@ router.post('/:id/sync', async (req, res) => {
   if (result.error) return res.status(400).json({ error: result.error });
   await notifySet(copy.id);
   res.json(result);
+});
+
+// --- Fehler melden ---
+const REPORT_KINDS = ['typo', 'wrong', 'other'];
+router.post('/cards/:cardId/report', async (req, res) => {
+  if (!isId(req.params.cardId) || !REPORT_KINDS.includes(req.body.kind)) return res.status(400).json({ error: 'Ungültige Meldung' });
+  const note = String(req.body.note || '').trim().slice(0, 500);
+  if (req.body.kind === 'other' && !note) return res.status(400).json({ error: 'Bitte kurz beschreiben, was nicht stimmt' });
+  const card = await db.one('SELECT id, set_id, term, definition FROM quiz.study_cards WHERE id = $1', [req.params.cardId]);
+  if (!card || !(await loadSet(card.set_id, req.user.id))) return res.status(404).json({ error: 'Karte nicht gefunden' });
+  const { n } = await db.one("SELECT COUNT(*)::int AS n FROM quiz.card_reports WHERE reporter_id = $1 AND created_at > now() - interval '1 day'", [req.user.id]);
+  if (n >= 50) return res.status(429).json({ error: 'Heute schon viele Meldungen – bitte morgen weiter' });
+  const row = await db.one(`
+    INSERT INTO quiz.card_reports (card_id, set_id, reporter_id, kind, note, term, definition) VALUES ($1, $2, $3, $4, $5, $6, $7)
+    ON CONFLICT (card_id, reporter_id) WHERE status = 'open' DO UPDATE SET kind = EXCLUDED.kind, note = EXCLUDED.note, term = EXCLUDED.term, definition = EXCLUDED.definition
+    RETURNING id`, [card.id, card.set_id, req.user.id, req.body.kind, note, card.term, card.definition]);
+  await notifySet(card.set_id);
+  res.json({ ok: true, id: Number(row.id) });
+});
+
+// Meldungen eines Sets (nur Besitzer/Mitarbeiter): offene zuerst, dazu die zuletzt erledigten
+router.get('/:id/reports', async (req, res) => {
+  const set = await editableSet(req.params.id, req.user.id);
+  if (!set) return res.status(404).json({ error: 'Lernset nicht gefunden' });
+  const rows = await db.query(`
+    SELECT r.id, r.card_id, r.kind, r.note, r.term, r.definition, r.status, r.created_at, u.username AS reporter,
+           (c.id IS NOT NULL) AS exists, c.term AS cur_term, c.definition AS cur_definition
+    FROM quiz.card_reports r JOIN quiz.users u ON u.id = r.reporter_id LEFT JOIN quiz.study_cards c ON c.id = r.card_id
+    WHERE r.set_id = $1 AND (r.status = 'open' OR r.resolved_at > now() - interval '14 days')
+    ORDER BY (r.status = 'open') DESC, r.created_at DESC LIMIT 200`, [set.id]);
+  res.json(rows.map((r) => ({ ...r, id: Number(r.id), card_id: Number(r.card_id) })));
+});
+router.post('/:id/reports/:rid', async (req, res) => {
+  const set = await editableSet(req.params.id, req.user.id);
+  if (!set || !isId(req.params.rid)) return res.status(404).json({ error: 'Lernset nicht gefunden' });
+  const status = req.body.status;
+  if (!['open', 'done', 'dismissed'].includes(status)) return res.status(400).json({ error: 'Ungültiger Status' });
+  const row = await db.one(`UPDATE quiz.card_reports SET status = $1::text, resolved_at = CASE WHEN $1::text = 'open' THEN NULL ELSE now() END, resolved_by = CASE WHEN $1::text = 'open' THEN NULL ELSE $2::bigint END
+    WHERE id = $3 AND set_id = $4 RETURNING id`, [status, req.user.id, req.params.rid, set.id]);
+  if (!row) return res.status(404).json({ error: 'Meldung nicht gefunden' });
+  res.json({ ok: true });
 });
 
 // Ergebnis einer Wiederholung: gewusst → eine Box höher, nicht gewusst → zurück in Box 0

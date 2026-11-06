@@ -2,6 +2,14 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-15',
+    title: 'Neu: Fehler in Lernsets melden',
+    items: [
+      ['🚩', 'Fehler melden', 'Beim Lernen unter der Karte auf „🚩 Fehler in dieser Karte melden“ tippen: Tippfehler, inhaltlich falsch oder Sonstiges.'],
+      ['📋', 'Für Ersteller', 'Im Bearbeiten-Fenster steht die Liste der gemeldeten Fehler: zur Karte springen, korrigieren, abhaken oder verwerfen. In „Lernen“ zeigt ein 🚩 offene Meldungen an.'],
+    ],
+  },
+  {
     id: '2026-11-14',
     title: 'Mehr Gesetze und deine eigene Bibliothek',
     items: [

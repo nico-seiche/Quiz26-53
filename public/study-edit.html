@@ -47,6 +47,12 @@
     </div>
     <div class="card" id="presence-card" hidden><div class="row" id="presence"></div></div>
 
+    <div class="card" id="reports-card" hidden>
+      <h2 style="margin-bottom:.25rem">🚩 Gemeldete Fehler <span class="muted" id="reports-count"></span></h2>
+      <p class="muted" style="margin-top:0">Andere Lernende haben diese Karten gemeldet. Korrigiere die Karte unten und hake die Meldung ab – oder verwirf sie, wenn alles stimmt.</p>
+      <div id="reports-list"></div>
+    </div>
+
     <details class="card" id="import-box">
       <summary><strong>Texte einfügen</strong> <span class="muted">– mehrere Definitionen auf einmal aus deinem Skript</span></summary>
       <p class="muted">Pro Karte eine Zeile im Format <code>Begriff - Definition</code> (auch <code>–</code> oder <code>:</code>).
@@ -144,6 +150,41 @@
       }
     }
     Spell.preload();
+
+    // --- Gemeldete Fehler ---
+    const KIND = { typo: '✏️ Tippfehler', wrong: '❌ Inhaltlich falsch', other: '💬 Sonstiges' };
+    async function loadReports() {
+      if (!live) return;
+      let list;
+      try { list = await api(`/api/study/${id}/reports`); } catch { return; }
+      const open = list.filter((r) => r.status === 'open');
+      $('#reports-card').hidden = !list.length;
+      $('#reports-count').textContent = open.length ? `(${open.length} offen)` : '(alles abgearbeitet)';
+      $('#reports-list').innerHTML = list.map((r) => `
+        <div class="card" style="margin:.5rem 0;padding:.7rem .9rem;${r.status !== 'open' ? 'opacity:.6' : ''}">
+          <div><strong>${KIND[r.kind] || r.kind}</strong> <span class="muted">von ${escapeHtml(r.reporter)}${r.status === 'done' ? ' · ✅ erledigt' : r.status === 'dismissed' ? ' · verworfen' : ''}</span></div>
+          ${r.note ? `<div style="margin:.25rem 0">„${escapeHtml(r.note)}“</div>` : ''}
+          <div class="muted" style="font-size:.92rem;overflow-wrap:anywhere"><strong>${escapeHtml(r.term)}</strong> – ${escapeHtml(r.definition)}</div>
+          ${r.exists && (r.cur_term !== r.term || r.cur_definition !== r.definition) && r.status === 'open' ? '<div class="muted" style="font-size:.88rem">ℹ️ Die Karte wurde seit der Meldung bereits geändert.</div>' : ''}
+          <div class="row" style="gap:.4rem;margin-top:.4rem;flex-wrap:wrap">
+            ${r.status === 'open' ? `${r.exists ? `<button type="button" data-goto="${r.card_id}">Zur Karte</button>` : ''}<button type="button" class="primary" data-rep="${r.id}" data-st="done">✅ Erledigt</button><button type="button" data-rep="${r.id}" data-st="dismissed">Verwerfen</button>`
+              : `<button type="button" data-rep="${r.id}" data-st="open">Wieder öffnen</button>`}
+          </div>
+        </div>`).join('');
+    }
+    $('#reports-list').addEventListener('click', async (e) => {
+      const g = e.target.closest('[data-goto]');
+      if (g) {
+        const el = document.querySelector(`#cards [data-key="${g.dataset.goto}"]`);
+        if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.style.outline = '3px solid var(--primary)'; setTimeout(() => { el.style.outline = ''; }, 2500); }
+        return;
+      }
+      const b = e.target.closest('[data-rep]');
+      if (!b) return;
+      b.disabled = true;
+      try { await api(`/api/study/${id}/reports/${b.dataset.rep}`, { method: 'POST', body: { status: b.dataset.st } }); loadReports(); }
+      catch (err) { $('#error').textContent = err.message; b.disabled = false; }
+    });
 
     function render() {
       const box = $('#cards');
@@ -493,6 +534,7 @@
           showTeam(set);
           startLive();
           tick(undefined);
+          loadReports();
         } catch (err) { $('#error').textContent = err.message; }
       } else {
         cards = [blank()];

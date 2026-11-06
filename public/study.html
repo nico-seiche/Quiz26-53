@@ -68,6 +68,7 @@
             <span class="muted">${nf(s.card_count)} ${s.card_count === 1 ? 'Karte' : 'Karten'}</span>
             ${s.subject ? `<span class="tag">${escapeHtml(s.subject)}</span>` : ''}
             ${s.copyId ? '<span class="tag">🔄 Update verfügbar</span>' : ''}
+            ${s.mine && s.open_reports ? `<span class="tag" title="Gemeldete Fehler in diesem Lernset">🚩 ${s.open_reports}</span>` : ''}
             ${s.isOwner ? (s.is_public ? '<span class="tag">🌍 Geteilt</span>' : '<span class="tag">🔒 Privat</span>') : s.mine ? `<span class="tag">🤝 von ${escapeHtml(s.owner)}</span>` : `<span class="tag">von ${escapeHtml(s.owner)}</span>`}
             <div class="set-meter" title="Gelernt = in mindestens Box 3 des Karteikasten-Systems">
               <div class="stat-bar"><span style="width:${learned}%"></span></div>

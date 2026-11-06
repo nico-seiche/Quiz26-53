@@ -42,6 +42,7 @@
     </div>
     <p class="error" id="error"></p>
     <div id="stage"></div>
+    <div style="text-align:center;margin-top:1rem"><button type="button" class="link-btn" id="report-btn" hidden>🚩 Fehler in dieser Karte melden</button></div>
   </main>
   <script src="/js/cloze.js"></script>
   <script src="/js/piper.js"></script>
@@ -541,6 +542,35 @@
     $('#modes').onclick = (e) => { if (e.target.dataset.mode) { mode = e.target.dataset.mode; localStorage.setItem('learn-mode', mode); startSession(); } };
     $('#scope').onclick = (e) => { if (e.target.dataset.scope) { scope = e.target.dataset.scope; startSession(); } };
     $('#levels').onclick = (e) => { if (e.target.dataset.level) { level = Number(e.target.dataset.level); localStorage.setItem('learn-level', level); startSession(); } };
+
+    // --- Fehler melden ---
+    const reportCard = () => (mode === 'hear' ? queue[hearIdx] : queue[0]);
+    new MutationObserver(() => { $('#report-btn').hidden = !reportCard(); }).observe(stage, { childList: true });
+    $('#report-btn').onclick = () => {
+      const c = reportCard();
+      if (!c) return;
+      const box = document.createElement('div');
+      box.style.cssText = 'position:fixed;inset:0;z-index:100;background:rgba(20,22,50,.5);display:flex;align-items:center;justify-content:center;padding:1rem';
+      box.innerHTML = `<div class="card" style="width:min(520px,100%);margin:0">
+        <h2 style="margin:0 0 .3rem">🚩 Fehler melden</h2>
+        <p class="muted" style="margin:0 0 .5rem;overflow-wrap:anywhere"><strong>${escapeHtml(c.term)}</strong></p>
+        <label><input type="radio" name="rk" value="typo" checked> ✏️ Tippfehler / Rechtschreibung</label>
+        <label><input type="radio" name="rk" value="wrong"> ❌ Inhaltlich falsch</label>
+        <label><input type="radio" name="rk" value="other"> 💬 Sonstiges</label>
+        <label for="rn" style="margin-top:.5rem">Was stimmt nicht? (optional, bei „Sonstiges“ nötig)</label>
+        <textarea id="rn" rows="3" maxlength="500" style="width:100%" placeholder="z. B. „Gefahr“ wird in der Definition falsch geschrieben"></textarea>
+        <p class="error" id="rerr"></p>
+        <div class="row" style="justify-content:flex-end;gap:.5rem"><button type="button" id="rx">Abbrechen</button><button type="button" class="primary" id="rok">Melden</button></div></div>`;
+      document.body.appendChild(box);
+      box.querySelector('#rx').onclick = () => box.remove();
+      box.querySelector('#rok').onclick = async () => {
+        try {
+          await api(`/api/study/cards/${c.id}/report`, { method: 'POST', body: { kind: box.querySelector('input[name=rk]:checked').value, note: box.querySelector('#rn').value } });
+          box.querySelector('.card').innerHTML = '<h2 style="margin:0 0 .4rem">Danke! 🙏</h2><p>Die Meldung geht an den Ersteller des Lernsets.</p><div class="row" style="justify-content:flex-end"><button type="button" class="primary">OK</button></div>';
+          box.querySelector('button').onclick = () => box.remove();
+        } catch (err) { box.querySelector('#rerr').textContent = err.message; }
+      };
+    };
 
     (async () => {
       await requireLogin();
