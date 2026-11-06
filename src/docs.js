@@ -101,12 +101,44 @@ router.get('/assets/:aid', async (req, res) => {
   res.set({ 'Content-Type': a.mime, 'Cache-Control': 'private, max-age=86400', 'X-Content-Type-Options': 'nosniff' }).send(a.data);
 });
 
-const own = (req) => (isId(req.params.id) ? db.one('SELECT id, title, delta, rev FROM quiz.docs WHERE id = $1 AND owner_id = $2', [req.params.id, req.user.id]) : null);
+const own = (req) => (isId(req.params.id) ? db.one('SELECT id, title, delta, ink, rev FROM quiz.docs WHERE id = $1 AND owner_id = $2', [req.params.id, req.user.id]) : null);
 
 router.get('/:id', async (req, res) => {
   const d = await own(req);
   if (!d) return res.status(404).json({ error: 'Dokument nicht gefunden' });
-  res.json({ id: Number(d.id), title: d.title, delta: d.delta, rev: d.rev });
+  res.json({ id: Number(d.id), title: d.title, delta: d.delta, ink: d.ink || [], rev: d.rev });
+});
+
+// Freie Handschrift: Striche { c: Farbe, w: Breite, k: 'p' Stift | 'h' Marker, a: Textposition der Verankerung, p: [[x, y, Druck], …] }
+// x in Tausendstel der Seitenbreite, y in derselben Einheit ab Oberkante der verankerten Zeile
+const MAX_PEN_STROKES = 8000;
+const MAX_PEN_POINTS = 300000;
+const MAX_PEN_BYTES = 3000000;
+function cleanPen(input) {
+  if (!Array.isArray(input)) throw new Error('Ungültige Handschrift');
+  const out = [];
+  let points = 0;
+  for (const s of input.slice(0, MAX_PEN_STROKES)) {
+    if (!s || !Array.isArray(s.p) || !s.p.length) continue;
+    const p = [];
+    for (const pt of s.p) {
+      if (!Array.isArray(pt) || pt.length < 2 || points >= MAX_PEN_POINTS) continue;
+      p.push([Math.round(num(pt[0], -200, 1200, 0) * 10) / 10, Math.round(num(pt[1], -3000, 400000, 0) * 10) / 10, Math.round(num(pt[2], 0, 1, 0.5) * 100) / 100]);
+      points += 1;
+    }
+    if (!p.length) continue;
+    out.push({ c: hex(s.c) || '#1b1d3a', w: num(s.w, 0.5, 80, 3), k: s.k === 'h' ? 'h' : 'p', a: Math.max(0, Math.min(5000000, Math.round(Number(s.a) || 0))), p });
+  }
+  if (Buffer.byteLength(JSON.stringify(out)) > MAX_PEN_BYTES) throw new Error('Zu viel Handschrift in diesem Dokument');
+  return out;
+}
+router.put('/:id/ink', async (req, res) => {
+  const d = await own(req);
+  if (!d) return res.status(404).json({ error: 'Dokument nicht gefunden' });
+  let ink;
+  try { ink = cleanPen(req.body.ink); } catch (err) { return res.status(400).json({ error: err.message }); }
+  await db.query('UPDATE quiz.docs SET ink = $1, updated_at = now() WHERE id = $2', [JSON.stringify(ink), d.id]);
+  res.json({ ok: true, strokes: ink.length });
 });
 
 // Speichern; rev schützt davor, dass ein zweiter Tab/Gerät unbemerkt überschrieben wird
@@ -133,7 +165,7 @@ router.post('/:id/duplicate', async (req, res) => {
   const d = await own(req);
   if (!d) return res.status(404).json({ error: 'Dokument nicht gefunden' });
   const id = await db.tx(async (client) => {
-    const { rows: [n] } = await client.query('INSERT INTO quiz.docs (owner_id, title, delta, preview) SELECT owner_id, $2, delta, preview FROM quiz.docs WHERE id = $1 RETURNING id', [d.id, `${d.title} (Kopie)`.slice(0, 120)]);
+    const { rows: [n] } = await client.query('INSERT INTO quiz.docs (owner_id, title, delta, preview, ink) SELECT owner_id, $2, delta, preview, ink FROM quiz.docs WHERE id = $1 RETURNING id', [d.id, `${d.title} (Kopie)`.slice(0, 120)]);
     let json = JSON.stringify(d.delta);
     const { rows: assets } = await client.query('SELECT id, mime, data FROM quiz.doc_assets WHERE doc_id = $1', [d.id]);
     for (const a of assets) {

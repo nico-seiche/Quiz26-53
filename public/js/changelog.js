@@ -2,6 +2,15 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-18',
+    title: 'Neu: Mit dem Apple Pencil in Dokumenten schreiben',
+    items: [
+      ['✏️', 'Überall auf dem Blatt schreiben', 'Im Dokument auf „✏️ Pencil“ tippen: Stift, Marker und Radierer, fünf Farben, drei Stärken. Der Stift zeichnet, der Finger scrollt wie gewohnt.'],
+      ['🔒', 'Schreibmodus', 'Schaltet das Scrollen und Tippen mit dem Finger ab, damit der Handballen nichts stört – nur der Stift wirkt.'],
+      ['📎', 'Bleibt am Text', 'Die Handschrift hängt an ihrer Textzeile und wandert mit, wenn du oben etwas einfügst. Im PDF ist sie mit drin.'],
+    ],
+  },
+  {
     id: '2026-11-17',
     title: 'Neu: Offline nutzen',
     items: [

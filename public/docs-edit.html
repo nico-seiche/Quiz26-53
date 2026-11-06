@@ -49,7 +49,20 @@
     .ql-editor table { border-collapse: collapse; width: 100%; table-layout: fixed; margin: .6rem 0; }
     .ql-editor td { border: 1px solid #c9cfe8; padding: .4rem .6rem; vertical-align: top; min-width: 3rem; }
     .ql-editor li[data-list="checked"]::before, .ql-editor li[data-list="unchecked"]::before { cursor: pointer; }
-    /* Handschrift-Feld */
+    /* Handschrift (Pencil) über dem ganzen Blatt */
+    #editor.pen-active { cursor: crosshair; }
+    #editor.pen-lock { -webkit-user-select: none; user-select: none; }
+    .pen-bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 2.6rem); z-index: 40; max-width: calc(100vw - 16px); background: var(--card); border: 1px solid var(--border); border-radius: 18px; box-shadow: 0 10px 34px rgba(20, 22, 50, .3); padding: .4rem; }
+    .pen-bar[hidden] { display: none; }
+    .pen-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: .3rem; }
+    .pen-bar button { margin: 0; padding: 0 .6rem; min-width: 2.3rem; height: 2.3rem; border-radius: 12px; font-size: .9rem; font-weight: 700; background: var(--card); color: var(--text); border: 1px solid var(--border); box-shadow: none; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+    .pen-bar button[aria-pressed="true"] { background: var(--primary-grad); color: #fff; border-color: transparent; }
+    .pen-bar button:disabled { opacity: .35; }
+    .pen-bar .pen-color { width: 1.9rem; min-width: 1.9rem; height: 1.9rem; padding: 0; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--border); }
+    .pen-bar .pen-color[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--primary); background-clip: padding-box; }
+    .pen-bar .pen-width i { display: block; border-radius: 50%; background: currentColor; }
+    .pen-sep { width: 1px; height: 1.5rem; background: var(--border); margin: 0 .15rem; }
+    /* Handschrift (alt) */
     .ql-ink { margin: .8rem 0; border: 1.5px dashed #b9c2fb; border-radius: 12px; background: repeating-linear-gradient(#fff 0 31px, #eef1ff 31px 32px); overflow: hidden; user-select: none; -webkit-user-select: none; }
     .ink-canvas { display: block; width: 100%; touch-action: pan-y; cursor: crosshair; }
     .ink-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem; padding: .3rem .4rem; background: rgba(238, 241, 255, .92); border-bottom: 1px solid #dfe4fb; }
@@ -68,7 +81,7 @@
     @media print {
       @page { size: A4; margin: 16mm; }
       body.doc-body { display: block; overflow: visible; height: auto; background: #fff; }
-      .d-top, .dtools, .doc-foot, .tbl-pop, .ink-bar { display: none !important; }
+      .d-top, .dtools, .doc-foot, .tbl-pop, .pen-bar { display: none !important; }
       .d-scroll { overflow: visible; padding: 0; background: #fff; }
       .paper { box-shadow: none; max-width: none; border-radius: 0; min-height: 0; }
       #editor .ql-editor { padding: 0; min-height: 0; }
@@ -115,6 +128,7 @@
     <span class="sep"></span>
     <button type="button" id="d-link" title="Link">🔗</button>
     <button type="button" id="d-image" title="Bild einfügen">🖼️</button>
+    <button type="button" id="d-pen" title="Mit dem Apple Pencil überall auf dem Blatt schreiben und zeichnen">✏️ Pencil</button>
     <button type="button" id="d-word" title="Word-Datei (.docx) an der Cursorstelle einfügen">📥 Word</button>
     <button type="button" id="d-table" title="Tabelle">⊞</button>
     <button type="button" data-act="clean" title="Formatierung entfernen">Tx</button>
@@ -127,6 +141,7 @@
   <input type="file" id="wordfile" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
   <script src="/js/docs-import.js"></script>
   <script src="/js/docs-pdf.js"></script>
+  <script src="/js/docs-pen.js"></script>
   <script src="/js/changelog.js"></script>
   <script src="/js/common.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
@@ -139,6 +154,10 @@
     let pending = false;
     let conflict = false;
     let lastRange = null;
+    let pen = null;
+    let inkTimer = null;
+    let inkPending = false;
+    let inkSaving = false;
 
     // Quill merkt sich den Inhalt zwischen; Änderungen an Handschrift-Feldern kennt es nicht, daher frisch einlesen
     function contents() { quill.editor.delta = quill.editor.getDelta(); return quill.getContents().ops; }
@@ -166,8 +185,20 @@
         if (/woanders/.test(err.message)) { conflict = true; setState('Woanders geändert – bitte neu laden', 'warn'); } else setState(`Nicht gespeichert: ${err.message}`, 'warn');
       } finally { saving = false; if (pending && !conflict) saveTimer = setTimeout(save, 2000); }
     }
-    addEventListener('beforeunload', (e) => { if (pending || saving) { e.preventDefault(); e.returnValue = ''; } });
+    addEventListener('beforeunload', (e) => { if (pending || saving || inkPending || inkSaving) { e.preventDefault(); e.returnValue = ''; } });
     addEventListener('pagehide', () => { if (pending && !conflict) { try { fetch(`/api/docs/${id}`, { method: 'PUT', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: $('#title').value, delta: contents(), rev: doc.rev }) }); } catch { /* egal */ } } });
+
+    // Handschrift: eigener Speicherweg (nur wenn sich etwas ändert)
+    function inkChanged() { inkPending = true; if (!conflict) setState('Ungespeichert …'); clearTimeout(inkTimer); inkTimer = setTimeout(saveInk, 1500); }
+    async function saveInk() {
+      clearTimeout(inkTimer);
+      if (inkSaving || !inkPending) return;
+      inkSaving = true; inkPending = false;
+      try { await api(`/api/docs/${id}/ink`, { method: 'PUT', body: { ink: pen.strokes() } }); if (!pending && !inkPending) setState('✓ Gespeichert', 'ok'); }
+      catch (err) { inkPending = true; setState(`Handschrift nicht gespeichert: ${err.message}`, 'warn'); }
+      finally { inkSaving = false; if (inkPending) inkTimer = setTimeout(saveInk, 3000); }
+    }
+    addEventListener('pagehide', () => { if (inkPending && pen) { try { fetch(`/api/docs/${id}/ink`, { method: 'PUT', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ink: pen.strokes() }) }); } catch { /* egal */ } } });
 
     // ---------- Bilder ----------
     async function uploadImage(file) {
@@ -221,6 +252,7 @@
     $('#tools').addEventListener('click', (e) => {
       const b = e.target.closest('button');
       if (!b) return;
+      if (b.id === 'd-pen') { pen.open(!pen.isOpen()); b.setAttribute('aria-pressed', String(pen.isOpen())); return; }
       const r = range();
       quill.focus();
       quill.setSelection(r.index, r.length, 'silent');
@@ -321,6 +353,7 @@
       quill.on('selection-change', (r) => { if (r) lastRange = r; refreshTools(); });
       // Bilder aus der Zwischenablage / per Ziehen
       quill.root.addEventListener('paste', (e) => { const f = [...(e.clipboardData?.files || [])].find((x) => /^image\//.test(x.type)); if (f) { e.preventDefault(); e.stopPropagation(); uploadImage(f); } }, true);
+      pen = DocsPen.attach(quill, { initial: doc.ink || [], onChange: inkChanged });
       quill.root.addEventListener('drop', (e) => { const f = [...(e.dataTransfer?.files || [])].find((x) => /^image\//.test(x.type)); if (f) { e.preventDefault(); e.stopPropagation(); uploadImage(f); } }, true);
       refreshTools();
     }
@@ -348,7 +381,7 @@
       btn.disabled = true;
       try {
         setState('PDF wird erstellt …');
-        const pages = await DocsPdf.exportDoc($('#title').value, quill.root, setState);
+        const pages = await DocsPdf.exportDoc($('#title').value, quill.root, setState, pen);
         setState(`✓ PDF gespeichert (${pages} Seite${pages === 1 ? '' : 'n'})`, 'ok');
       } catch (err) { setState(`PDF: ${err.message}`, 'warn'); }
       btn.disabled = false;
