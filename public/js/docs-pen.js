@@ -14,40 +14,91 @@ const DocsPen = (() => {
   const WIDTHS = [1.2, 2.4, 5];                       // Einheiten (Tausendstel der Blattbreite)
   const MARKER_ALPHA = 0.35;
 
-  function attach(quill, { initial = [], onChange = () => {} } = {}) {
-    const paper = quill.root.parentElement;           // #editor (das Blatt, inklusive Rand)
+  // Gemeinsamer Zustand aller Blätter einer Seite (Werkzeug, Farbe …) und die eine Stiftleiste
+  const ui = { tool: 'text', color: COLORS[0], widthIdx: 1, lock: false, visible: true, open: false, bar: null, active: null };
+
+  function ensureBar() {
+    if (ui.bar) return ui.bar;
+    const bar = document.createElement('div');
+    bar.className = 'pen-bar';
+    bar.hidden = true;
+    bar.innerHTML = `
+      <div class="pen-row">
+        <button type="button" data-tool="text" title="Text schreiben und markieren (Stift wie Finger)">🔤 Text</button>
+        <button type="button" data-tool="pen" title="Stift">✏️ Stift</button>
+        <button type="button" data-tool="marker" title="Textmarker">🖍️ Marker</button>
+        <button type="button" data-tool="eraser" title="Radierer: wischt ganze Striche weg">⌫ Radierer</button>
+        <span class="pen-sep"></span>
+        ${COLORS.map((c) => `<button type="button" class="pen-color" data-color="${c}" style="background:${c}" aria-label="Farbe"></button>`).join('')}
+        <span class="pen-sep"></span>
+        ${WIDTHS.map((w, i) => `<button type="button" class="pen-width" data-width="${i}" aria-label="Strichstärke ${i + 1}"><i style="width:${6 + i * 4}px;height:${6 + i * 4}px"></i></button>`).join('')}
+        <span class="pen-sep"></span>
+        <button type="button" data-act="undo" title="Rückgängig (Handschrift)">↶</button>
+        <button type="button" data-act="redo" title="Wiederholen (Handschrift)">↷</button>
+        <button type="button" data-act="lock" title="Schreibmodus: der Finger scrollt und tippt nicht mehr – nur der Stift wirkt">🔒 Schreibmodus</button>
+        <button type="button" data-act="visible" title="Handschrift ein-/ausblenden">👁</button>
+        <button type="button" data-act="clear" title="Alle Handschrift löschen">🗑</button>
+      </div>`;
+    document.body.appendChild(bar);
+    bar.addEventListener('pointerdown', (e) => e.preventDefault());       // Auswahl im Text bleibt
+    bar.addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      const act = ui.active;
+      if (b.dataset.tool) setTool(b.dataset.tool);
+      else if (b.dataset.color) { ui.color = b.dataset.color; if (ui.tool === 'text' || ui.tool === 'eraser') setTool('pen'); }
+      else if (b.dataset.width) ui.widthIdx = Number(b.dataset.width);
+      else if (b.dataset.act === 'undo') act && act.undo();
+      else if (b.dataset.act === 'redo') act && act.redo();
+      else if (b.dataset.act === 'lock') { ui.lock = !ui.lock; if (ui.lock && ui.tool === 'text') ui.tool = 'pen'; }
+      else if (b.dataset.act === 'visible') { ui.visible = !ui.visible; act && act.applyVisible(); }
+      else if (b.dataset.act === 'clear') { if (act && confirm('Die gesamte Handschrift hier löschen?')) act.clearAll(); }
+      refreshUi();
+    });
+    ui.bar = bar;
+    return bar;
+  }
+  function setTool(t) { ui.tool = t; if (t === 'text') ui.lock = false; refreshUi(); }
+  function refreshUi() {
+    const bar = ensureBar();
+    bar.hidden = !ui.open;
+    bar.querySelectorAll('[data-tool]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tool === ui.tool)));
+    bar.querySelectorAll('[data-color]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.color === ui.color && ui.tool !== 'text' && ui.tool !== 'eraser')));
+    bar.querySelectorAll('[data-width]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.width) === ui.widthIdx)));
+    bar.querySelector('[data-act="lock"]').setAttribute('aria-pressed', String(ui.lock));
+    bar.querySelector('[data-act="visible"]').setAttribute('aria-pressed', String(!ui.visible));
+    const a = ui.active;
+    bar.querySelector('[data-act="undo"]').disabled = !(a && a.canUndo());
+    bar.querySelector('[data-act="redo"]').disabled = !(a && a.canRedo());
+    if (a) { const on = ui.open && ui.tool !== 'text'; a.paper.classList.toggle('pen-active', on); a.paper.classList.toggle('pen-lock', on && ui.lock); }
+  }
+  function openBar(on) { ui.open = on; if (on && ui.tool === 'text') ui.tool = 'pen'; if (!on) { ui.tool = 'text'; ui.lock = false; } refreshUi(); }
+
+  // adapter: { paper, measure() → { idx: [Anker …], top: [px …] }, subscribe(fn) – fn(delta | null) bei Textänderung, observe: [Elemente] }
+  function create(adapter, { initial = [], onChange = () => {} } = {}) {
+    const { paper } = adapter;
     if (getComputedStyle(paper).position === 'static') paper.style.position = 'relative';
     const layer = document.createElement('div');
     layer.className = 'pen-layer';
     layer.style.cssText = 'position:absolute;left:0;top:0;width:100%;pointer-events:none;z-index:3;overflow:hidden';
     paper.appendChild(layer);
+    const ctl = new AbortController();
+    const sig = { signal: ctl.signal };
 
     let strokes = Array.isArray(initial) ? initial.map((s) => ({ ...s })) : [];
-    let tool = 'text';                                // 'text' | 'pen' | 'marker' | 'eraser'
-    let color = COLORS[0];
-    let widthIdx = 1;
-    let lock = false;                                 // Schreibmodus: Finger macht nichts (kein Scrollen, kein Tippen)
-    let visible = true;
     const undoStack = [];
     const redoStack = [];
-    let lines = { idx: [], top: [] };                 // Zeilenanfänge (Textposition) und ihre Höhe im Blatt
-    let current = null;                               // laufender Strich { s, id, anchorTop }
+    let lines = { idx: [], top: [] };                 // Zeilenanfänge (Anker) und ihre Höhe im Blatt
+    let current = null;                               // laufender Strich { s, id, top }
     let erasing = null;
     let raf = 0;
-    const listeners = [];
+    const tool = () => ui.tool;
+    const lock = () => ui.lock;
 
     // ---------- Geometrie ----------
     const width = () => paper.clientWidth || 1;
     const k = () => width() / UNITS;
-    function measureLines() {
-      const base = paper.getBoundingClientRect().top;
-      const idx = []; const top = [];
-      for (const line of quill.getLines(0, quill.getLength())) {
-        idx.push(quill.getIndex(line));
-        top.push(line.domNode.getBoundingClientRect().top - base);
-      }
-      lines = { idx, top };
-    }
+    function measureLines() { lines = adapter.measure(); }
     function topOfAnchor(a) {                         // Höhe der Zeile, die zur Textposition a gehört
       const { idx, top } = lines;
       if (!idx.length) return 0;
@@ -147,7 +198,7 @@ const DocsPen = (() => {
     }
 
     // ---------- Eingabe ----------
-    const drawing = () => tool !== 'text';
+    const drawing = () => ui.open && ui.tool !== 'text' && ui.active === inst;
     function point(e) {
       const r = paper.getBoundingClientRect();
       return { x: (e.clientX - r.left) / k(), y: e.clientY - r.top };
@@ -155,15 +206,15 @@ const DocsPen = (() => {
     function pressure(e) { return e.pointerType === 'pen' ? (e.pressure > 0 ? e.pressure : 0.5) : 0.5; }
     function down(e) {
       if (!drawing()) return;
-      if (e.pointerType === 'touch') { if (lock) e.preventDefault(); return; }   // Finger: scrollt/tippt normal – außer im Schreibmodus
+      if (e.pointerType === 'touch') { if (ui.lock) e.preventDefault(); return; }   // Finger: scrollt/tippt normal – außer im Schreibmodus
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       e.preventDefault();
       try { paper.setPointerCapture(e.pointerId); } catch { /* egal */ }
       measureLines();
       const p = point(e);
-      if (tool === 'eraser') { erasing = { id: e.pointerId, removed: [] }; erase(p); return; }
+      if (ui.tool === 'eraser') { erasing = { id: e.pointerId, removed: [] }; erase(p); return; }
       const an = anchorAt(p.y);
-      const s = { c: color, w: tool === 'marker' ? WIDTHS[widthIdx] * 1.6 : WIDTHS[widthIdx], k: tool === 'marker' ? 'h' : 'p', a: an.a, p: [[p.x, (p.y - an.top) / k(), pressure(e)]] };
+      const s = { c: ui.color, w: ui.tool === 'marker' ? WIDTHS[ui.widthIdx] * 1.6 : WIDTHS[ui.widthIdx], k: ui.tool === 'marker' ? 'h' : 'p', a: an.a, p: [[p.x, (p.y - an.top) / k(), pressure(e)]] };
       strokes.push(s);
       current = { s, id: e.pointerId, top: an.top, last: 0 };
       liveDraw(s);
@@ -235,108 +286,97 @@ const DocsPen = (() => {
     }
 
     // ---------- Rückgängig ----------
-    function pushUndo(op) { undoStack.push(op); if (undoStack.length > 200) undoStack.shift(); redoStack.length = 0; refreshUi(); }
+    function pushUndo(op) { undoStack.push(op); if (undoStack.length > 200) undoStack.shift(); redoStack.length = 0; if (ui.active === inst) refreshUi(); }
     function apply(op, inverse) {
       const add = (list) => { strokes.push(...list); };
       const del = (list) => { list.forEach((s) => { const i = strokes.indexOf(s); if (i >= 0) strokes.splice(i, 1); }); };
       if (op.add) (inverse ? del : add)([op.add]);
       if (op.del) (inverse ? add : del)(op.del);
     }
-    function undo() { const op = undoStack.pop(); if (!op) return; apply(op, true); redoStack.push(op); redraw(); emit(); refreshUi(); }
-    function redo() { const op = redoStack.pop(); if (!op) return; apply(op, false); undoStack.push(op); redraw(); emit(); refreshUi(); }
+    function undo() { const op = undoStack.pop(); if (!op) return; apply(op, true); redoStack.push(op); redraw(); emit(); if (ui.active === inst) refreshUi(); }
+    function redo() { const op = redoStack.pop(); if (!op) return; apply(op, false); undoStack.push(op); redraw(); emit(); if (ui.active === inst) refreshUi(); }
     function clearAll() { if (!strokes.length) return; pushUndo({ del: [...strokes] }); strokes = []; redraw(); emit(); }
 
     // ---------- Texteditor: Anker mitrechnen ----------
-    quill.on('text-change', (delta) => {
-      if (!strokes.length) { schedule(); return; }
-      let moved = false;
-      for (const s of strokes) { const a = delta.transformPosition(s.a); if (a !== s.a) { s.a = a; moved = true; } }
-      if (moved) emit();      // Anker haben sich verschoben → auch die Handschrift neu speichern
+    adapter.subscribe((delta) => {
+      if (delta && strokes.length) {
+        let moved = false;
+        for (const s of strokes) { const a = delta.transformPosition(s.a); if (a !== s.a) { s.a = a; moved = true; } }
+        if (moved) emit();      // Anker haben sich verschoben → auch die Handschrift neu speichern
+      }
       schedule();
     });
-    if (window.ResizeObserver) { const ro = new ResizeObserver(schedule); ro.observe(paper); ro.observe(quill.root); }
-    window.addEventListener('resize', schedule);
+    if (window.ResizeObserver) { const ro = new ResizeObserver(schedule); (adapter.observe || [paper]).forEach((el) => ro.observe(el)); ctl.signal.addEventListener('abort', () => ro.disconnect()); }
+    window.addEventListener('resize', schedule, sig);
 
     // ---------- Ereignisse am Blatt ----------
-    paper.addEventListener('pointerdown', down, true);
-    paper.addEventListener('pointermove', move, true);
-    paper.addEventListener('pointerup', up, true);
-    paper.addEventListener('pointercancel', up, true);
+    paper.addEventListener('pointerdown', down, { capture: true, ...sig });
+    paper.addEventListener('pointermove', move, { capture: true, ...sig });
+    paper.addEventListener('pointerup', up, { capture: true, ...sig });
+    paper.addEventListener('pointercancel', up, { capture: true, ...sig });
     // iPad: Stift-Berührungen dürfen die Seite nicht scrollen; Finger-Berührungen nur im Schreibmodus nicht
     const touchGuard = (e) => {
       if (!drawing()) return;
       for (const t of e.changedTouches) {
-        if (t.touchType === 'stylus' || (lock && t.touchType !== 'stylus')) { e.preventDefault(); return; }
+        if (t.touchType === 'stylus' || (ui.lock && t.touchType !== 'stylus')) { e.preventDefault(); return; }
       }
     };
-    paper.addEventListener('touchstart', touchGuard, { passive: false, capture: true });
-    paper.addEventListener('touchmove', touchGuard, { passive: false, capture: true });
-    paper.addEventListener('selectstart', (e) => { if (current || erasing) e.preventDefault(); });
-    paper.addEventListener('contextmenu', (e) => { if (drawing() && e.pointerType !== 'touch') e.preventDefault(); });
+    paper.addEventListener('touchstart', touchGuard, { passive: false, capture: true, ...sig });
+    paper.addEventListener('touchmove', touchGuard, { passive: false, capture: true, ...sig });
+    paper.addEventListener('selectstart', (e) => { if (current || erasing) e.preventDefault(); }, sig);
+    paper.addEventListener('contextmenu', (e) => { if (drawing() && e.pointerType !== 'touch') e.preventDefault(); }, sig);
 
-    // ---------- Werkzeugleiste ----------
-    const bar = document.createElement('div');
-    bar.className = 'pen-bar';
-    bar.hidden = true;
-    bar.innerHTML = `
-      <div class="pen-row">
-        <button type="button" data-tool="text" title="Text schreiben und markieren (Stift wie Finger)">🔤 Text</button>
-        <button type="button" data-tool="pen" title="Stift">✏️ Stift</button>
-        <button type="button" data-tool="marker" title="Textmarker">🖍️ Marker</button>
-        <button type="button" data-tool="eraser" title="Radierer: wischt ganze Striche weg">⌫ Radierer</button>
-        <span class="pen-sep"></span>
-        ${COLORS.map((c) => `<button type="button" class="pen-color" data-color="${c}" style="background:${c}" aria-label="Farbe"></button>`).join('')}
-        <span class="pen-sep"></span>
-        ${WIDTHS.map((w, i) => `<button type="button" class="pen-width" data-width="${i}" aria-label="Strichstärke ${i + 1}"><i style="width:${6 + i * 4}px;height:${6 + i * 4}px"></i></button>`).join('')}
-        <span class="pen-sep"></span>
-        <button type="button" data-act="undo" title="Rückgängig (Handschrift)">↶</button>
-        <button type="button" data-act="redo" title="Wiederholen (Handschrift)">↷</button>
-        <button type="button" data-act="lock" title="Schreibmodus: der Finger scrollt und tippt nicht mehr – nur der Stift wirkt">🔒 Schreibmodus</button>
-        <button type="button" data-act="visible" title="Handschrift ein-/ausblenden">👁</button>
-        <button type="button" data-act="clear" title="Alle Handschrift löschen">🗑</button>
-      </div>`;
-    document.body.appendChild(bar);
-    bar.addEventListener('pointerdown', (e) => e.preventDefault());       // Auswahl im Text bleibt
-    bar.addEventListener('click', (e) => {
-      const b = e.target.closest('button');
-      if (!b) return;
-      if (b.dataset.tool) setTool(b.dataset.tool);
-      else if (b.dataset.color) { color = b.dataset.color; if (tool === 'text' || tool === 'eraser') setTool('pen'); }
-      else if (b.dataset.width) widthIdx = Number(b.dataset.width);
-      else if (b.dataset.act === 'undo') undo();
-      else if (b.dataset.act === 'redo') redo();
-      else if (b.dataset.act === 'lock') setLock(!lock);
-      else if (b.dataset.act === 'visible') setVisible(!visible);
-      else if (b.dataset.act === 'clear') { if (confirm('Die gesamte Handschrift in diesem Dokument löschen?')) clearAll(); }
-      refreshUi();
-    });
-    function refreshUi() {
-      bar.querySelectorAll('[data-tool]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tool === tool)));
-      bar.querySelectorAll('[data-color]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.color === color && tool !== 'text' && tool !== 'eraser')));
-      bar.querySelectorAll('[data-width]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.width) === widthIdx)));
-      bar.querySelector('[data-act="lock"]').setAttribute('aria-pressed', String(lock));
-      bar.querySelector('[data-act="visible"]').setAttribute('aria-pressed', String(!visible));
-      bar.querySelector('[data-act="undo"]').disabled = !undoStack.length;
-      bar.querySelector('[data-act="redo"]').disabled = !redoStack.length;
-      paper.classList.toggle('pen-active', drawing());
-      paper.classList.toggle('pen-lock', drawing() && lock);
-    }
-    function setTool(t) { tool = t; if (t === 'text') lock = false; refreshUi(); }
-    function setLock(v) { lock = v; if (lock && tool === 'text') tool = 'pen'; refreshUi(); }
-    function setVisible(v) { visible = v; layer.style.display = v ? '' : 'none'; refreshUi(); }
     function emit() { onChange(strokes); }
-    function open(on) { bar.hidden = !on; if (on && tool === 'text') tool = 'pen'; if (!on) { tool = 'text'; lock = false; } refreshUi(); }
-
-    refreshUi();
-    requestAnimationFrame(() => redraw());
-
-    return {
-      open, isOpen: () => !bar.hidden, setTool, undo, redo,
+    function applyVisible() { layer.style.display = ui.visible ? '' : 'none'; }
+    const inst = {
+      paper,
+      canUndo: () => undoStack.length > 0, canRedo: () => redoStack.length > 0,
+      undo, redo, clearAll, applyVisible,
+      open(on) { ui.active = inst; if (on !== ui.open) openBar(on); else refreshUi(); applyVisible(); },
+      isOpen: () => ui.open,
       strokes: () => strokes.map(({ c, w, k: kind, a, p }) => ({ c, w, k: kind, a, p })),
       redraw: schedule,
       // Für den PDF-Export: Handschrift in einen Container malen (gleiche Blattbreite wie auf dem Bildschirm)
       paintInto(host, w, h, dpr) { const hostTiles = []; measureLines(); paintAll(host, hostTiles, w, h, dpr); return hostTiles; },
+      destroy() { ctl.abort(); layer.remove(); cancelAnimationFrame(raf); if (ui.active === inst) { ui.active = null; refreshUi(); } paper.classList.remove('pen-active', 'pen-lock'); },
     };
+    ui.active = inst;
+    ensureBar();
+    refreshUi();
+    applyVisible();
+    requestAnimationFrame(() => redraw());
+    return inst;
   }
-  return { attach };
+
+  // Für den Texteditor (Quill): Zeilen = Textzeilen, Anker = Zeichenposition
+  function attach(quill, opts) {
+    const paper = quill.root.parentElement;
+    return create({
+      paper,
+      measure() {
+        const base = paper.getBoundingClientRect().top;
+        const idx = []; const top = [];
+        for (const line of quill.getLines(0, quill.getLength())) { idx.push(quill.getIndex(line)); top.push(line.domNode.getBoundingClientRect().top - base); }
+        return { idx, top };
+      },
+      subscribe(fn) { quill.on('text-change', (delta) => fn(delta)); },
+      observe: [paper, quill.root],
+    }, opts);
+  }
+
+  // Für beliebigen Text in einem Element: Zeilen = Elemente (selector), Anker = laufende Nummer
+  function attachTo(paper, selector, opts) {
+    return create({
+      paper,
+      measure() {
+        const base = paper.getBoundingClientRect().top;
+        const els = [...paper.querySelectorAll(selector)];
+        return { idx: els.map((_, i) => i), top: els.map((el) => el.getBoundingClientRect().top - base) };
+      },
+      subscribe() {},
+      observe: [paper],
+    }, opts);
+  }
+
+  return { attach, attachTo, setTool, openBar, ui };
 })();

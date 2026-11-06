@@ -2,6 +2,15 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-19',
+    title: 'Neu: Mit dem Pencil im Gesetz markieren',
+    items: [
+      ['✏️', 'Im Gesetzestext schreiben', 'Bei jedem Paragraphen auf „✏️ Pencil“ tippen und mit Stift oder Marker direkt über dem Text markieren, unterstreichen und Anmerkungen an den Rand schreiben.'],
+      ['📝', 'Kommentare', 'Dazu gibt es weiterhin Notizen zum Paragraphen und zu markierten Stellen – tippen oder mit Scribble schreiben.'],
+      ['💾', 'Gespeichert', 'Deine Handschrift bleibt bei dem Paragraphen und liegt auf allen deinen Geräten. Der Tab „📝 Notizen“ listet alle Paragraphen mit Handschrift.'],
+    ],
+  },
+  {
     id: '2026-11-18',
     title: 'Neu: Mit dem Apple Pencil in Dokumenten schreiben',
     items: [

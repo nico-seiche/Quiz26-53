@@ -192,4 +192,4 @@ router.post('/:id/assets', async (req, res) => {
   res.json({ id: Number(row.id), url: `/api/docs/assets/${row.id}` });
 });
 
-module.exports = { router, cleanDelta };
+module.exports = { router, cleanDelta, cleanPen };

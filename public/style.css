@@ -754,3 +754,20 @@ input[type="password"]::-ms-reveal, input[type="password"]::-ms-clear { display:
 .spell-chip button.ok { font-weight: 600; color: var(--muted); }
 .spell-tip { display: flex; gap: .8rem; align-items: center; justify-content: space-between; font-size: .9rem; }
 .spell-tip button { flex: none; }
+
+/* Stiftleiste (Handschrift mit dem Apple Pencil, public/js/docs-pen.js) */
+#editor.pen-active { cursor: crosshair; }
+#editor.pen-lock { -webkit-user-select: none; user-select: none; }
+.pen-bar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 2.6rem); z-index: 40; max-width: calc(100vw - 16px); background: var(--card); border: 1px solid var(--border); border-radius: 18px; box-shadow: 0 10px 34px rgba(20, 22, 50, .3); padding: .4rem; }
+.pen-bar[hidden] { display: none; }
+.pen-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: .2rem; }
+.pen-bar button { margin: 0; padding: 0 .45rem; min-width: 2rem; height: 2rem; border-radius: 10px; font-size: .82rem; font-weight: 700; background: var(--card); color: var(--text); border: 1px solid var(--border); box-shadow: none; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.pen-bar button[aria-pressed="true"] { background: var(--primary-grad); color: #fff; border-color: transparent; }
+.pen-bar button:disabled { opacity: .35; }
+.pen-bar .pen-color { width: 1.6rem; min-width: 1.6rem; height: 1.6rem; padding: 0; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--border); }
+.pen-bar .pen-color[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--primary); background-clip: padding-box; }
+.pen-bar .pen-width i { display: block; border-radius: 50%; background: currentColor; }
+.pen-sep { width: 1px; height: 1.5rem; background: var(--border); margin: 0 .15rem; }
+.pen-active { cursor: crosshair; }
+@media print { .pen-bar { display: none !important; } }
+.has-nav .pen-bar { bottom: calc(env(safe-area-inset-bottom, 0px) + 5.8rem); }

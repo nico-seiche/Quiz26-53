@@ -1,5 +1,6 @@
 const express = require('express');
 const { requireAuth } = require('./auth');
+const { cleanPen } = require('./docs');
 const db = require('./db');
 
 // Gesetzessammlung für alle angemeldeten Nutzer.
@@ -106,6 +107,29 @@ router.delete('/notes/:id', async (req, res) => {
   if (!idOk(req.params.id)) return res.status(404).json({ error: 'Nicht gefunden' });
   await db.query('DELETE FROM quiz.law_notes WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
   res.json({ ok: true });
+});
+
+// Handschrift über einem Paragraphen (Pencil)
+router.get('/ink/all', async (req, res) => {
+  const rows = await db.query("SELECT law, num, jsonb_array_length(ink)::int AS strokes FROM quiz.law_ink WHERE user_id = $1 AND jsonb_array_length(ink) > 0 ORDER BY law, num", [req.user.id]);
+  res.json(rows);
+});
+router.get('/ink/:slug/:num', async (req, res) => {
+  if (!known(req.params.slug) || !NUMBER.test(req.params.num)) return res.status(400).json({ error: 'Ungültiger Paragraph' });
+  const row = await db.one('SELECT ink FROM quiz.law_ink WHERE user_id = $1 AND law = $2 AND num = $3', [req.user.id, req.params.slug, req.params.num]);
+  res.json({ ink: row ? row.ink : [] });
+});
+router.put('/ink/:slug/:num', async (req, res) => {
+  if (!known(req.params.slug) || !NUMBER.test(req.params.num)) return res.status(400).json({ error: 'Ungültiger Paragraph' });
+  let ink;
+  try { ink = cleanPen(req.body && req.body.ink); } catch (err) { return res.status(400).json({ error: err.message }); }
+  if (!ink.length) { await db.query('DELETE FROM quiz.law_ink WHERE user_id = $1 AND law = $2 AND num = $3', [req.user.id, req.params.slug, req.params.num]); return res.json({ ok: true, strokes: 0 }); }
+  const { n } = await db.one('SELECT COUNT(*)::int AS n FROM quiz.law_ink WHERE user_id = $1', [req.user.id]);
+  const has = await db.one('SELECT 1 AS x FROM quiz.law_ink WHERE user_id = $1 AND law = $2 AND num = $3', [req.user.id, req.params.slug, req.params.num]);
+  if (!has && n >= 2000) return res.status(400).json({ error: 'Zu viele Paragraphen mit Handschrift' });
+  await db.query(`INSERT INTO quiz.law_ink (user_id, law, num, ink, updated_at) VALUES ($1, $2, $3, $4, now())
+    ON CONFLICT (user_id, law, num) DO UPDATE SET ink = EXCLUDED.ink, updated_at = now()`, [req.user.id, req.params.slug, req.params.num, JSON.stringify(ink)]);
+  res.json({ ok: true, strokes: ink.length });
 });
 
 // Favoriten (Paragraphen, die man sich markiert hat)

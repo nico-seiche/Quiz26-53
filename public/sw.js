@@ -9,7 +9,7 @@ const DATA = `quiz-data-${VERSION}`;
 const LIBS = `quiz-libs-${VERSION}`;
 const PRECACHE = ['/offline', '/dashboard', '/study', '/learn', '/gesetze', '/profile', '/js/common.js', '/js/changelog.js', '/js/speech.js', '/js/cloze.js',
   '/manifest.webmanifest', '/icons/icon-192.png?v=2', '/icons/apple-touch-icon.png?v=2'];
-const STYLE = '/style.css?v=14';
+const STYLE = '/style.css?v=15';
 // Daten-Endpunkte, die offline gelesen werden dürfen
 const DATA_RE = /^\/api\/(auth\/me|subjects|gesetze(\/[\w\-./]*)?|study|study\/(\d+|stats))$/;
 const LIB_HOSTS = ['cdn.jsdelivr.net', 'cdnjs.cloudflare.com', 'unpkg.com'];

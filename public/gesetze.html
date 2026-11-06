@@ -13,7 +13,7 @@
   <link rel="icon" href="/icons/icon-192.png?v=2">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2">
   <title>Quiz – Gesetze</title>
-  <link rel="stylesheet" href="/style.css?v=14">
+  <link rel="stylesheet" href="/style.css?v=15">
   <style>
     :root { --tile-border: #d3d9fd; }   /* heller Rahmen im Lightmode */
     @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --tile-border: var(--link); } }
@@ -168,6 +168,7 @@
     </div>
     <section class="card" id="favs" hidden></section>
   </main>
+  <script src="/js/docs-pen.js"></script>
   <script src="/js/changelog.js"></script>
   <script src="/js/common.js"></script>
   <script>
@@ -433,6 +434,7 @@
     }
 
     function renderRead() {
+      destroyPen();
       const box = $('#read');
       if (pane === 'grid' || !current) {
         box.innerHTML = `${viewsHtml()}<h2 class="grid-head">${escapeHtml(law.short)} · ${pars.length} ${U() === "§" ? "Paragraphen" : "Artikel"}</h2><p class="muted" style="margin:0 0 .8rem">${escapeHtml(law.title)} – tippe auf eine Zahl.</p>${gridHtml()}<details class="notes" style="margin-top:1.2rem"><summary>Fassung &amp; Quelle</summary>${intro()}</details>`;
@@ -448,13 +450,14 @@
           <button type="button" data-num="${next ? next.num : ''}" ${next ? '' : 'disabled'}><span class="small">Weiter ›</span><span class="tt">${next ? `${U()} ${next.num} ${escapeHtml(lt(next))}` : '–'}</span></button>
         </div>
         <div class="law-crumb">${escapeHtml(law.short)} › ${escapeHtml(crumbOf(current.num))}</div>
-        <div class="par-head"><span class="par-num">${U()} ${current.num}</span>${current.title ? `<h2 class="par-title">${highlight(escapeHtml(current.title))}</h2>` : ''}<button type="button" class="fav-btn" data-fav aria-pressed="${isFav(law.slug, current.num)}">${isFav(law.slug, current.num) ? '★ Favorit' : '☆ Merken'}</button></div>
+        <div class="par-head"><span class="par-num">${U()} ${current.num}</span>${current.title ? `<h2 class="par-title">${highlight(escapeHtml(current.title))}</h2>` : ''}<button type="button" class="fav-btn" data-fav aria-pressed="${isFav(law.slug, current.num)}">${isFav(law.slug, current.num) ? '★ Favorit' : '☆ Merken'}</button><button type="button" class="fav-btn" id="pen-toggle" style="margin-left:.4rem" aria-pressed="${DocsPen.ui.open}" title="Mit dem Apple Pencil im Text markieren und kommentieren">✏️ Pencil</button></div>
         ${relatedHtml(current)}
         ${linesHtml(current.text)}
         ${formHtml(current)}
         ${paraNoteHtml()}
         ${current.notes.length ? `<details class="notes"><summary>Änderungshistorie (${current.notes.length})</summary>${current.notes.map((n) => `<p>${escapeHtml(n)}</p>`).join('')}</details>` : ''}`;
       applyNotes();
+      loadPen();
     }
 
     // --- Persönliche Bibliothek: Gesetze ein-/ausblenden und sortieren ---
@@ -681,13 +684,16 @@
       const byNum = (a, b) => parseInt(a.num, 10) - parseInt(b.num, 10) || a.num.localeCompare(b.num) || a.line - b.line || a.start - b.start;
       box.innerHTML = `<h2 style="margin:0 0 .3rem">📝 Meine Notizen und Markierungen</h2>
         <p class="muted" style="margin:0 0 .6rem">${notes.length ? `${notes.length} Einträge – tippe auf einen Paragraphen, um ihn zu öffnen. Nur du siehst sie.` : 'Noch nichts markiert. Wähle im Gesetzestext ein paar Wörter aus und tippe auf eine Farbe – oder schreibe unter dem Paragraphen eine Notiz.'}</p>`
+        + (inkList.length ? `<h3 class="fav-law">✏️ Handschrift mit dem Pencil</h3>` + inkList.map((i) => { const l = laws.find((x) => x.slug === i.law); return l ? `<div class="note-row"><a class="go" href="#${i.law}/${i.num}" data-open-fav="${i.law}/${i.num}">${escapeHtml(l.short)} ${l.short === 'GG' ? 'Art.' : '§'} ${escapeHtml(i.num)}</a><span class="muted">${i.strokes} Strich${i.strokes === 1 ? '' : 'e'}</span></div>` : ''; }).join('') : '')
         + groups.map((g) => `<h3 class="fav-law">${escapeHtml(g.l.short)}</h3>` + [...g.items].sort(byNum).map((n) => `<div class="note-row">
             <a class="go" href="#${n.law}/${n.num}" data-open-fav="${n.law}/${n.num}">${g.l.short === 'GG' ? 'Art.' : '§'} ${escapeHtml(n.num)}</a>
             ${n.line >= 0 ? `<span class="q hl-${n.color}" data-edit-note="${n.id}" style="cursor:pointer">${escapeHtml(n.quote)}</span>` : '<span class="muted">Notiz zum Paragraphen</span>'}
             ${n.note ? `<div style="margin-top:.3rem;white-space:pre-wrap;overflow-wrap:anywhere">${escapeHtml(n.note)}</div>` : ''}
           </div>`).join('')).join('');
     }
+    let inkList = [];
     function openNotes() {
+      api('/api/gesetze/ink/all').then((l) => { inkList = l; if (favMode && special === '__notes') renderNotes(); }).catch(() => {});
       favMode = true;
       special = '__notes';
       $('#layout').hidden = true;
@@ -696,6 +702,43 @@
       history.replaceState(null, '', '#notizen');
       renderNotes();
     }
+
+    // --- Handschrift mit dem Apple Pencil über dem Paragraphen ---
+    let lawPen = null;
+    let penKey = null;
+    let penTimer = null;
+    let penPending = false;
+    const inkCache = new Map();
+    async function savePen() {
+      clearTimeout(penTimer);
+      if (!penPending || !lawPen || !penKey) return;
+      penPending = false;
+      const [slug, num] = penKey.split('/');
+      const strokes = lawPen.strokes();
+      inkCache.set(penKey, strokes);
+      try { await api(`/api/gesetze/ink/${slug}/${num}`, { method: 'PUT', body: { ink: strokes }, offlineQueue: true }); }
+      catch (err) { penPending = true; $('#error').textContent = `Handschrift nicht gespeichert: ${err.message}`; }
+    }
+    function destroyPen() {
+      if (penPending) savePen();
+      clearTimeout(penTimer);
+      if (lawPen) { lawPen.destroy(); lawPen = null; }
+      penKey = null;
+    }
+    async function loadPen() {
+      if (!law || !current || pane !== 'read') return;
+      const key = `${law.slug}/${current.num}`;
+      let ink = inkCache.get(key);
+      if (!ink) { try { ink = (await api(`/api/gesetze/ink/${key}`)).ink; inkCache.set(key, ink); } catch { ink = []; } }
+      if (!current || key !== `${law.slug}/${current.num}` || pane !== 'read' || lawPen) return;     // inzwischen woanders
+      penKey = key;
+      lawPen = DocsPen.attachTo($('#read'), '#read .abs > p', {
+        initial: ink,
+        onChange: () => { penPending = true; clearTimeout(penTimer); penTimer = setTimeout(savePen, 1200); },
+      });
+      lawPen.open(DocsPen.ui.open);
+    }
+    addEventListener('pagehide', () => { if (penPending && lawPen && penKey) { const [slug, num] = penKey.split('/'); try { fetch(`/api/gesetze/ink/${slug}/${num}`, { method: 'PUT', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ink: lawPen.strokes() }) }); } catch { /* egal */ } } });
 
     const isFav = (slug, num) => favs.some((f) => f.law === slug && f.num === num);
     async function toggleFav(slug, num, title) {
@@ -790,6 +833,7 @@
 
     // --- Ereignisse ----------------------------------------------------------
     document.addEventListener('click', async (e) => {
+      if (e.target.closest('#pen-toggle')) { DocsPen.openBar(!DocsPen.ui.open); if (lawPen) lawPen.open(DocsPen.ui.open); e.target.closest('#pen-toggle').setAttribute('aria-pressed', String(DocsPen.ui.open)); return; }
       const unfav = e.target.closest('[data-unfav]');
       if (unfav) { const [slug, num] = unfav.dataset.unfav.split('/'); toggleFav(slug, num, ''); return; }
       const openFav = e.target.closest('[data-open-fav]');

@@ -23,7 +23,7 @@ app.set('trust proxy', true);
 app.use('/api/me/avatar', express.raw({ type: 'image/jpeg', limit: '200kb' }));
 app.use('/api/docs', express.raw({ type: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'], limit: '2mb' }));
 app.use('/api/slides', express.raw({ type: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'], limit: '2mb' }));
-app.use('/api/docs', express.json({ limit: '5mb' }));   // Handschrift kann groß werden
+app.use(['/api/docs', '/api/gesetze/ink'], express.json({ limit: '5mb' }));   // Handschrift kann groß werden
 app.use(express.json({ limit: '2mb' }));
 app.use(auth.loadUser);
 
