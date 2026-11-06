@@ -57,6 +57,57 @@ router.put('/prefs/me', async (req, res) => {
   res.json({ hidden, order });
 });
 
+// Markierungen und Notizen (privat)
+const COLORS = ['yellow', 'green', 'blue', 'pink'];
+const idOk = (v) => /^\d{1,15}$/.test(String(v));
+const MAX_NOTES = 3000;
+router.get('/notes/all', async (req, res) => {
+  const rows = await db.query('SELECT id, law, num, line, start_pos, end_pos, quote, color, note, updated_at FROM quiz.law_notes WHERE user_id = $1 ORDER BY law, num, line, start_pos', [req.user.id]);
+  res.json(rows.map((r) => ({ id: Number(r.id), law: r.law, num: r.num, line: r.line, start: r.start_pos, end: r.end_pos, quote: r.quote, color: r.color, note: r.note, updatedAt: r.updated_at })));
+});
+function cleanNote(b, partial) {
+  const out = {};
+  if (!partial || b.color !== undefined) { if (!COLORS.includes(b.color)) return { error: 'Ungültige Farbe' }; out.color = b.color; }
+  if (!partial || b.note !== undefined) out.note = String(b.note || '').slice(0, 2000);
+  return { out };
+}
+router.post('/notes', async (req, res) => {
+  const b = req.body || {};
+  if (!known(b.law) || !NUMBER.test(String(b.num))) return res.status(400).json({ error: 'Ungültiger Paragraph' });
+  const line = Number(b.line);
+  const quote = String(b.quote || '');
+  const start = Number(b.start) || 0;
+  const end = Number(b.end) || 0;
+  if (!Number.isInteger(line) || line < -1 || line > 500) return res.status(400).json({ error: 'Ungültige Stelle' });
+  if (line >= 0 && (!quote.trim() || quote.length > 1500 || !Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end <= start || end > 30000)) return res.status(400).json({ error: 'Ungültige Markierung' });
+  const c = cleanNote({ color: b.color || 'yellow', note: b.note }, false);
+  if (c.error) return res.status(400).json({ error: c.error });
+  if (line < 0 && !c.out.note.trim()) return res.status(400).json({ error: 'Notiz ist leer' });
+  const { n } = await db.one('SELECT COUNT(*)::int AS n FROM quiz.law_notes WHERE user_id = $1', [req.user.id]);
+  if (n >= MAX_NOTES) return res.status(400).json({ error: 'Zu viele Markierungen – bitte ein paar löschen' });
+  if (line < 0) {   // Paragraphen-Notiz: nur eine je Paragraph
+    const old = await db.one('SELECT id FROM quiz.law_notes WHERE user_id = $1 AND law = $2 AND num = $3 AND line = -1', [req.user.id, b.law, b.num]);
+    if (old) { await db.query('UPDATE quiz.law_notes SET note = $1, updated_at = now() WHERE id = $2', [c.out.note, old.id]); return res.json({ id: Number(old.id) }); }
+  }
+  const row = await db.one(`INSERT INTO quiz.law_notes (user_id, law, num, line, start_pos, end_pos, quote, color, note)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`, [req.user.id, b.law, b.num, line, line < 0 ? 0 : start, line < 0 ? 0 : end, line < 0 ? '' : quote, c.out.color, c.out.note]);
+  res.json({ id: Number(row.id) });
+});
+router.patch('/notes/:id', async (req, res) => {
+  if (!idOk(req.params.id)) return res.status(404).json({ error: 'Nicht gefunden' });
+  const c = cleanNote(req.body || {}, true);
+  if (c.error) return res.status(400).json({ error: c.error });
+  const row = await db.one('UPDATE quiz.law_notes SET color = COALESCE($1::text, color), note = COALESCE($2::text, note), updated_at = now() WHERE id = $3 AND user_id = $4 RETURNING id',
+    [c.out.color ?? null, c.out.note ?? null, req.params.id, req.user.id]);
+  if (!row) return res.status(404).json({ error: 'Nicht gefunden' });
+  res.json({ ok: true });
+});
+router.delete('/notes/:id', async (req, res) => {
+  if (!idOk(req.params.id)) return res.status(404).json({ error: 'Nicht gefunden' });
+  await db.query('DELETE FROM quiz.law_notes WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+  res.json({ ok: true });
+});
+
 // Favoriten (Paragraphen, die man sich markiert hat)
 const NUMBER = /^[0-9]{1,4}[a-z]{0,2}$/;
 const known = (slug) => Object.hasOwn(LOADERS, slug);

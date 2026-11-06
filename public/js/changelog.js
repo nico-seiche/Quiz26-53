@@ -2,6 +2,15 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-16',
+    title: 'Neu: Markierungen und Notizen in den Gesetzen',
+    items: [
+      ['🖍️', 'Text markieren', 'Wörter im Gesetzestext auswählen und eine Farbe antippen – gelb, grün, blau oder rosa. Ein Tipp auf die Markierung öffnet Farbe, Notiz und Löschen.'],
+      ['📝', 'Notizen', 'Zu jeder Markierung und zu jedem Paragraphen kannst du eine eigene Notiz schreiben. Alles ist privat und liegt auf allen deinen Geräten.'],
+      ['📋', 'Übersicht', 'Der Tab „📝 Notizen“ zeigt alle deine Markierungen und Notizen nach Gesetz sortiert.'],
+    ],
+  },
+  {
     id: '2026-11-15',
     title: 'Neu: Fehler in Lernsets melden',
     items: [

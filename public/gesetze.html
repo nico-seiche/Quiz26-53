@@ -37,6 +37,18 @@
     .lib-row button { margin: 0; padding: .2rem .55rem; box-shadow: none; }
     .lib-row.off .nm { opacity: .5; text-decoration: line-through; }
     .law-tab.fav { border-color: #f2c94c; }
+    .hl { color: #1b1d3a; border-radius: 3px; padding: .05em 0; cursor: pointer; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+    .hl-yellow { background: #fde68a; } .hl-green { background: #bbf7d0; } .hl-blue { background: #bfdbfe; } .hl-pink { background: #fbcfe8; }
+    .hl.has-note { border-bottom: 2px solid #7c4dff; }
+    .sel-bar { position: fixed; z-index: 60; display: flex; gap: .35rem; align-items: center; padding: .35rem .5rem; border-radius: 999px; background: var(--card); border: 1px solid var(--border); box-shadow: 0 8px 28px rgba(20, 22, 50, .3); }
+    .sel-bar button { margin: 0; padding: 0; width: 2rem; height: 2rem; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--border); cursor: pointer; font-size: 1rem; display: inline-grid; place-items: center; }
+    .sel-bar .c-yellow { background: #fde68a; } .sel-bar .c-green { background: #bbf7d0; } .sel-bar .c-blue { background: #bfdbfe; } .sel-bar .c-pink { background: #fbcfe8; }
+    .sel-bar .sb-note { background: var(--card); width: auto; padding: 0 .6rem; border-radius: 999px; font-weight: 800; font-size: .9rem; }
+    .par-note { margin-top: 1.2rem; border: 1px dashed var(--border); border-radius: 12px; padding: .6rem .8rem; }
+    .par-note textarea { width: 100%; min-height: 4.5rem; margin: .3rem 0 0; }
+    .note-row { padding: .55rem .7rem; border: 1px solid var(--border); border-radius: 12px; margin-bottom: .4rem; background: var(--card); }
+    .note-row .q { padding: .1rem .35rem; border-radius: 4px; color: #1b1d3a; display: inline; overflow-wrap: anywhere; }
+    .note-row a.go { color: var(--primary); font-weight: 800; text-decoration: none; margin-right: .4rem; }
     .form-sec { margin-top: 1.4rem; }
     .form-sec h3 { margin: 1rem 0 .3rem; font-size: 1.02rem; }
     .form-sec .form-note { font-size: .88rem; margin: 0 0 .6rem; }
@@ -168,8 +180,10 @@
     let query = '';
     const openGroups = new Set();
     let prefs = { hidden: [], order: [] };
+    let notes = [];            // Markierungen und Notizen: { id, law, num, line, start, end, quote, color, note }
     let favs = [];             // { law, num, title }
-    let favMode = false;       // Favoritenseite offen
+    let favMode = false;       // Favoriten- oder Notizenseite offen
+    let special = '__fav';     // welche: '__fav' oder '__notes'
     const cache = new Map();
 
     const store = {
@@ -438,7 +452,9 @@
         ${relatedHtml(current)}
         ${linesHtml(current.text)}
         ${formHtml(current)}
+        ${paraNoteHtml()}
         ${current.notes.length ? `<details class="notes"><summary>Änderungshistorie (${current.notes.length})</summary>${current.notes.map((n) => `<p>${escapeHtml(n)}</p>`).join('')}</details>` : ''}`;
+      applyNotes();
     }
 
     // --- Persönliche Bibliothek: Gesetze ein-/ausblenden und sortieren ---
@@ -451,9 +467,9 @@
       return [...laws].sort((a, b) => rank(a) - rank(b));
     }
     function renderTabs() {
-      const cur = law && !favMode ? law.slug : (favMode ? '__fav' : null);
+      const cur = law && !favMode ? law.slug : (favMode ? special : null);
       const vis = visibleLaws();
-      $('#tabs').innerHTML = `<button type="button" class="law-tab fav" data-slug="__fav" aria-pressed="${cur === '__fav'}">⭐ Favoriten</button>`
+      $('#tabs').innerHTML = `<button type="button" class="law-tab fav" data-slug="__fav" aria-pressed="${cur === '__fav'}">⭐ Favoriten</button><button type="button" class="law-tab fav" data-slug="__notes" aria-pressed="${cur === '__notes'}">📝 Notizen${notes.length ? ` (${notes.length})` : ''}</button>`
         + vis.map((l) => `<button type="button" class="law-tab" data-slug="${l.slug}" aria-pressed="${l.slug === cur}" title="${escapeHtml(l.title)}">${escapeHtml(l.short)}</button>`).join('')
         + `<button type="button" class="law-tab cfg" data-cfg title="Gesetze ein- und ausblenden, Reihenfolge ändern">⚙️ Bibliothek${prefs.hidden.length ? ` (${vis.length}/${laws.length})` : ''}</button>`;
     }
@@ -492,6 +508,195 @@
       });
     }
 
+    // --- Markierungen und Notizen ----------------------------------------------
+    const COLOR_NAMES = { yellow: 'Gelb', green: 'Grün', blue: 'Blau', pink: 'Rosa' };
+    const notesOf = (slug, num) => notes.filter((n) => n.law === slug && n.num === num);
+    const pOf = (i) => document.querySelectorAll('#read .abs > p')[i];
+
+    // Text einer Zeile: Textknoten mit Zeichenpositionen
+    function textNodes(p) {
+      const out = [];
+      const w = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+      let pos = 0;
+      for (let n = w.nextNode(); n; n = w.nextNode()) { out.push({ node: n, from: pos, to: pos + n.data.length }); pos += n.data.length; }
+      return out;
+    }
+    function wrapRange(p, start, end, note) {
+      for (const t of textNodes(p).filter((x) => x.to > start && x.from < end).reverse()) {
+        const a = Math.max(start, t.from) - t.from;
+        const b = Math.min(end, t.to) - t.from;
+        let node = t.node;
+        if (b < node.data.length) node.splitText(b);
+        if (a > 0) node = node.splitText(a);
+        const span = document.createElement('span');
+        span.className = `hl hl-${note.color}${note.note ? ' has-note' : ''}`;
+        span.dataset.nid = note.id;
+        node.parentNode.insertBefore(span, node);
+        span.appendChild(node);
+      }
+    }
+    // Markierungen nach dem Zeichnen eines Paragraphen einsetzen; stimmt der Wortlaut nicht mehr, wird er per Textsuche wiedergefunden
+    function applyNotes() {
+      if (!law || !current) return;
+      for (const n of notesOf(law.slug, current.num)) {
+        if (n.line < 0) continue;
+        const p = pOf(n.line);
+        if (!p) { n.orphan = true; continue; }
+        const text = p.textContent;
+        let { start, end } = n;
+        if (text.slice(start, end) !== n.quote) {
+          const at = text.indexOf(n.quote);
+          if (at < 0) { n.orphan = true; continue; }
+          start = at; end = at + n.quote.length;
+        }
+        n.orphan = false;
+        wrapRange(p, start, end, n);
+      }
+    }
+    function paraNoteHtml() {
+      const n = notesOf(law.slug, current.num).find((x) => x.line < 0);
+      const orphans = notesOf(law.slug, current.num).filter((x) => x.line >= 0 && x.orphan);
+      return `<div class="par-note"><strong>📝 Meine Notiz zu ${U()} ${escapeHtml(current.num)}</strong> <span class="muted" id="pn-state"></span>
+        <textarea id="pn-text" placeholder="Eigene Merksätze, Beispiele, Fälle …" rows="3">${escapeHtml(n ? n.note : '')}</textarea>
+        ${orphans.length ? `<p class="muted" style="margin:.5rem 0 0">Diese Markierungen finde ich im Text nicht mehr (Gesetz geändert): ${orphans.map((o) => `„${escapeHtml(o.quote.slice(0, 40))}“`).join(', ')}</p>` : ''}</div>`;
+    }
+    let pnTimer = null;
+    async function savePara(text) {
+      const existing = notesOf(law.slug, current.num).find((x) => x.line < 0);
+      $('#pn-state') && ($('#pn-state').textContent = 'speichert …');
+      try {
+        if (existing && !text.trim()) { await api(`/api/gesetze/notes/${existing.id}`, { method: 'DELETE' }); notes = notes.filter((x) => x !== existing); }
+        else if (existing) { await api(`/api/gesetze/notes/${existing.id}`, { method: 'PATCH', body: { note: text } }); existing.note = text; }
+        else if (text.trim()) { const { id } = await api('/api/gesetze/notes', { method: 'POST', body: { law: law.slug, num: current.num, line: -1, note: text } }); notes.push({ id, law: law.slug, num: current.num, line: -1, start: 0, end: 0, quote: '', color: 'yellow', note: text }); }
+        $('#pn-state') && ($('#pn-state').textContent = '✓ gespeichert');
+        renderTabs();
+      } catch (err) { $('#pn-state') && ($('#pn-state').textContent = ''); $('#error').textContent = err.message; }
+    }
+
+    // Auswahl im Text → Leiste zum Markieren
+    let selBar = null;
+    function hideSelBar() { if (selBar) { selBar.remove(); selBar = null; } }
+    function currentSelection() {
+      const sel = getSelection();
+      if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+      const r = sel.getRangeAt(0);
+      const startP = (r.startContainer.nodeType === 1 ? r.startContainer : r.startContainer.parentElement).closest('#read .abs > p');
+      const endP = (r.endContainer.nodeType === 1 ? r.endContainer : r.endContainer.parentElement).closest('#read .abs > p');
+      if (!startP || startP !== endP) return null;      // eine Markierung gehört in eine Zeile (Absatz/Punkt)
+      const pre = document.createRange();
+      pre.selectNodeContents(startP);
+      pre.setEnd(r.startContainer, r.startOffset);
+      const start = pre.toString().length;
+      const quote = r.toString();
+      if (!quote.trim()) return null;
+      const lead = quote.length - quote.trimStart().length;
+      const trimmed = quote.trim();
+      const line = [...document.querySelectorAll('#read .abs > p')].indexOf(startP);
+      return { line, start: start + lead, end: start + lead + trimmed.length, quote: trimmed, rect: r.getBoundingClientRect() };
+    }
+    function showSelBar() {
+      if (!law || !current || pane !== 'read') return hideSelBar();
+      const s = currentSelection();
+      if (!s) return hideSelBar();
+      if (!selBar) {
+        selBar = document.createElement('div');
+        selBar.className = 'sel-bar';
+        selBar.innerHTML = Object.keys(COLOR_NAMES).map((c) => `<button type="button" class="c-${c}" data-hl="${c}" aria-label="${COLOR_NAMES[c]} markieren"></button>`).join('') + '<button type="button" class="sb-note" data-hl-note="1">📝 Notiz</button>';
+        selBar.addEventListener('pointerdown', (e) => e.preventDefault());     // Auswahl bleibt bestehen
+        selBar.addEventListener('click', (e) => {
+          const b = e.target.closest('button');
+          if (!b) return;
+          const sel = currentSelection();
+          if (!sel) return hideSelBar();
+          addHighlight(sel, b.dataset.hl || 'yellow', Boolean(b.dataset.hlNote));
+        });
+        document.body.appendChild(selBar);
+      }
+      const w = selBar.offsetWidth || 220;
+      selBar.style.left = `${Math.max(8, Math.min(innerWidth - w - 8, s.rect.left + s.rect.width / 2 - w / 2))}px`;
+      selBar.style.top = `${Math.min(innerHeight - 56, s.rect.bottom + 10)}px`;
+    }
+    async function addHighlight(sel, color, withNote) {
+      hideSelBar();
+      getSelection().removeAllRanges();
+      try {
+        const body = { law: law.slug, num: current.num, line: sel.line, start: sel.start, end: sel.end, quote: sel.quote, color };
+        const { id } = await api('/api/gesetze/notes', { method: 'POST', body });
+        const n = { id, law: law.slug, num: current.num, line: sel.line, start: sel.start, end: sel.end, quote: sel.quote, color, note: '' };
+        notes.push(n);
+        renderRead(); renderTabs();
+        if (withNote) openNoteEditor(n.id);
+      } catch (err) { $('#error').textContent = err.message; }
+    }
+    // Popover zu einer Markierung: Farbe, Notiz, Löschen
+    function openNoteEditor(id) {
+      const n = notes.find((x) => x.id === Number(id));
+      const el = document.querySelector(`#read .hl[data-nid="${id}"]`) || document.querySelector(`[data-edit-note="${id}"]`);
+      if (!n || !el) return;
+      document.querySelectorAll('.hl-pop').forEach((x) => x.remove());
+      const pop = document.createElement('div');
+      pop.className = 'sel-bar hl-pop';
+      pop.style.cssText = 'flex-direction:column;align-items:stretch;border-radius:16px;width:min(340px,calc(100vw - 16px));padding:.6rem';
+      pop.innerHTML = `<div class="row" style="gap:.35rem;flex-wrap:nowrap">${Object.keys(COLOR_NAMES).map((c) => `<button type="button" class="c-${c}" data-c="${c}" aria-label="${COLOR_NAMES[c]}" style="${n.color === c ? 'box-shadow:0 0 0 3px var(--primary)' : ''}"></button>`).join('')}<span style="flex:1"></span><button type="button" data-del style="width:auto;padding:0 .6rem;border-radius:999px;font-size:.9rem">🗑 Löschen</button></div>
+        <textarea rows="3" placeholder="Notiz zu dieser Stelle …" style="width:100%;margin:.5rem 0 0">${escapeHtml(n.note)}</textarea>
+        <div class="row" style="justify-content:flex-end;margin-top:.4rem"><button type="button" data-ok style="width:auto;padding:0 .8rem;border-radius:999px;border:0;background:var(--primary-grad);color:#fff;font-weight:800">Fertig</button></div>`;
+      document.body.appendChild(pop);
+      const r = el.getBoundingClientRect();
+      pop.style.left = `${Math.max(8, Math.min(innerWidth - pop.offsetWidth - 8, r.left))}px`;
+      pop.style.top = `${Math.min(innerHeight - pop.offsetHeight - 8, r.bottom + 8)}px`;
+      const ta = pop.querySelector('textarea');
+      const close = async () => {
+        const text = ta.value;
+        pop.remove();
+        if (text !== n.note) { try { await api(`/api/gesetze/notes/${n.id}`, { method: 'PATCH', body: { note: text } }); n.note = text; } catch (err) { $('#error').textContent = err.message; } }
+        if (favMode) renderNotes(); else renderRead();
+      };
+      pop.addEventListener('pointerdown', (e) => { if (!e.target.closest('textarea')) e.preventDefault(); });
+      pop.addEventListener('click', async (e) => {
+        const c = e.target.closest('[data-c]');
+        if (c) { n.color = c.dataset.c; api(`/api/gesetze/notes/${n.id}`, { method: 'PATCH', body: { color: n.color } }).catch(() => {}); pop.querySelectorAll('[data-c]').forEach((b) => { b.style.boxShadow = b.dataset.c === n.color ? '0 0 0 3px var(--primary)' : ''; }); document.querySelectorAll(`.hl[data-nid="${n.id}"]`).forEach((h) => { h.className = `hl hl-${n.color}${n.note ? ' has-note' : ''}`; }); return; }
+        if (e.target.closest('[data-del]')) { pop.remove(); await api(`/api/gesetze/notes/${n.id}`, { method: 'DELETE' }).catch(() => {}); notes = notes.filter((x) => x !== n); renderTabs(); if (favMode) renderNotes(); else renderRead(); return; }
+        if (e.target.closest('[data-ok]')) close();
+      });
+      setTimeout(() => ta.focus(), 0);
+    }
+    document.addEventListener('selectionchange', () => { clearTimeout(showSelBar.t); showSelBar.t = setTimeout(showSelBar, 250); });
+    window.addEventListener('scroll', () => { if (selBar) showSelBar(); }, { passive: true });
+    document.addEventListener('click', (e) => {
+      const en = e.target.closest('[data-edit-note]');
+      if (en) { openNoteEditor(en.dataset.editNote); return; }
+      const h = e.target.closest('#read .hl');
+      if (h && !(getSelection() && !getSelection().isCollapsed)) { e.preventDefault(); openNoteEditor(h.dataset.nid); return; }
+      if (!e.target.closest('.hl-pop') && !e.target.closest('.sel-bar')) document.querySelectorAll('.hl-pop').forEach((x) => x.remove());
+    }, true);
+    document.addEventListener('input', (e) => {
+      if (e.target.id === 'pn-text') { clearTimeout(pnTimer); const v = e.target.value; pnTimer = setTimeout(() => savePara(v), 800); }
+    });
+
+    // Übersicht „Notizen“
+    function renderNotes() {
+      const box = $('#favs');
+      const order = laws.map((l) => l.slug);
+      const groups = order.map((slug) => ({ l: laws.find((x) => x.slug === slug), items: notes.filter((n) => n.law === slug) })).filter((g) => g.items.length);
+      const byNum = (a, b) => parseInt(a.num, 10) - parseInt(b.num, 10) || a.num.localeCompare(b.num) || a.line - b.line || a.start - b.start;
+      box.innerHTML = `<h2 style="margin:0 0 .3rem">📝 Meine Notizen und Markierungen</h2>
+        <p class="muted" style="margin:0 0 .6rem">${notes.length ? `${notes.length} Einträge – tippe auf einen Paragraphen, um ihn zu öffnen. Nur du siehst sie.` : 'Noch nichts markiert. Wähle im Gesetzestext ein paar Wörter aus und tippe auf eine Farbe – oder schreibe unter dem Paragraphen eine Notiz.'}</p>`
+        + groups.map((g) => `<h3 class="fav-law">${escapeHtml(g.l.short)}</h3>` + [...g.items].sort(byNum).map((n) => `<div class="note-row">
+            <a class="go" href="#${n.law}/${n.num}" data-open-fav="${n.law}/${n.num}">${g.l.short === 'GG' ? 'Art.' : '§'} ${escapeHtml(n.num)}</a>
+            ${n.line >= 0 ? `<span class="q hl-${n.color}" data-edit-note="${n.id}" style="cursor:pointer">${escapeHtml(n.quote)}</span>` : '<span class="muted">Notiz zum Paragraphen</span>'}
+            ${n.note ? `<div style="margin-top:.3rem;white-space:pre-wrap;overflow-wrap:anywhere">${escapeHtml(n.note)}</div>` : ''}
+          </div>`).join('')).join('');
+    }
+    function openNotes() {
+      favMode = true;
+      special = '__notes';
+      $('#layout').hidden = true;
+      $('#favs').hidden = false;
+      renderTabs();
+      history.replaceState(null, '', '#notizen');
+      renderNotes();
+    }
+
     const isFav = (slug, num) => favs.some((f) => f.law === slug && f.num === num);
     async function toggleFav(slug, num, title) {
       const was = isFav(slug, num);
@@ -516,6 +721,7 @@
     }
     function openFavs() {
       favMode = true;
+      special = '__fav';
       $('#layout').hidden = true;
       $('#favs').hidden = false;
       renderTabs();
@@ -627,6 +833,7 @@
       const [slug, num] = location.hash.slice(1).split('/');
       if (slug && law && slug === law.slug) { if (num && byNum.has(num) && (!current || current.num !== num)) show(num, { push: false }); }
       else if (slug === 'favoriten') openFavs();
+      else if (slug === 'notizen') openNotes();
       else if (slug && laws.some((l) => l.slug === slug)) openLaw(slug, num);
     });
 
@@ -636,17 +843,18 @@
       try {
         laws = await api('/api/gesetze');
         favs = await api('/api/gesetze/favorites/all').catch(() => []);
+        notes = await api('/api/gesetze/notes/all').catch(() => []);
         prefs = await api('/api/gesetze/prefs/me').catch(() => ({ hidden: [], order: [] }));
         renderTabs();
         $('#tabs').addEventListener('click', (e) => {
           if (e.target.closest('[data-cfg]')) { openLibrary(); return; }
           const b = e.target.closest('.law-tab');
-          if (b) (b.dataset.slug === '__fav' ? Promise.resolve(openFavs()) : openLaw(b.dataset.slug)).catch((err) => { $('#error').textContent = err.message; });
+          if (b) (b.dataset.slug === '__fav' ? Promise.resolve(openFavs()) : b.dataset.slug === '__notes' ? Promise.resolve(openNotes()) : openLaw(b.dataset.slug)).catch((err) => { $('#error').textContent = err.message; });
         });
         const [hs, hn] = location.hash.slice(1).split('/');
         const vis = visibleLaws();
         const slug = laws.some((l) => l.slug === hs) ? hs : (vis.some((l) => l.slug === store.get('law:last')) ? store.get('law:last') : (vis[0] || laws[0]).slug);
-        if (hs === 'favoriten') openFavs(); else await openLaw(slug, hn && hs === slug ? hn : null);
+        if (hs === 'favoriten') openFavs(); else if (hs === 'notizen') openNotes(); else await openLaw(slug, hn && hs === slug ? hn : null);
       } catch (err) {
         $('#error').textContent = err.message;
       }
