@@ -163,12 +163,23 @@ const DocsPen = (() => {
       if (pts.length === 1) { ctx.beginPath(); ctx.arc(pts[0][0], pts[0][1], widthAt(s, kk, pts[0][2]) / 2, 0, Math.PI * 2); ctx.fill(); return; }
       for (let i = 1; i < pts.length; i += 1) paintSegment(ctx, pts, i, s, kk);
     }
-    function paintSegment(ctx, pts, i, s, kk) {       // weiche Kurve über Mittelpunkte, Breite nach Druck
+    // Ein Stück der Kurve (Mittelpunkt → Mittelpunkt, Stützpunkt dazwischen): als dichte Reihe runder Punkte mit
+    // stufenlos wechselnder Breite gezeichnet – so bleiben die Ränder glatt, auch wenn der Druck schwankt
+    function paintSegment(ctx, pts, i, s, kk) {
       const prev = pts[i - 1]; const cur = pts[i];
-      const a = i === 1 ? prev : [(pts[i - 2][0] + prev[0]) / 2, (pts[i - 2][1] + prev[1]) / 2];
-      const b = i === pts.length - 1 ? cur : [(prev[0] + cur[0]) / 2, (prev[1] + cur[1]) / 2];
-      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.quadraticCurveTo(prev[0], prev[1], b[0], b[1]);
-      ctx.lineWidth = widthAt(s, kk, (prev[2] + cur[2]) / 2); ctx.stroke();
+      const a = i === 1 ? prev : [(pts[i - 2][0] + prev[0]) / 2, (pts[i - 2][1] + prev[1]) / 2, (pts[i - 2][2] + prev[2]) / 2];
+      const b = i === pts.length - 1 ? cur : [(prev[0] + cur[0]) / 2, (prev[1] + cur[1]) / 2, (prev[2] + cur[2]) / 2];
+      const ra = widthAt(s, kk, a[2] === undefined ? prev[2] : a[2]) / 2;
+      const rb = widthAt(s, kk, b[2] === undefined ? cur[2] : b[2]) / 2;
+      const len = Math.hypot(prev[0] - a[0], prev[1] - a[1]) + Math.hypot(b[0] - prev[0], b[1] - prev[1]);
+      const n = Math.max(2, Math.ceil(len / Math.max(0.35, Math.min(ra, rb) * 0.3)));
+      ctx.fillStyle = s.c;
+      for (let j = 0; j <= n; j += 1) {
+        const t = j / n; const u = 1 - t;
+        const x = u * u * a[0] + 2 * u * t * prev[0] + t * t * b[0];
+        const y = u * u * a[1] + 2 * u * t * prev[1] + t * t * b[1];
+        ctx.beginPath(); ctx.arc(x, y, ra + (rb - ra) * t, 0, Math.PI * 2); ctx.fill();
+      }
     }
     // Alle Striche in die Zeichenflächen eines Containers malen (Blattbreite w, Höhe h)
     function paintAll(host, hostTiles, w, h, dpr, only) {
@@ -188,7 +199,7 @@ const DocsPen = (() => {
       const h = Math.max(paper.scrollHeight, paper.clientHeight);
       layer.style.height = `${h}px`;
       strokes.forEach((s) => { s._span = null; });
-      paintAll(layer, tiles, width(), h, Math.min(window.devicePixelRatio || 1, 2), only);
+      paintAll(layer, tiles, width(), h, Math.min(window.devicePixelRatio || 1, 3), only);
     }
     function schedule() { if (!raf) raf = requestAnimationFrame(() => { raf = 0; redraw(); }); }
     function tilesOf(s) {
@@ -204,6 +215,8 @@ const DocsPen = (() => {
       return { x: (e.clientX - r.left) / k(), y: e.clientY - r.top };
     }
     function pressure(e) { return e.pointerType === 'pen' ? (e.pressure > 0 ? e.pressure : 0.5) : 0.5; }
+    // Druck glätten (der Pencil liefert schwankende Werte): gleitender Mittelwert über die letzten Punkte
+    const smooth = (s, raw) => { const last = s.p[s.p.length - 1]; return last ? Math.round((last[2] * 0.6 + raw * 0.4) * 100) / 100 : raw; };
     function down(e) {
       if (!drawing()) return;
       if (e.pointerType === 'touch') { if (ui.lock) e.preventDefault(); return; }   // Finger: scrollt/tippt normal – außer im Schreibmodus
@@ -228,8 +241,8 @@ const DocsPen = (() => {
         const p = point(ev);
         const last = s.p[s.p.length - 1];
         const ny = (p.y - current.top) / k();
-        if (Math.hypot(last[0] - p.x, last[1] - ny) < 0.5) continue;
-        s.p.push([p.x, ny, pressure(ev)]);
+        if (Math.hypot(last[0] - p.x, last[1] - ny) < 0.3) continue;
+        s.p.push([p.x, ny, smooth(s, pressure(ev))]);
       }
       liveDraw(s);
     }
@@ -242,7 +255,7 @@ const DocsPen = (() => {
       if (!current || e.pointerId !== current.id) return;
       const s = current.s;
       current = null;
-      if (s.p.length > 700) s.p = s.p.filter((_, i, a) => i % 2 === 0 || i === a.length - 1);   // sehr lange Striche ausdünnen
+      if (s.p.length > 2500) s.p = s.p.filter((_, i, a) => i % 2 === 0 || i === a.length - 1);   // sehr lange Striche ausdünnen
       pushUndo({ add: s });
       redraw(tilesOf(s));
       emit();
@@ -268,7 +281,7 @@ const DocsPen = (() => {
     }
     function redrawTiles(only) {
       const h = Math.max(paper.scrollHeight, paper.clientHeight);
-      paintAll(layer, tiles, width(), h, Math.min(window.devicePixelRatio || 1, 2), only);
+      paintAll(layer, tiles, width(), h, Math.min(window.devicePixelRatio || 1, 3), only);
     }
     function erase(p) {
       const kk = k();
