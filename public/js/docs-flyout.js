@@ -92,33 +92,31 @@ const DocsFlyout = (() => {
     }
     async function lawData(slug) { if (!cache[slug]) cache[slug] = await api(`/api/gesetze/${slug}`); return cache[slug]; }
 
+    // Schritt 1: Gesetz und Paragraph wählen (die Liste füllt den Rest des Menüs)
     async function lawPicker() {
       title.textContent = '⚖️ Gesetz einfügen'; back.hidden = false;
+      back.onclick = menu;
       body.innerHTML = '<p class="muted">Lädt …</p>';
       let list;
       try { list = await loadLaws(); } catch (err) { body.innerHTML = `<p class="error">${esc(err.message)}</p>`; return; }
       if (!list.length) { body.innerHTML = '<p class="muted">Du hast alle Gesetze ausgeblendet. Unter Gesetze → „⚙️ Bibliothek“ kannst du sie wieder einblenden.</p>'; return; }
-      body.innerHTML = `<label for="fl-law">Gesetz</label>
-        <select id="fl-law">${list.map((l) => `<option value="${l.slug}">${esc(l.short)} – ${esc(l.title)}</option>`).join('')}</select>
-        <label for="fl-q">Paragraph suchen (Nummer oder Stichwort)</label>
-        <input type="text" id="fl-q" inputmode="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="z. B. 211 oder Mord">
-        <div id="fl-list" class="fl-list"></div>
-        <div id="fl-sel"></div>`;
+      body.innerHTML = `<select id="fl-law" aria-label="Gesetz">${list.map((l) => `<option value="${l.slug}">${esc(l.short)} – ${esc(l.title)}</option>`).join('')}</select>
+        <input type="text" id="fl-q" inputmode="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paragraph suchen: Nummer oder Stichwort" aria-label="Paragraph suchen" style="margin-top:.5rem">
+        <div id="fl-list" class="fl-list"></div>`;
       const sel = body.querySelector('#fl-law');
       const q = body.querySelector('#fl-q');
       let law = null;
       async function setLaw() {
-        body.querySelector('#fl-sel').innerHTML = '';
-        body.querySelector('#fl-list').innerHTML = '<p class="muted">Lädt …</p>';
-        try { law = await lawData(sel.value); } catch (err) { body.querySelector('#fl-list').innerHTML = `<p class="error">${esc(err.message)}</p>`; return; }
+        body.querySelector('#fl-list').innerHTML = '<p class="muted" style="padding:.6rem">Lädt …</p>';
+        try { law = await lawData(sel.value); } catch (err) { body.querySelector('#fl-list').innerHTML = `<p class="error" style="padding:.6rem">${esc(err.message)}</p>`; return; }
         showList();
       }
       function showList() {
-        const term = q.value.trim().toLowerCase();
+        const term = q.value.trim().toLowerCase().replace(/^(§|art\.?)\s*/, '');
         const pars = law.items.filter((i) => i.type === 'par');
         const unit = law.unit || '§';
-        const hits = (term ? pars.filter((p) => p.num.toLowerCase() === term.replace(/^(§|art\.?)\s*/, '') || p.num.toLowerCase().startsWith(term.replace(/^(§|art\.?)\s*/, '')) || (p.title || '').toLowerCase().includes(term) || (p.text[0] || '').toLowerCase().includes(term)) : pars).slice(0, 60);
-        body.querySelector('#fl-list').innerHTML = hits.length ? hits.map((p) => `<button type="button" class="fl-row" data-num="${esc(p.num)}"><b>${esc(unit)} ${esc(p.num)}</b> ${esc(p.title || (p.text[0] || '').slice(0, 50))}</button>`).join('') + (hits.length === 60 ? '<p class="muted" style="margin:.3rem 0 0">Weitere Treffer – Suche eingrenzen.</p>' : '') : '<p class="muted">Nichts gefunden.</p>';
+        const hits = (term ? pars.filter((p) => p.num.toLowerCase().startsWith(term) || (p.title || '').toLowerCase().includes(term) || (p.text[0] || '').toLowerCase().includes(term)) : pars).slice(0, 80);
+        body.querySelector('#fl-list').innerHTML = hits.length ? hits.map((p) => `<button type="button" class="fl-row" data-num="${esc(p.num)}"><b>${esc(unit)} ${esc(p.num)}</b> ${esc(p.title || (p.text[0] || '').slice(0, 50))}</button>`).join('') + (hits.length === 80 ? '<p class="muted" style="margin:.4rem .7rem">Weitere Treffer – Suche eingrenzen.</p>' : '') : '<p class="muted" style="padding:.6rem">Nichts gefunden.</p>';
       }
       sel.onchange = setLaw;
       q.oninput = () => law && showList();
@@ -126,49 +124,66 @@ const DocsFlyout = (() => {
       setLaw();
     }
 
-    // Passage mit zwei Schiebereglern wählen
+    // Schritt 2: Passage mit zwei Reglern wählen (eigener Regler: zwei Griffe, die man auf dem iPad auch wirklich ziehen kann)
     function passage(law, par) {
       const unit = law.unit || '§';
       const units = unitsOf(par);
       const n = units.length;
       let a = 0; let b = n - 1;
-      const box = body.querySelector('#fl-sel');
-      body.querySelector('#fl-list').innerHTML = '';
-      box.innerHTML = `<div class="fl-sel-head"><strong>${esc(unit)} ${esc(par.num)} ${esc(law.short)}</strong> ${esc(par.title || '')}</div>
-        ${n > 1 ? `<div class="fl-range"><div class="fl-track"><span id="fl-fill"></span></div><input type="range" id="fl-a" min="0" max="${n - 1}" value="0" aria-label="Von Satz"><input type="range" id="fl-b" min="0" max="${n - 1}" value="${n - 1}" aria-label="Bis Satz"></div>
-        <div class="muted" id="fl-count" style="font-size:.85rem;margin:.2rem 0 .4rem"></div>` : ''}
+      title.textContent = `${unit} ${par.num} ${law.short}`;
+      back.hidden = false;
+      back.onclick = lawPicker;
+      body.innerHTML = `<div class="fl-sel-head">${esc(par.title || law.title)}</div>
+        ${n > 1 ? `<div class="fl-range"><div class="fl-rail" id="fl-rail"><div class="fl-track"><span id="fl-fill"></span></div><button type="button" class="fl-h" id="fl-ha" aria-label="Von Satz"></button><button type="button" class="fl-h" id="fl-hb" aria-label="Bis Satz"></button></div></div>
+        <div class="muted" id="fl-count" style="font-size:.85rem;margin:0 0 .4rem"></div>` : ''}
         <div id="fl-prev" class="fl-prev"></div>
-        <label class="inline-check"><input type="checkbox" id="fl-head" checked> Überschrift („${esc(unit)} ${esc(par.num)} ${esc(law.short)} – Titel“)</label>
-        <label class="inline-check"><input type="checkbox" id="fl-quote" checked> Als Zitat einrücken</label>
-        <label class="inline-check"><input type="checkbox" id="fl-src" checked> Quelle darunter angeben</label>
-        <label class="inline-check"><input type="checkbox" id="fl-gaps" checked> Auslassungen mit […] kennzeichnen</label>
-        <button type="button" class="primary" id="fl-ins" style="margin-top:.6rem;width:100%">In das Dokument einfügen</button>`;
-      const $$ = (id) => box.querySelector(id);
+        <div class="fl-opts">
+          <label class="inline-check"><input type="checkbox" id="fl-head" checked> Überschrift</label>
+          <label class="inline-check"><input type="checkbox" id="fl-quote" checked> Als Zitat</label>
+          <label class="inline-check"><input type="checkbox" id="fl-src" checked> Quelle</label>
+          <label class="inline-check"><input type="checkbox" id="fl-gaps" checked> […] Auslassung</label>
+        </div>
+        <button type="button" class="primary" id="fl-ins" style="margin-top:.5rem;width:100%">In das Dokument einfügen</button>`;
+      const $$ = (id) => body.querySelector(id);
+      const pct = (i) => (n > 1 ? (i / (n - 1)) * 100 : 0);
       function render() {
         const lines = pick(units, a, b, $$('#fl-gaps').checked);
-        // Vorschau: ausgewählte Sätze normal, übrige abgeblendet
         let html = '';
         units.forEach((u, i) => {
           if (u.first) html += `${html ? '</div>' : ''}<div style="margin-left:${Math.min(u.depth, 3) * 1.1}rem">`;
-          html += `<span class="${i >= a && i <= b ? '' : 'fl-off'}">${esc(u.text)}</span> `;
+          html += `<span class="${i >= a && i <= b ? 'fl-on' : 'fl-off'}" data-u="${i}">${esc(u.text)}</span> `;
         });
         $$('#fl-prev').innerHTML = html + (html ? '</div>' : '');
         if (n > 1) {
-          $$('#fl-count').textContent = `Sätze ${a + 1} bis ${b + 1} von ${n} · ${lines.reduce((s, l) => s + l.text.length, 0)} Zeichen`;
-          const fill = $$('#fl-fill'); fill.style.left = `${(a / (n - 1)) * 100}%`; fill.style.right = `${100 - (b / (n - 1)) * 100}%`;
+          $$('#fl-count').textContent = `Sätze ${a + 1} bis ${b + 1} von ${n} · ${lines.reduce((t, l) => t + l.text.length, 0)} Zeichen`;
+          $$('#fl-ha').style.left = `${pct(a)}%`; $$('#fl-hb').style.left = `${pct(b)}%`;
+          $$('#fl-fill').style.left = `${pct(a)}%`; $$('#fl-fill').style.right = `${100 - pct(b)}%`;
         }
       }
       if (n > 1) {
-        $$('#fl-a').oninput = (e) => { a = Math.min(Number(e.target.value), b); e.target.value = a; render(); };
-        $$('#fl-b').oninput = (e) => { b = Math.max(Number(e.target.value), a); e.target.value = b; render(); };
+        const rail = $$('#fl-rail');
+        const idxAt = (clientX) => { const r = rail.getBoundingClientRect(); return Math.max(0, Math.min(n - 1, Math.round(((clientX - r.left) / r.width) * (n - 1)))); };
+        const setA = (i) => { a = Math.min(i, b); render(); };
+        const setB = (i) => { b = Math.max(i, a); render(); };
+        for (const [el, set, cur] of [[$$('#fl-ha'), setA, () => a], [$$('#fl-hb'), setB, () => b]]) {
+          el.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); el.setPointerCapture(e.pointerId); el.classList.add('drag'); });
+          el.addEventListener('pointermove', (e) => { if (el.hasPointerCapture(e.pointerId)) set(idxAt(e.clientX)); });
+          const end = (e) => { el.classList.remove('drag'); try { el.releasePointerCapture(e.pointerId); } catch { /* egal */ } };
+          el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+          el.addEventListener('keydown', (e) => { const d = e.key === 'ArrowRight' || e.key === 'ArrowUp' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? -1 : 0; if (d) { e.preventDefault(); set(cur() + d); el.focus(); } });
+        }
+        // Tipp auf die Schiene: der nähere Griff springt dorthin
+        rail.addEventListener('pointerdown', (e) => { if (e.target.closest('.fl-h')) return; const i = idxAt(e.clientX); if (Math.abs(i - a) <= Math.abs(i - b)) setA(i); else setB(i); });
+        // Tipp auf einen Satz in der Vorschau: außerhalb → Auswahl erweitern, innerhalb → Anfang/Ende dorthin
+        $$('#fl-prev').addEventListener('click', (e) => { const sp = e.target.closest('[data-u]'); if (!sp) return; const i = Number(sp.dataset.u); if (i < a) a = i; else if (i > b) b = i; else if (i - a <= b - i) a = i; else b = i; render(); });
       }
       $$('#fl-gaps').onchange = render;
       render();
       $$('#fl-ins').onclick = () => {
         insert({ law, par, unit, lines: pick(units, a, b, $$('#fl-gaps').checked), head: $$('#fl-head').checked, quote: $$('#fl-quote').checked, src: $$('#fl-src').checked });
+        back.onclick = menu;
         setOpen(false);
       };
-      box.scrollIntoView({ block: 'nearest' });
     }
 
     function insert({ law, par, unit, lines, head, quote, src }) {

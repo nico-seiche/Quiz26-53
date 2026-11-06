@@ -62,22 +62,24 @@
     .fly-item { display: flex; align-items: center; gap: .8rem; width: 100%; text-align: left; margin: 0 0 .5rem; padding: .8rem; border-radius: 14px; border: 1px solid var(--border); background: var(--bg); color: var(--text); box-shadow: none; cursor: pointer; }
     .fly-item .fi { font-size: 1.6rem; }
     .fly-item small { display: block; color: var(--muted); font-weight: 400; }
-    .fl-list { max-height: 14rem; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; margin: .3rem 0 .6rem; }
+    .fly-body { display: flex; flex-direction: column; }
+    .fl-list { flex: 1; min-height: 6rem; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; margin: .5rem 0 0; -webkit-overflow-scrolling: touch; }
     .fl-list:empty { display: none; }
-    .fl-row { display: block; width: 100%; text-align: left; margin: 0; padding: .5rem .7rem; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; color: var(--text); box-shadow: none; font-weight: 400; overflow-wrap: anywhere; cursor: pointer; }
+    .fl-row { display: block; width: 100%; text-align: left; margin: 0; padding: .55rem .7rem; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; color: var(--text); box-shadow: none; font-weight: 400; overflow-wrap: anywhere; cursor: pointer; }
     .fl-row b { color: var(--primary); }
-    .fl-sel-head { margin: .3rem 0 .5rem; overflow-wrap: anywhere; }
-    .fl-prev { border: 1px solid var(--border); border-radius: 12px; padding: .6rem .7rem; margin: .3rem 0 .6rem; max-height: 14rem; overflow-y: auto; font-size: .92rem; line-height: 1.5; background: var(--bg); }
+    .fl-sel-head { margin: 0 0 .4rem; font-weight: 700; overflow-wrap: anywhere; }
+    .fl-prev { flex: 1; min-height: 6rem; border: 1px solid var(--border); border-radius: 12px; padding: .6rem .7rem; margin: 0 0 .5rem; overflow-y: auto; font-size: .92rem; line-height: 1.5; background: var(--bg); -webkit-overflow-scrolling: touch; }
     .fl-prev div { margin-bottom: .3rem; }
+    .fl-prev span { cursor: pointer; }
     .fl-off { opacity: .3; text-decoration: line-through; }
-    .fl-range { position: relative; height: 2.2rem; margin: .4rem .2rem 0; }
-    .fl-track { position: absolute; left: 0; right: 0; top: 50%; height: 6px; margin-top: -3px; border-radius: 3px; background: var(--border); }
-    .fl-track span { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: var(--primary-grad); }
-    .fl-range input[type=range] { position: absolute; left: 0; width: 100%; top: 0; height: 2.2rem; margin: 0; background: none; pointer-events: none; -webkit-appearance: none; appearance: none; }
-    .fl-range input[type=range]::-webkit-slider-runnable-track { background: none; height: 6px; }
-    .fl-range input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; pointer-events: auto; width: 1.7rem; height: 1.7rem; margin-top: -.75rem; border-radius: 50%; background: #fff; border: 3px solid var(--primary); box-shadow: 0 2px 8px rgba(20, 22, 50, .3); cursor: pointer; }
-    .fl-range input[type=range]::-moz-range-track { background: none; }
-    .fl-range input[type=range]::-moz-range-thumb { pointer-events: auto; width: 1.4rem; height: 1.4rem; border-radius: 50%; background: #fff; border: 3px solid var(--primary); cursor: pointer; }
+    .fl-opts { display: grid; grid-template-columns: 1fr 1fr; gap: .3rem .6rem; }
+    .fl-opts .inline-check { margin: 0; font-size: .88rem; }
+    .fl-range { padding: .2rem 1rem; margin: 0 0 .1rem; }
+    .fl-rail { position: relative; height: 2.6rem; touch-action: none; cursor: pointer; }
+    .fl-track { position: absolute; left: 0; right: 0; top: 50%; height: 8px; margin-top: -4px; border-radius: 4px; background: var(--border); }
+    .fl-track span { position: absolute; top: 0; bottom: 0; border-radius: 4px; background: var(--primary-grad); }
+    .fl-h { position: absolute; top: 50%; width: 2rem; height: 2rem; margin: 0; padding: 0; border-radius: 50%; transform: translate(-50%, -50%); background: #fff; border: 3px solid var(--primary); box-shadow: 0 2px 8px rgba(20, 22, 50, .3); touch-action: none; cursor: grab; }
+    .fl-h.drag { cursor: grabbing; transform: translate(-50%, -50%) scale(1.15); }
     /* Handschrift (alt) */
     .ql-ink { margin: .8rem 0; border: 1.5px dashed #b9c2fb; border-radius: 12px; background: repeating-linear-gradient(#fff 0 31px, #eef1ff 31px 32px); overflow: hidden; user-select: none; -webkit-user-select: none; }
     .ink-canvas { display: block; width: 100%; touch-action: pan-y; cursor: crosshair; }
