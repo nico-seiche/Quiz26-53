@@ -2,6 +2,15 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-17',
+    title: 'Neu: Offline nutzen',
+    items: [
+      ['📴', 'Gesetze und Lernsets ohne Internet', 'Unter Profil → „📴 Offline nutzen“ lädst du Gesetze und Lernsets vor – dann kannst du sie im Zug oder ohne Netz lesen und lernen.'],
+      ['🔄', 'Fortschritt geht nicht verloren', 'Was du offline lernst, wird gespeichert und automatisch gesendet, sobald du wieder online bist.'],
+      ['ℹ️', 'Was weiter Internet braucht', 'Quiz spielen, Battles, Folien, Dokumente sowie neue Markierungen und Favoriten.'],
+    ],
+  },
+  {
     id: '2026-11-16',
     title: 'Neu: Markierungen und Notizen in den Gesetzen',
     items: [

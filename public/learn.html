@@ -137,8 +137,8 @@
       if (isKnown) known++;
       else if (!retried.has(c.id)) { retried.add(c.id); queue.push(c); total++; }
       c.due = false;
-      const saved = api(`/api/study/cards/${c.id}/review`, { method: 'POST', body: { known: isKnown, mode, share: mode === 'cards' ? undefined : lastShare } })
-        .then((r) => { if (r.points) { sessionPoints += r.points; pointsToast(r.points); } })
+      const saved = api(`/api/study/cards/${c.id}/review`, { method: 'POST', body: { known: isKnown, mode, share: mode === 'cards' ? undefined : lastShare }, offlineQueue: true })
+        .then((r) => { if (r.queued) { $('#error').textContent = '📴 Offline – dein Fortschritt wird gesendet, sobald du wieder online bist.'; } else if (r.points) { sessionPoints += r.points; pointsToast(r.points); } })
         .catch((e) => { $('#error').textContent = e.message; });
       pendingSaves.push(saved);
       // Letzte Karte: kurz auf die Speicherung warten, damit die Punkte in der Zusammenfassung stimmen

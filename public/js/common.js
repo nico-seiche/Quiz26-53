@@ -2,27 +2,74 @@
 const apiHeaders = {};
 
 async function api(path, options = {}) {
-  const res = await fetch(path, {
-    method: options.method || 'GET',
-    headers: { ...apiHeaders, ...(options.body ? { 'Content-Type': 'application/json' } : {}) },
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+  let res;
+  try {
+    res = await fetch(path, {
+      method: options.method || 'GET',
+      headers: { ...apiHeaders, ...(options.body ? { 'Content-Type': 'application/json' } : {}) },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+  } catch {
+    // Keine Verbindung: Schreibzugriffe, die warten dürfen (z. B. Lernergebnisse), kommen in die Warteschlange und gehen später raus
+    if (options.offlineQueue && typeof Outbox !== 'undefined') { await Outbox.add({ path, method: options.method || 'POST', body: options.body || null, user: window.__me && window.__me.username }); return { queued: true }; }
+    const err = new Error('Keine Verbindung');
+    err.offline = true;
+    throw err;
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = new Error(data.error || `Fehler ${res.status}`);
     err.data = data;
+    err.offline = Boolean(data.offline);
     throw err;
   }
   return data;
 }
+
+// Warteschlange für Schreibzugriffe ohne Verbindung (IndexedDB)
+const Outbox = (() => {
+  const open = () => new Promise((ok, fail) => {
+    const r = indexedDB.open('quiz-outbox', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('q', { keyPath: 'id', autoIncrement: true });
+    r.onsuccess = () => ok(r.result);
+    r.onerror = () => fail(r.error);
+  });
+  const run = async (mode, fn) => { const db = await open(); return new Promise((ok, fail) => { const t = db.transaction('q', mode); const out = fn(t.objectStore('q')); t.oncomplete = () => ok(out && out.result); t.onerror = () => fail(t.error); }); };
+  return {
+    add: (item) => run('readwrite', (st) => st.add({ ...item, at: Date.now() })),
+    all: () => run('readonly', (st) => st.getAll()),
+    remove: (id) => run('readwrite', (st) => st.delete(id)),
+    clear: () => run('readwrite', (st) => st.clear()),
+    // Sendet wartende Einträge des angemeldeten Nutzers; stoppt bei fehlender Verbindung
+    async flush() {
+      if (!navigator.onLine || !window.__me) return 0;
+      let sent = 0;
+      for (const it of (await this.all().catch(() => [])) || []) {
+        if (it.user && it.user !== window.__me.username) continue;
+        try {
+          const res = await fetch(it.path, { method: it.method, headers: { ...apiHeaders, ...(it.body ? { 'Content-Type': 'application/json' } : {}) }, body: it.body ? JSON.stringify(it.body) : undefined });
+          if (res.status >= 500) break;          // Server-Problem: später noch einmal
+          await this.remove(it.id);              // gesendet (oder dauerhaft abgelehnt, z. B. Karte gelöscht)
+          sent += 1;
+        } catch { break; }
+      }
+      return sent;
+    },
+  };
+})();
 
 // Leitet zur Anmeldung um, wenn niemand eingeloggt ist
 async function requireLogin() {
   try {
     const me = await api('/api/auth/me');
     window.__me = me;   // für avatarHtml: eigenes Bild sofort nach dem Ändern anzeigen
+    try { localStorage.setItem('me', JSON.stringify(me)); } catch { /* egal */ }
+    Outbox.flush().catch(() => {});
     return me;
-  } catch {
+  } catch (err) {
+    if (err.offline) {   // ohne Verbindung nicht zur Anmeldung schicken: mit dem zuletzt bekannten Konto weitermachen
+      try { const saved = JSON.parse(localStorage.getItem('me') || 'null'); if (saved) { window.__me = saved; return saved; } } catch { /* egal */ }
+    }
     const next = encodeURIComponent(location.pathname + location.search);
     location.href = `/?next=${next}`;
     return new Promise(() => {});
@@ -31,6 +78,8 @@ async function requireLogin() {
 
 async function logout() {
   await api('/api/auth/logout', { method: 'POST' });
+  // gespeicherte persönliche Daten (Offline-Speicher) entfernen
+  try { for (const k of await caches.keys()) if (/^quiz-data-/.test(k)) await caches.delete(k); localStorage.removeItem('me'); localStorage.removeItem('offline:pins'); await Outbox.clear(); } catch { /* egal */ }
   location.href = '/';
 }
 
@@ -266,3 +315,33 @@ function addPasswordToggles(root = document) {
   });
 }
 addPasswordToggles();
+
+
+// --- Offline: Service Worker, Hinweisleiste, Vorladen ---
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+(() => {
+  let bar = null;
+  const sync = () => {
+    if (navigator.onLine) { if (bar) { bar.remove(); bar = null; } Outbox.flush().catch(() => {}); return; }
+    if (bar || !document.body) return;
+    bar = document.createElement('a');
+    bar.href = '/offline';
+    bar.textContent = '📴 Offline – nur Gespeichertes verfügbar';
+    bar.style.cssText = 'position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 5.6rem);left:50%;transform:translateX(-50%);z-index:90;white-space:nowrap;background:#1b1d3a;color:#fff;padding:.3rem .8rem;border-radius:999px;font-size:.85rem;font-weight:700;text-decoration:none;box-shadow:0 4px 14px rgba(0,0,0,.3)';
+    document.body.appendChild(bar);
+  };
+  addEventListener('online', sync);
+  addEventListener('offline', sync);
+  addEventListener('DOMContentLoaded', sync);
+  // Vorgeladene Gesetze/Lernsets im Hintergrund aktuell halten (höchstens alle 6 Stunden)
+  addEventListener('load', () => setTimeout(async () => {
+    try {
+      if (!navigator.onLine || !window.__me) return;
+      const last = Number(localStorage.getItem('offline:refreshed')) || 0;
+      if (Date.now() - last < 6 * 3600 * 1000) return;
+      const pins = JSON.parse(localStorage.getItem('offline:pins') || '[]');
+      for (const url of pins) await fetch(url, { cache: 'no-cache' }).catch(() => {});
+      localStorage.setItem('offline:refreshed', String(Date.now()));
+    } catch { /* egal */ }
+  }, 4000));
+})();

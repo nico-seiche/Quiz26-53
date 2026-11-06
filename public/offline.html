@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <script>try{var d=document.documentElement,t=localStorage.getItem("theme"),m=localStorage.getItem("motion");if(t)d.dataset.theme=t;if(m==="off"||(m==="auto"&&matchMedia("(prefers-reduced-motion: reduce)").matches))d.classList.add("reduce-motion")}catch(e){}</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Quiz">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png?v=2">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2">
+  <title>Quiz – Offline</title>
+  <link rel="stylesheet" href="/style.css?v=14">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/profile">← Profil</a>
+    <strong>Offline nutzen</strong>
+    <span id="me"></span>
+  </header>
+  <main style="max-width:760px">
+    <div class="card">
+      <h1 style="margin:0 0 .3rem">📴 Offline nutzen</h1>
+      <p class="muted" style="margin:0">Lade Gesetze und Lernsets vor, dann kannst du sie ohne Internet lesen und lernen – zum Beispiel im Zug. Dein Lernfortschritt wird gespeichert und automatisch gesendet, sobald du wieder online bist. Quiz spielen, Battles, Folien und Dokumente brauchen weiterhin eine Verbindung.</p>
+      <p id="status" style="margin:.6rem 0 0;font-weight:800"></p>
+      <p id="pending" class="muted" style="margin:.2rem 0 0"></p>
+    </div>
+    <p class="error" id="error"></p>
+
+    <div class="card">
+      <div class="row spread"><h2 style="margin:0">⚖️ Gesetze</h2><button type="button" id="laws-all">Alle sichtbaren laden</button></div>
+      <p class="muted" style="margin:.3rem 0 .5rem">Zusammen mit deinen Favoriten, Notizen und Markierungen.</p>
+      <div id="laws"></div>
+    </div>
+
+    <div class="card">
+      <div class="row spread"><h2 style="margin:0">📚 Lernsets</h2><button type="button" id="sets-all">Alle meine laden</button></div>
+      <div id="sets"></div>
+    </div>
+
+    <div class="card">
+      <button type="button" class="danger" id="wipe">🗑 Alles Offline-Gespeicherte entfernen</button>
+      <p class="muted" id="size" style="margin:.5rem 0 0"></p>
+    </div>
+  </main>
+  <style>
+    .off-row { display: flex; align-items: center; gap: .6rem; padding: .5rem .2rem; border-bottom: 1px solid var(--border); }
+    .off-row .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .off-row .t small { display: block; color: var(--muted); font-weight: 400; }
+    .off-row a { font-weight: 800; color: var(--text); text-decoration: none; }
+    .off-row button { margin: 0; padding: .35rem .8rem; box-shadow: none; white-space: nowrap; }
+    .off-ok { color: var(--ok); font-weight: 800; white-space: nowrap; }
+  </style>
+  <script src="/js/changelog.js"></script>
+  <script src="/js/common.js"></script>
+  <script>
+    const DATA_CACHE = 'quiz-data-v1';
+    const store = {
+      get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
+      set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* egal */ } },
+    };
+    let laws = [];
+    let sets = [];
+    let saved = new Set();     // gespeicherte Pfade
+
+    const meta = () => store.get('offline:meta', { laws: {}, sets: {} });
+    const pins = () => store.get('offline:pins', []);
+    const pinAdd = (u) => store.set('offline:pins', [...new Set([...pins(), u])]);
+    const pinDel = (u) => store.set('offline:pins', pins().filter((x) => x !== u));
+
+    async function refreshSaved() {
+      saved = new Set();
+      try { const c = await caches.open(DATA_CACHE); for (const r of await c.keys()) saved.add(new URL(r.url).pathname); } catch { /* egal */ }
+    }
+    async function load(url) {
+      const res = await fetch(url, { cache: 'no-cache' });
+      if (!res.ok) throw new Error(`Fehler ${res.status}`);
+      return res;
+    }
+    const mb = (n) => (n / 1048576).toFixed(n > 1048576 * 10 ? 0 : 1).replace('.', ',');
+
+    async function lawDownload(slug) {
+      await Promise.all(['/api/gesetze', '/api/gesetze/favorites/all', '/api/gesetze/notes/all', '/api/gesetze/prefs/me', '/api/auth/me', '/api/subjects'].map((u) => load(u).catch(() => {})));
+      await load(`/api/gesetze/${slug}`);
+      for (const u of ['/api/gesetze', `/api/gesetze/${slug}`, '/api/gesetze/favorites/all', '/api/gesetze/notes/all', '/api/gesetze/prefs/me']) pinAdd(u);
+      const l = laws.find((x) => x.slug === slug);
+      const m = meta(); m.laws[slug] = { short: l.short, title: l.title }; store.set('offline:meta', m);
+    }
+    async function setDownload(id) {
+      await Promise.all(['/api/study', '/api/auth/me', '/api/subjects'].map((u) => load(u).catch(() => {})));
+      const set = await (await load(`/api/study/${id}`)).json();
+      pinAdd(`/api/study/${id}`); pinAdd('/api/study');
+      const m = meta(); m.sets[id] = { title: set.title, count: set.cards.length }; store.set('offline:meta', m);
+    }
+    async function remove(path) {
+      const c = await caches.open(DATA_CACHE);
+      await c.delete(path);
+      pinDel(path);
+    }
+
+    function render() {
+      const m = meta();
+      const online = navigator.onLine;
+      $('#status').textContent = online ? '🟢 Du bist online' : '📴 Du bist offline – hier steht, was gespeichert ist';
+      // Gesetze: online alle aus dem Index, offline nur gespeicherte
+      const lawList = laws.length ? laws : Object.entries(m.laws).map(([slug, v]) => ({ slug, ...v }));
+      $('#laws').innerHTML = lawList.filter((l) => online || saved.has(`/api/gesetze/${l.slug}`)).map((l) => {
+        const has = saved.has(`/api/gesetze/${l.slug}`);
+        return `<div class="off-row"><div class="t"><a href="/gesetze#${l.slug}">${escapeHtml(l.short)}</a><small>${escapeHtml(l.title)}</small></div>
+          ${has ? `<span class="off-ok">✓ gespeichert</span>${online ? `<button type="button" data-rm="/api/gesetze/${l.slug}">Entfernen</button>` : ''}` : `<button type="button" data-law="${l.slug}">⬇️ Laden</button>`}</div>`;
+      }).join('') || '<p class="muted">Nichts gespeichert.</p>';
+      const setList = sets.length ? sets : Object.entries(m.sets).map(([id, v]) => ({ id: Number(id), title: v.title, card_count: v.count }));
+      $('#sets').innerHTML = setList.filter((s) => online || saved.has(`/api/study/${s.id}`)).map((s) => {
+        const has = saved.has(`/api/study/${s.id}`);
+        return `<div class="off-row"><div class="t"><a href="/learn?id=${s.id}">${escapeHtml(s.title)}</a><small>${s.card_count ?? ''} Karten</small></div>
+          ${has ? `<span class="off-ok">✓ gespeichert</span>${online ? `<button type="button" data-rm="/api/study/${s.id}">Entfernen</button>` : ''}` : `<button type="button" data-set="${s.id}">⬇️ Laden</button>`}</div>`;
+      }).join('') || `<p class="muted">${online ? 'Du hast noch keine Lernsets.' : 'Nichts gespeichert.'}</p>`;
+      $('#laws-all').hidden = !online; $('#sets-all').hidden = !online; $('#wipe').hidden = !online;
+    }
+    async function sizes() {
+      try { const e = await navigator.storage.estimate(); $('#size').textContent = `Speicher: ${mb(e.usage)} MB von ${mb(e.quota)} MB genutzt (inkl. App).`; } catch { /* egal */ }
+      try { const n = (await Outbox.all()).length; $('#pending').textContent = n ? `⏳ ${n} Lernergebnis${n === 1 ? '' : 'se'} warten auf die Übertragung.` : ''; } catch { /* egal */ }
+    }
+    async function busy(btn, fn) {
+      const old = btn.textContent; btn.disabled = true; btn.textContent = 'Lädt …';
+      try { await fn(); } catch (err) { $('#error').textContent = `Laden nicht möglich: ${err.message}`; }
+      await refreshSaved(); render(); sizes(); btn.disabled = false; btn.textContent = old;
+    }
+    document.querySelector('main').addEventListener('click', async (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      if (b.dataset.law) busy(b, () => lawDownload(b.dataset.law));
+      else if (b.dataset.set) busy(b, () => setDownload(b.dataset.set));
+      else if (b.dataset.rm) busy(b, () => remove(b.dataset.rm));
+      else if (b.id === 'laws-all') busy(b, async () => { const vis = await visibleLaws(); for (const l of vis) await lawDownload(l.slug); });
+      else if (b.id === 'sets-all') busy(b, async () => { for (const s of sets) await setDownload(s.id); });
+      else if (b.id === 'wipe' && confirm('Alle für Offline gespeicherten Daten entfernen? (Dein Konto und deine Daten auf dem Server bleiben unverändert.)')) busy(b, async () => { await caches.delete(DATA_CACHE); store.set('offline:pins', []); store.set('offline:meta', { laws: {}, sets: {} }); });
+    });
+    async function visibleLaws() {
+      const p = await api('/api/gesetze/prefs/me').catch(() => ({ hidden: [] }));
+      return laws.filter((l) => !p.hidden.includes(l.slug));
+    }
+    addEventListener('online', () => { refreshSaved().then(render); load('/api/gesetze').then(async (r) => { laws = await r.json(); render(); }).catch(() => {}); });
+    addEventListener('offline', () => render());
+
+    requireLogin().then(async (me) => {
+      mountNav('profile', me);
+      await refreshSaved();
+      if (navigator.onLine) {
+        laws = await api('/api/gesetze').catch(() => []);
+        const s = await api('/api/study').catch(() => null);
+        sets = s ? s.mine : [];
+      } else {
+        laws = await api('/api/gesetze').catch(() => []);
+      }
+      render(); sizes();
+    });
+  </script>
+</body>
+</html>

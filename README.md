@@ -218,6 +218,14 @@ Aktuell einfache Wertung: richtige Antwort = 500–1000 Punkte, je schneller des
 
 Beim Lernen (`public/learn.html`) meldet „🚩 Fehler in dieser Karte melden“ eine Karte (Tippfehler / inhaltlich falsch / Sonstiges + Notiz) über `POST /api/study/cards/:cardId/report`; Tabelle `quiz.card_reports` (Migration 030; Begriff und Definition werden als Momentaufnahme mitgespeichert, eine offene Meldung je Karte und Melder, höchstens 50 pro Tag). Besitzer und Mitarbeiter sehen im Editor (`study-edit.html`) den Kasten „Gemeldete Fehler“ (`GET /api/study/:id/reports`, `POST /api/study/:id/reports/:rid` mit `status` done/dismissed/open) und in der Lernset-Liste ein 🚩 mit der Zahl offener Meldungen.
 
+## Offline
+
+- **Service Worker** `public/sw.js` (Registrierung in `common.js`): Seiten, Skripte und Styles sowie die Datenabfragen `GET /api/auth/me`, `/api/subjects`, `/api/gesetze…`, `/api/study`, `/api/study/:id` gehen erst ins Netz („network first“, Zeitlimit 6–8 s) und fallen ohne Verbindung auf den zuletzt gespeicherten Stand zurück (Caches `quiz-shell-v1`, `quiz-data-v1`, Bibliotheken von jsdelivr/cdnjs/unpkg in `quiz-libs-v1`). Ohne gespeicherte Seite zeigt die Navigation `/offline`. Neu hinzugefügte Seiten für den Offline-Start gehören in `PRECACHE`; `VERSION` hochzählen leert alle Caches.
+- **Offline-Seite** `/offline` (Profil → „📴 Offline nutzen“): Gesetze (inkl. Favoriten, Notizen, Einstellungen) und Lernsets gezielt vorladen oder entfernen, Speicher und wartende Ergebnisse anzeigen. Vorgeladenes (`offline:pins` im localStorage) wird beim App-Start höchstens alle 6 Stunden im Hintergrund aktualisiert.
+- **Warteschlange** `Outbox` (IndexedDB `quiz-outbox`, in `common.js`): `api(…, { offlineQueue: true })` legt Schreibzugriffe bei fehlender Verbindung ab (bisher: Lernergebnisse beim Karteikarten-Lernen, `POST /api/study/cards/:id/review`) und sendet sie beim nächsten Online-Gehen oder Seitenaufruf, nur für das Konto, das sie erzeugt hat.
+- **Anmeldung offline:** `requireLogin()` nutzt bei fehlender Verbindung das zuletzt gespeicherte Konto (`localStorage.me`); beim Abmelden werden `quiz-data-*`, `me`, `offline:pins` und die Warteschlange gelöscht (gemeinsam genutzte Geräte).
+- **Nicht offline:** Quiz spielen/hosten, Battles, Folien, Dokumente, Markierungen/Favoriten setzen, Sprachausgabe mit Piper-Stimmen.
+
 ## Quiz-Import (z. B. von einer KI erstellt)
 
 Im Quiz-Editor (neu und bestehend) öffnet „🤖 Import“ einen Dialog: Anleitung für die KI kopieren (enthält die Fächerliste, optional mit Thema), KI-Antwort einfügen, Vorschau mit Fehlern, „Übernehmen“. Parser und Anleitung: `public/js/quiz-import.js` (`QuizImport.prompt/parse/finalize`), reine Textverarbeitung im Browser, keine KI im Programm. Format:
