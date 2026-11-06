@@ -30,7 +30,7 @@ const CHANGELOG = [
     title: 'Neu: Dokumente',
     items: [
       ['📝', 'Texte wie in Word', 'Überschriften, Listen, Tabellen, Bilder, Links und Farben – alles wird automatisch gespeichert.'],
-      ['🖨️', 'Als PDF speichern', 'Über „PDF / Drucken“ wird das Dokument sauber ausgegeben.'],
+      ['🖨️', 'Als PDF speichern', '„📄 PDF“ speichert das Dokument als PDF-Datei (auch auf dem iPad), „🖨️“ öffnet den Druckdialog.'],
     ],
   },
   {

@@ -82,7 +82,8 @@
     <a class="back" href="/docs">← Dokumente</a>
     <input class="title" id="title" maxlength="120" aria-label="Titel des Dokuments" placeholder="Titel des Dokuments">
     <span class="muted" id="state" aria-live="polite"></span>
-    <button type="button" id="print" title="Als PDF speichern oder drucken (Druckdialog)">🖨️ PDF / Drucken</button>
+    <button type="button" id="pdf" title="Als PDF-Datei speichern">📄 PDF</button>
+    <button type="button" id="print" title="Drucken (Druckdialog)">🖨️</button>
   </div>
   <div class="dtools" id="tools" role="toolbar" aria-label="Formatierung">
     <button type="button" data-act="undo" title="Rückgängig (Strg+Z)">↶</button>
@@ -125,6 +126,7 @@
   <input type="file" id="file" accept="image/*" hidden>
   <input type="file" id="wordfile" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
   <script src="/js/docs-import.js"></script>
+  <script src="/js/docs-pdf.js"></script>
   <script src="/js/changelog.js"></script>
   <script src="/js/common.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
@@ -339,7 +341,18 @@
       } catch (err) { setState(`Word-Datei: ${err.message}`, 'warn'); }
     });
     $('#title').addEventListener('input', () => { document.title = `${$('#title').value || 'Dokument'} – Dokumente`; dirty(); });
-    $('#print').onclick = async () => { await save(); print(); };
+    // Druckdialog: window.print() muss direkt im Klick laufen (nach einem await blockieren Safari/iPad es), Speichern ist dafür nicht nötig
+    $('#print').onclick = () => { try { print(); } catch { setState('Drucken geht hier nicht – nimm „📄 PDF“', 'warn'); } };
+    $('#pdf').onclick = async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      try {
+        setState('PDF wird erstellt …');
+        const pages = await DocsPdf.exportDoc($('#title').value, quill.root, setState);
+        setState(`✓ PDF gespeichert (${pages} Seite${pages === 1 ? '' : 'n'})`, 'ok');
+      } catch (err) { setState(`PDF: ${err.message}`, 'warn'); }
+      btn.disabled = false;
+    };
 
     requireLogin().then(async () => {
       try {
