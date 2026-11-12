@@ -101,12 +101,12 @@ router.get('/assets/:aid', async (req, res) => {
   res.set({ 'Content-Type': a.mime, 'Cache-Control': 'private, max-age=86400', 'X-Content-Type-Options': 'nosniff' }).send(a.data);
 });
 
-const own = (req) => (isId(req.params.id) ? db.one('SELECT id, title, delta, ink, rev FROM quiz.docs WHERE id = $1 AND owner_id = $2', [req.params.id, req.user.id]) : null);
+const own = (req) => (isId(req.params.id) ? db.one('SELECT d.id, d.title, d.delta, d.ink, d.rev, c.slug AS course_slug, c.name AS course_name FROM quiz.docs d LEFT JOIN quiz.lw_courses c ON c.id = d.course_id WHERE d.id = $1 AND d.owner_id = $2', [req.params.id, req.user.id]) : null);
 
 router.get('/:id', async (req, res) => {
   const d = await own(req);
   if (!d) return res.status(404).json({ error: 'Dokument nicht gefunden' });
-  res.json({ id: Number(d.id), title: d.title, delta: d.delta, ink: d.ink || [], rev: d.rev });
+  res.json({ id: Number(d.id), title: d.title, delta: d.delta, ink: d.ink || [], rev: d.rev, course: d.course_slug ? { slug: d.course_slug, name: d.course_name } : null });
 });
 
 // Freie Handschrift: Striche { c: Farbe, w: Breite, k: 'p' Stift | 'h' Marker, a: Textposition der Verankerung, p: [[x, y, Druck], …] }

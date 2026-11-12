@@ -110,7 +110,7 @@
 </head>
 <body class="doc-body">
   <div class="d-top">
-    <a class="back" href="/docs">← Dokumente</a>
+    <a class="back" id="back-link" href="/docs">← Dokumente</a>
     <input class="title" id="title" maxlength="120" aria-label="Titel des Dokuments" placeholder="Titel des Dokuments">
     <span class="muted" id="state" aria-live="polite"></span>
     <button type="button" id="pdf" title="Als PDF-Datei speichern">📄 PDF</button>
@@ -412,6 +412,8 @@
         doc = await api(`/api/docs/${id}`);
         $('#title').value = doc.title;
         document.title = `${doc.title} – Dokumente`;
+        // Gehört das Dokument zu einem Fach der Learnworld, führt „Zurück“ dorthin
+        if (doc.course) { $('#back-link').href = `/learnworld#${doc.course.slug}`; $('#back-link').textContent = `← ${doc.course.name}`; }
         startEditor();
         setState('✓ Gespeichert', 'ok');
       } catch (err) {
