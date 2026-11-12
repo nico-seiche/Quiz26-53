@@ -2,6 +2,14 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-24',
+    title: 'Learnworld: Ordner und Kacheln',
+    items: [
+      ['📁', 'Ordner und Dateien als Kacheln', 'In jedem Fach siehst du deine Unterlagen als Kacheln mit Ordner- und Datei-Symbolen. Ordner kannst du anlegen, umbenennen und verschachteln.'],
+      ['↔️', 'Sortieren', 'Dateien auf einen Ordner ziehen oder über „⋯“ in einen Ordner verschieben. Oben zeigt eine Brotkrumenleiste, wo du bist.'],
+    ],
+  },
+  {
     id: '2026-11-23',
     title: 'Learnworld: jede Datei hinzufügen',
     items: [

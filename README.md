@@ -232,6 +232,8 @@ Beim Lernen (`public/learn.html`) meldet „🚩 Fehler in dieser Karte melden�
 
 `/learnworld` (Startseite → „Ansehen“ → Learnworld, `public/learnworld.html`, `src/learnworld.js`, Migration 034): Rechtsfächer (`quiz.lw_courses`, per SQL erweiterbar; `subject_id` verknüpft das passende Fach der Lernsets) mit den eigenen **Dokumenten** (`quiz.docs.course_id`: neu anlegen, **beliebige Dateien hinzufügen** (auch mehrere, `importFiles()`), vorhandene zuordnen) und **Lernsets** (`quiz.study_sets.course_id`; sie erscheinen wie alle eigenen Lernsets auch bei „Lernen“). Bei einem Dokument lässt sich ein Lernset **anfragen** (`quiz.lw_requests`, Wünsche als Text, je Dokument eine offene Anfrage, höchstens 20 offene je Nutzer; Zustand „wird erstellt“ → „fertig“ mit Link).
 
+**Ordner und Kacheln:** Die Fachseite zeigt Ordner (`quiz.lw_folders`, verschachtelbar, Migration 036) und Dokumente (`quiz.docs.folder_id`) als Kacheln, Lernsets auf der obersten Ebene. Hash `#fach` bzw. `#fach/<ordner-id>`; Aktionen über „⋯“ (öffnen, verschieben, umbenennen, löschen = Inhalt rückt nach oben), Ziehen und Ablegen auf Ordner und Brotkrumen, Sortierung A–Z oder neueste zuerst. API: `POST /api/learnworld/courses/:slug/folders`, `PATCH`/`DELETE /folders/:id`, `PUT /folders/:id/parent`, `PUT /docs/:id/folder`; neue Dateien landen im geöffneten Ordner.
+
 **Anfragen bearbeiten** (nicht automatisch – geschieht, wenn Claude dazu aufgefordert wird): offene Anfragen samt Dokumenttext liefert `SELECT * FROM quiz.lw_open_requests;` (Spalten `id, username, user_id, course, subject_id, course_id, doc_id, doc_title, note, text`). Danach das Lernset anlegen und die Anfrage abschließen:
 
 ```sql

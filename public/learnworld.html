@@ -52,6 +52,28 @@
     .lw-modal .card { width: min(560px, 100%); margin: 0; max-height: 90vh; overflow: auto; }
     .lw-pick { max-height: 16rem; overflow: auto; border: 1px solid var(--border); border-radius: 12px; margin: .5rem 0; }
     .lw-pick button { display: block; width: 100%; text-align: left; margin: 0; padding: .55rem .8rem; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; color: var(--text); box-shadow: none; font-weight: 600; }
+
+    .lw-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem; margin: 0 0 .7rem; font-weight: 700; }
+    .lw-crumbs button { margin: 0; padding: .3rem .65rem; border-radius: 999px; box-shadow: none; background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+    .lw-crumbs button.cur { background: var(--primary-grad); color: #fff; border-color: transparent; }
+    .lw-crumbs .sep { color: var(--muted); }
+    .lw-over { outline: 3px dashed var(--primary); outline-offset: 2px; background: color-mix(in srgb, var(--primary) 12%, var(--card)) !important; }
+    .lw-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .8rem; }
+    .lw-tile { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: .3rem; padding: 1rem .6rem .8rem; border: 1px solid var(--border); border-radius: 18px; background: var(--card); box-shadow: var(--shadow); cursor: pointer; min-width: 0; user-select: none; -webkit-user-select: none; }
+    .lw-tile:hover { border-color: var(--primary); }
+    .lw-tile .ic { font-size: 3rem; line-height: 1.1; }
+    .lw-tile.folder .ic { filter: drop-shadow(0 3px 6px rgba(245, 158, 11, .35)); }
+    .lw-tile .nm { font-weight: 800; font-size: .95rem; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; max-width: 100%; }
+    .lw-tile .meta { font-size: .78rem; color: var(--muted); }
+    .lw-tile .lw-chip { font-size: .72rem; }
+    .lw-more { position: absolute; top: .3rem; right: .3rem; margin: 0; width: 2rem; height: 2rem; padding: 0; border-radius: 50%; border: 0; background: transparent; box-shadow: none; font-size: 1.2rem; font-weight: 800; color: var(--muted); }
+    .lw-more:hover { background: var(--bg); }
+    .lw-tile.dragging { opacity: .4; }
+    .lw-bar { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: 0 0 .9rem; }
+    .lw-bar button, .lw-bar select { margin: 0; width: auto; padding: .4rem .7rem; font-size: .88rem; }
+    .lw-menu button { display: block; width: 100%; text-align: left; margin: 0 0 .35rem; }
+    .lw-tree button { display: block; width: 100%; text-align: left; margin: 0; padding: .55rem .8rem; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; color: var(--text); box-shadow: none; font-weight: 600; }
+    .lw-tree button[disabled] { opacity: .35; }
   </style>
   <script src="/js/docs-import.js"></script>
   <script src="/js/changelog.js"></script>
@@ -60,7 +82,9 @@
     const view = $('#view');
     const fmt = (d) => new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const fail = (err) => { $('#error').textContent = err.message; };
-    const slugNow = () => decodeURIComponent(location.hash.slice(1)).split('/')[0];
+    const hashParts = () => decodeURIComponent(location.hash.slice(1)).split('/');
+    const slugNow = () => hashParts()[0];
+    const state = { slug: null, data: null, folder: null, sort: localStorage.getItem('lw-sort') || 'name' };
     let courses = [];
 
     function modal(html, onMount) {
@@ -85,38 +109,133 @@
           <span class="lw-chips"><span class="lw-chip">📄 ${c.docs} Dokument${c.docs === 1 ? '' : 'e'}</span><span class="lw-chip">🧠 ${c.sets} Lernset${c.sets === 1 ? '' : 's'}</span>${c.open_requests ? `<span class="lw-chip warn">⏳ ${c.open_requests}</span>` : ''}</span></a>`).join('')}</div>`;
     }
 
-    // ---------- Ein Fach ----------
-    async function course(slug) {
-      const data = await api(`/api/learnworld/courses/${slug}`);
-      const c = data.course;
-      $('#back-link').href = '#'; $('#back-link').textContent = '← Alle Fächer';
-      view.innerHTML = `<div class="card lw-hero"><h1>${c.icon} ${escapeHtml(c.name)}</h1>
-        <p class="muted" style="margin:0 0 .7rem">Dokumente dieses Fachs und die daraus entstandenen Lernsets.</p>
-        <div class="lw-tools"><button type="button" class="primary" data-act="new">+ Neues Dokument</button><button type="button" data-act="files">📎 Dateien hinzufügen</button><button type="button" data-act="assign">📎 Vorhandene zuordnen</button></div>
-        <input type="file" id="wordfile" multiple hidden></div>
-        <p class="muted" style="margin:.6rem 0 0;font-size:.88rem">Mehrere Dateien auf einmal auswählen oder hierher ziehen. Word, PDF, PowerPoint, Text, Markdown, HTML, OpenDocument und Bilder – die App erkennt die Art selbst und legt daraus ein bearbeitbares Dokument an. Bei PDF und PowerPoint wird nur der Text übernommen.</p><div id="import-log"></div>
-
-        <div class="lw-sec"><h2>📄 Meine Dokumente</h2>${data.docs.length ? data.docs.map((d) => docRow(d)).join('') : '<div class="lw-empty">Noch kein Dokument in diesem Fach. Lege eine Mitschrift an, importiere eine Word-Datei oder ordne ein vorhandenes Dokument zu.</div>'}</div>
-        <div class="lw-sec"><h2>🧠 Lernsets in diesem Fach</h2>${data.sets.length ? data.sets.map((s) => `<div class="lw-row"><div class="t"><a href="/learn?id=${s.id}">${escapeHtml(s.title)}</a><div class="snippet">${s.cards} ${s.cards === 1 ? "Karte" : "Karten"} · ${fmt(s.updatedAt)}</div>
-          <div class="lw-actions"><a class="btn primary" href="/learn?id=${s.id}">Lernen</a><a class="btn" href="/study-edit?id=${s.id}">Bearbeiten</a><button type="button" data-unset="${s.id}">Aus dem Fach nehmen</button></div></div></div>`).join('') : '<div class="lw-empty">Noch kein Lernset. Wähle bei einem Dokument „🧠 Lernset erstellen lassen“.</div>'}</div>`;
-      view.dataset.slug = slug;
-      view.dataset.title = c.name;
+    // ---------- Ein Fach: Ordner und Dateien als Kacheln ----------
+    const collator = new Intl.Collator('de', { numeric: true, sensitivity: 'base' });
+    async function load(slug) {
+      state.data = await api(`/api/learnworld/courses/${slug}`);
+      state.slug = slug;
     }
-    function docRow(d) {
-      const r = d.request;
-      const status = r && r.status === 'open' ? `<span class="lw-chip warn">⏳ Lernset wird erstellt</span>`
-        : r && r.status === 'done' ? `<span class="lw-chip">✅ Lernset fertig</span>` : '';
-      return `<div class="lw-row"><div class="t"><a href="/docs-edit?id=${d.id}">${escapeHtml(d.title)}</a> ${status}
-        <div class="snippet">${escapeHtml(d.preview || 'Leeres Dokument')}</div>
-        <div class="lw-actions"><a class="btn" href="/docs-edit?id=${d.id}">Öffnen</a>
-          ${r && r.status === 'open' ? `<button type="button" data-cancel="${r.id}">Anfrage zurückziehen</button>`
-            : r && r.status === 'done' && r.setId ? `<a class="btn primary" href="/learn?id=${r.setId}">Lernset lernen</a><button type="button" data-req="${d.id}" data-title="${escapeHtml(d.title)}">Neues Lernset anfragen</button>`
-            : `<button type="button" class="primary" data-req="${d.id}" data-title="${escapeHtml(d.title)}">🧠 Lernset erstellen lassen</button>`}
-          <button type="button" data-unassign="${d.id}">Aus dem Fach nehmen</button></div></div></div>`;
+    async function refresh() { if (state.slug) { await load(state.slug); render(); } }
+    const folderById = (id) => state.data.folders.find((f) => f.id === id);
+    function pathOf(id) {
+      const out = [];
+      for (let f = id && folderById(id); f; f = f.parentId && folderById(f.parentId)) out.unshift(f);
+      return out;
+    }
+    const kids = (id) => state.data.folders.filter((f) => f.parentId === id);
+    const docsIn = (id) => state.data.docs.filter((d) => d.folderId === id);
+    function countIn(id) {       // alle Dateien in einem Ordner samt Unterordnern
+      let n = docsIn(id).length;
+      for (const f of kids(id)) n += countIn(f.id);
+      return n;
+    }
+    const cmp = (a, b, nameKey) => (state.sort === 'date' ? new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0) : collator.compare(a[nameKey], b[nameKey]));
+
+    function render() {
+      const { course: c } = state.data;
+      const here = state.folder && folderById(state.folder) ? state.folder : null;
+      state.folder = here;
+      const path = pathOf(here);
+      $('#back-link').href = '#'; $('#back-link').textContent = here ? `← ${path.length > 1 ? path[path.length - 2].name : c.name}` : '← Alle Fächer';
+      const folders = kids(here).sort((a, b) => collator.compare(a.name, b.name));
+      const docs = docsIn(here).sort((a, b) => cmp(a, b, 'title'));
+      const sets = here === null ? [...state.data.sets].sort((a, b) => cmp(a, b, 'title')) : [];
+      const crumb = (id, label, cur) => `<button type="button" class="lw-drop ${cur ? 'cur' : ''}" data-go="${id === null ? '' : id}" data-drop-folder="${id === null ? '' : id}">${label}</button>`;
+      view.innerHTML = `<div class="card lw-hero"><h1>${c.icon} ${escapeHtml(c.name)}</h1>
+        <p class="muted" style="margin:0">Deine Unterlagen in diesem Fach – sortiert in Ordnern. Dateien auf einen Ordner ziehen oder über „⋯“ verschieben.</p></div>
+        <div class="lw-crumbs">${crumb(null, `${c.icon} ${escapeHtml(c.name)}`, here === null)}${path.map((f, i) => `<span class="sep">›</span>${crumb(f.id, `📁 ${escapeHtml(f.name)}`, i === path.length - 1)}`).join('')}</div>
+        <div class="lw-bar"><button type="button" class="primary" data-act="new">+ Neues Dokument</button><button type="button" data-act="files">📎 Dateien hinzufügen</button><button type="button" data-act="folder">📁 Neuer Ordner</button><button type="button" data-act="assign">📎 Vorhandene zuordnen</button>
+          <select id="lw-sort" aria-label="Sortierung"><option value="name" ${state.sort === 'name' ? 'selected' : ''}>A–Z</option><option value="date" ${state.sort === 'date' ? 'selected' : ''}>Neueste zuerst</option></select></div>
+        <input type="file" id="wordfile" multiple hidden>
+        <div id="import-log"></div>
+        <div class="lw-tiles">
+          ${folders.map((f) => `<div class="lw-tile folder lw-drop" draggable="true" data-open-folder="${f.id}" data-drag="folder:${f.id}" data-drop-folder="${f.id}"><button type="button" class="lw-more" data-more="folder:${f.id}" aria-label="Aktionen">⋯</button><div class="ic" aria-hidden="true">📁</div><div class="nm">${escapeHtml(f.name)}</div><div class="meta">${countIn(f.id)} ${countIn(f.id) === 1 ? 'Datei' : 'Dateien'}${kids(f.id).length ? ` · ${kids(f.id).length} Ordner` : ''}</div></div>`).join('')}
+          ${docs.map((d) => { const r = d.request; return `<div class="lw-tile doc" draggable="true" data-open-doc="${d.id}" data-drag="doc:${d.id}"><button type="button" class="lw-more" data-more="doc:${d.id}" aria-label="Aktionen">⋯</button><div class="ic" aria-hidden="true">📄</div><div class="nm">${escapeHtml(d.title)}</div><div class="meta">${fmt(d.updatedAt)}</div>${r && r.status === 'open' ? '<span class="lw-chip warn">⏳ Lernset wird erstellt</span>' : r && r.status === 'done' ? '<span class="lw-chip">✅ Lernset fertig</span>' : ''}</div>`; }).join('')}
+        </div>
+        ${!folders.length && !docs.length ? `<div class="lw-empty">${here ? 'Dieser Ordner ist leer.' : 'Noch nichts in diesem Fach.'} Lege ein Dokument an, füge Dateien hinzu oder erstelle einen Ordner.</div>` : ''}
+        ${here === null ? `<div class="lw-sec"><h2>🧠 Lernsets in diesem Fach</h2>${sets.length ? `<div class="lw-tiles">${sets.map((x) => `<div class="lw-tile set" data-open-set="${x.id}"><button type="button" class="lw-more" data-more="set:${x.id}" aria-label="Aktionen">⋯</button><div class="ic" aria-hidden="true">🧠</div><div class="nm">${escapeHtml(x.title)}</div><div class="meta">${x.cards} ${x.cards === 1 ? 'Karte' : 'Karten'}</div></div>`).join('')}</div>` : '<div class="lw-empty">Noch kein Lernset. Wähle bei einem Dokument über „⋯“ „Lernset erstellen lassen“.</div>'}</div>` : ''}`;
+      view.dataset.slug = c.slug;
+      view.dataset.title = c.name;
     }
 
     // ---------- Aktionen ----------
-    async function newDoc(slug) { const { id } = await api(`/api/learnworld/courses/${slug}/docs`, { method: 'POST', body: {} }); location.href = `/docs-edit?id=${id}`; }
+    async function newDoc() { const { id } = await api(`/api/learnworld/courses/${state.slug}/docs`, { method: 'POST', body: { folderId: state.folder } }); location.href = `/docs-edit?id=${id}`; }
+    function nameDialog(title, value, ok) {
+      modal(`<h2 style="margin:0 0 .5rem">${title}</h2><input type="text" id="nm-in" maxlength="80" value="${escapeHtml(value)}" autocomplete="off" style="width:100%"><p class="error" id="nm-err"></p>
+        <div class="row" style="justify-content:flex-end;gap:.5rem"><button type="button" data-close>Abbrechen</button><button type="button" class="primary" id="nm-ok">OK</button></div>`, (box, close) => {
+        const inp = box.querySelector('#nm-in');
+        setTimeout(() => { inp.focus(); inp.select(); }, 30);
+        const go = async () => { try { await ok(inp.value); close(); await refresh(); } catch (err) { box.querySelector('#nm-err').textContent = err.message; } };
+        box.querySelector('#nm-ok').onclick = go;
+        inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+      });
+    }
+    // Ziel für „Verschieben“ wählen: oberste Ebene und alle Ordner (eigene Unterordner bei Ordnern gesperrt)
+    function moveDialog(kind, id) {
+      const blocked = new Set();
+      if (kind === 'folder') { const walk = (x) => { blocked.add(x); kids(x).forEach((k) => walk(k.id)); }; walk(id); }
+      const rows = [];
+      const walk = (parent, depth) => { for (const f of kids(parent).sort((a, b) => collator.compare(a.name, b.name))) { rows.push(`<button type="button" data-to="${f.id}" style="padding-left:${0.8 + depth * 1.1}rem" ${blocked.has(f.id) ? 'disabled' : ''}>📁 ${escapeHtml(f.name)}</button>`); walk(f.id, depth + 1); } };
+      walk(null, 1);
+      modal(`<h2 style="margin:0 0 .5rem">In Ordner verschieben</h2><div class="lw-tree" style="border:1px solid var(--border);border-radius:12px;max-height:20rem;overflow:auto"><button type="button" data-to="">${state.data.course.icon} ${escapeHtml(state.data.course.name)} (oberste Ebene)</button>${rows.join('')}</div>
+        <div class="row" style="justify-content:flex-end;margin-top:.6rem"><button type="button" data-close>Abbrechen</button></div>`, (box, close) => {
+        box.addEventListener('click', async (e) => { const b = e.target.closest('[data-to]'); if (!b || b.disabled) return; try { await moveTo(kind, id, b.dataset.to === '' ? null : Number(b.dataset.to)); close(); } catch (err) { fail(err); } });
+      });
+    }
+    async function moveTo(kind, id, folderId) {
+      if (kind === 'doc') await api(`/api/learnworld/docs/${id}/folder`, { method: 'PUT', body: { folderId } });
+      else if (kind === 'folder') await api(`/api/learnworld/folders/${id}/parent`, { method: 'PUT', body: { parentId: folderId } });
+      await refresh();
+    }
+    function menu(kind, id) {
+      let title = ''; let items = [];
+      if (kind === 'doc') {
+        const d = state.data.docs.find((x) => x.id === id); const r = d.request;
+        title = d.title;
+        items = [['open', '📄 Öffnen'],
+          r && r.status === 'open' ? ['cancel', '↩ Anfrage zurückziehen'] : r && r.status === 'done' && r.setId ? ['learn', '🧠 Lernset lernen'] : null,
+          !(r && r.status === 'open') ? ['request', r && r.status === 'done' ? '🧠 Neues Lernset anfragen' : '🧠 Lernset erstellen lassen'] : null,
+          ['move', '📁 In Ordner verschieben …'], ['unassign', '✖ Aus dem Fach nehmen']];
+      } else if (kind === 'folder') {
+        title = folderById(id).name;
+        items = [['open', '📂 Öffnen'], ['rename', '✏️ Umbenennen'], ['move', '📁 Verschieben …'], ['delete', '🗑 Ordner löschen (Inhalt bleibt erhalten)']];
+      } else {
+        const x = state.data.sets.find((y) => y.id === id); title = x.title;
+        items = [['learn', '🧠 Lernen'], ['edit', '✏️ Bearbeiten'], ['unset', '✖ Aus dem Fach nehmen']];
+      }
+      modal(`<h2 style="margin:0 0 .6rem;overflow-wrap:anywhere">${escapeHtml(title)}</h2><div class="lw-menu">${items.filter(Boolean).map(([k, l]) => `<button type="button" data-m="${k}">${l}</button>`).join('')}</div>
+        <div class="row" style="justify-content:flex-end"><button type="button" data-close>Schließen</button></div>`, (box, close) => {
+        box.addEventListener('click', async (e) => {
+          const b = e.target.closest('[data-m]');
+          if (!b) return;
+          const m = b.dataset.m;
+          close();
+          try {
+            if (kind === 'doc') {
+              const d = state.data.docs.find((x) => x.id === id);
+              if (m === 'open') location.href = `/docs-edit?id=${id}`;
+              else if (m === 'learn') location.href = `/learn?id=${d.request.setId}`;
+              else if (m === 'request') requestDialog(String(id), d.title);
+              else if (m === 'cancel') { await api(`/api/learnworld/requests/${d.request.id}`, { method: 'DELETE' }); await refresh(); }
+              else if (m === 'move') moveDialog('doc', id);
+              else if (m === 'unassign' && confirm('Das Dokument bleibt erhalten, ist aber nicht mehr diesem Fach zugeordnet. Offene Anfragen dazu werden zurückgezogen.')) { await api(`/api/learnworld/docs/${id}/course`, { method: 'PUT', body: { slug: null } }); await refresh(); }
+            } else if (kind === 'folder') {
+              const f = folderById(id);
+              if (m === 'open') go(id);
+              else if (m === 'rename') nameDialog('Ordner umbenennen', f.name, (v) => api(`/api/learnworld/folders/${id}`, { method: 'PATCH', body: { name: v } }));
+              else if (m === 'move') moveDialog('folder', id);
+              else if (m === 'delete' && confirm(`Ordner „${f.name}“ löschen? Die Dateien und Unterordner darin bleiben erhalten und rücken eine Ebene nach oben.`)) { await api(`/api/learnworld/folders/${id}`, { method: 'DELETE' }); await refresh(); }
+            } else {
+              if (m === 'learn') location.href = `/learn?id=${id}`;
+              else if (m === 'edit') location.href = `/study-edit?id=${id}`;
+              else if (m === 'unset') { await api(`/api/learnworld/sets/${id}/course`, { method: 'PUT', body: { slug: null } }); await refresh(); }
+            }
+          } catch (err) { fail(err); }
+        });
+      });
+    }
+    const go = (folderId) => { location.hash = `${state.slug}${folderId ? `/${folderId}` : ''}`; };
+
     // Beliebige Dateien (auch mehrere) als Dokumente im Fach ablegen
     async function importFiles(slug, files, btn) {
       const log = [];
@@ -128,7 +247,7 @@
         try {
           btn.textContent = `Lese ${label} …`;
           const title = file.name.replace(/\.[a-z0-9]{1,5}$/i, '').slice(0, 120) || 'Importiertes Dokument';
-          ({ id: docId } = await api(`/api/learnworld/courses/${slug}/docs`, { method: 'POST', body: { title } }));
+          ({ id: docId } = await api(`/api/learnworld/courses/${slug}/docs`, { method: 'POST', body: { title, folderId: state.folder } }));
           const { html, kind } = await DocsImport.fileToHtml(file, docId, (t) => { btn.textContent = `${label}: ${t}`; });
           btn.textContent = `Lege ${label} ab …`;
           const ops = await DocsImport.htmlToOps(html);
@@ -142,7 +261,7 @@
       }
       btn.disabled = false; btn.textContent = '📎 Dateien hinzufügen';
       const keep = log.slice();
-      await course(slug).catch(fail);
+      await refresh().catch(fail);
       log.splice(0, log.length, ...keep); show();
     }
     async function assignDialog(slug) {
@@ -155,7 +274,7 @@
         box.addEventListener('click', async (e) => {
           const b = e.target.closest('[data-doc], [data-set]');
           if (!b) return;
-          try { await api(b.dataset.doc ? `/api/learnworld/docs/${b.dataset.doc}/course` : `/api/learnworld/sets/${b.dataset.set}/course`, { method: 'PUT', body: { slug } }); b.remove(); route(); } catch (err) { fail(err); }
+          try { await api(b.dataset.doc ? `/api/learnworld/docs/${b.dataset.doc}/course` : `/api/learnworld/sets/${b.dataset.set}/course`, { method: 'PUT', body: { slug, folderId: state.folder } }); b.remove(); refresh(); } catch (err) { fail(err); }
         });
       });
     }
@@ -167,49 +286,83 @@
         <p class="error" id="rq-err"></p>
         <div class="row" style="justify-content:flex-end;gap:.5rem"><button type="button" data-close>Abbrechen</button><button type="button" class="primary" id="rq-ok">Anfrage senden</button></div>`, (box, close) => {
         box.querySelector('#rq-ok').onclick = async () => {
-          try { await api('/api/learnworld/requests', { method: 'POST', body: { docId, note: box.querySelector('#rq-note').value } }); close(); route(); }
+          try { await api('/api/learnworld/requests', { method: 'POST', body: { docId, note: box.querySelector('#rq-note').value } }); close(); refresh(); }
           catch (err) { box.querySelector('#rq-err').textContent = err.message; }
         };
       });
     }
+    // Klicks: Kacheln öffnen, „⋯“-Menü, Werkzeugleiste, Brotkrumen
     view.addEventListener('click', async (e) => {
-      const t = e.target.closest('button');
+      if (!state.data) return;
+      const more = e.target.closest('[data-more]');
+      if (more) { e.stopPropagation(); const [k, id] = more.dataset.more.split(':'); menu(k, Number(id)); return; }
+      const crumb = e.target.closest('[data-go]');
+      if (crumb) { go(crumb.dataset.go === '' ? null : Number(crumb.dataset.go)); return; }
+      const f = e.target.closest('[data-open-folder]'); if (f) { go(Number(f.dataset.openFolder)); return; }
+      const d = e.target.closest('[data-open-doc]'); if (d) { location.href = `/docs-edit?id=${d.dataset.openDoc}`; return; }
+      const st = e.target.closest('[data-open-set]'); if (st) { location.href = `/learn?id=${st.dataset.openSet}`; return; }
+      const t = e.target.closest('button[data-act]');
       if (!t) return;
-      const slug = view.dataset.slug;
       try {
-        if (t.dataset.act === 'new') await newDoc(slug);
+        if (t.dataset.act === 'new') await newDoc();
         else if (t.dataset.act === 'files') $('#wordfile').click();
-        else if (t.dataset.act === 'assign') await assignDialog(slug);
-        else if (t.dataset.req) requestDialog(t.dataset.req, t.dataset.title);
-        else if (t.dataset.cancel) { await api(`/api/learnworld/requests/${t.dataset.cancel}`, { method: 'DELETE' }); route(); }
-        else if (t.dataset.unassign) { if (confirm('Das Dokument bleibt erhalten, ist aber nicht mehr diesem Fach zugeordnet. Offene Anfragen dazu werden zurückgezogen.')) { await api(`/api/learnworld/docs/${t.dataset.unassign}/course`, { method: 'PUT', body: { slug: null } }); route(); } }
-        else if (t.dataset.unset) { await api(`/api/learnworld/sets/${t.dataset.unset}/course`, { method: 'PUT', body: { slug: null } }); route(); }
+        else if (t.dataset.act === 'assign') await assignDialog(state.slug);
+        else if (t.dataset.act === 'folder') nameDialog('Neuer Ordner', '', (v) => api(`/api/learnworld/courses/${state.slug}/folders`, { method: 'POST', body: { name: v, parentId: state.folder } }));
       } catch (err) { fail(err); }
     });
+    view.addEventListener('change', (e) => { if (e.target.id === 'lw-sort') { state.sort = e.target.value; try { localStorage.setItem('lw-sort', state.sort); } catch { /* egal */ } render(); } });
+
+    // Ziehen und Ablegen: Dateien/Ordner auf einen Ordner (oder eine Brotkrume) ziehen
+    view.addEventListener('dragstart', (e) => { const t = e.target.closest('[data-drag]'); if (!t) return; e.dataTransfer.setData('application/x-lw', t.dataset.drag); e.dataTransfer.effectAllowed = 'move'; t.classList.add('dragging'); });
+    view.addEventListener('dragend', (e) => { e.target.closest && e.target.closest('[data-drag]')?.classList.remove('dragging'); view.querySelectorAll('.lw-over').forEach((x) => x.classList.remove('lw-over')); });
+    const dropTarget = (e) => (e.dataTransfer && [...e.dataTransfer.types].includes('application/x-lw') ? e.target.closest('[data-drop-folder]') : null);
+    view.addEventListener('dragover', (e) => { const t = dropTarget(e); if (t) { e.preventDefault(); view.querySelectorAll('.lw-over').forEach((x) => x !== t && x.classList.remove('lw-over')); t.classList.add('lw-over'); } });
+    view.addEventListener('dragleave', (e) => { const t = e.target.closest && e.target.closest('[data-drop-folder]'); if (t && !t.contains(e.relatedTarget)) t.classList.remove('lw-over'); });
+    view.addEventListener('drop', async (e) => {
+      const t = dropTarget(e);
+      if (!t) return;
+      e.preventDefault(); e.stopPropagation();
+      t.classList.remove('lw-over');
+      const [kind, id] = e.dataTransfer.getData('application/x-lw').split(':');
+      const to = t.dataset.dropFolder === '' ? null : Number(t.dataset.dropFolder);
+      if (kind === 'folder' && Number(id) === to) return;
+      try { await moveTo(kind, Number(id), to); } catch (err) { fail(err); }
+    });
+
     // Dateien einfach auf die Seite ziehen (Computer/iPad mit Maus oder Split View)
-    addEventListener('dragover', (e) => { if (view.dataset.slug && [...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); document.body.classList.add('dropping'); } });
+    addEventListener('dragover', (e) => { if (state.slug && [...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); document.body.classList.add('dropping'); } });
     addEventListener('dragleave', (e) => { if (!e.relatedTarget) document.body.classList.remove('dropping'); });
     addEventListener('drop', (e) => {
       document.body.classList.remove('dropping');
-      if (!view.dataset.slug || !e.dataTransfer?.files?.length) return;
+      if (!state.slug || !e.dataTransfer?.files?.length) return;
       e.preventDefault();
-      importFiles(view.dataset.slug, [...e.dataTransfer.files], document.querySelector('[data-act=files]'));
+      importFiles(state.slug, [...e.dataTransfer.files], document.querySelector('[data-act=files]'));
     });
     document.addEventListener('change', (e) => {
       if (e.target.id !== 'wordfile') return;
       const files = [...e.target.files];
       e.target.value = '';
-      if (files.length) importFiles(view.dataset.slug, files, document.querySelector('[data-act=files]'));
+      if (files.length) importFiles(state.slug, files, document.querySelector('[data-act=files]'));
     });
-    document.querySelector('#back-link').addEventListener('click', (e) => { if (slugNow()) { e.preventDefault(); location.hash = ''; } });
+    document.querySelector('#back-link').addEventListener('click', (e) => {
+      if (!slugNow()) return;
+      e.preventDefault();
+      const f = state.folder && folderById(state.folder);
+      if (f) go(f.parentId); else location.hash = '';
+    });
 
-    function route() {
+    // Hash: #fach oder #fach/ordner
+    async function route() {
       $('#error').textContent = '';
-      const slug = slugNow();
-      (slug ? course(slug) : home()).catch(fail);
+      const [slug, folder] = hashParts();
+      if (!slug) { state.slug = null; state.data = null; await home(); return; }
+      if (state.slug !== slug || !state.data) await load(slug);
+      state.folder = /^\d+$/.test(folder || '') ? Number(folder) : null;
+      render();
     }
-    addEventListener('hashchange', route);
-    requireLogin().then((me) => { mountNav('home', me); route(); });
+    const run = () => route().catch(fail);
+    addEventListener('hashchange', run);
+    requireLogin().then((me) => { mountNav('home', me); run(); });
   </script>
 </body>
 </html>
