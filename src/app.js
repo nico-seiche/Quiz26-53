@@ -15,6 +15,7 @@ const gesetze = require('./gesetze');
 const slides = require('./slides');
 const docs = require('./docs');
 const learnworld = require('./learnworld');
+const trainings = require('./trainings');
 const db = require('./db');
 
 // Die API; lokal von server.js gestartet, auf Vercel als Serverless-Funktion (api/index.js)
@@ -68,6 +69,7 @@ app.use('/api/gesetze', gesetze.router);
 app.use('/api/slides', slides.router);
 app.use('/api/docs', docs.router);
 app.use('/api/learnworld', learnworld.router);
+app.use('/api/trainings', trainings.router);
 app.use('/api/me/avatar', avatars.meRouter);
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Nicht gefunden' }));

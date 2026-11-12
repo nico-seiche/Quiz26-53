@@ -2,6 +2,15 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-25',
+    title: 'Neu: Übungen für Gutachten',
+    items: [
+      ['🧩', 'Prüfungsschemata üben', 'Reihenfolge herstellen, Lücken ergänzen oder das ganze Schema aus dem Kopf aufschreiben – für den Prüfungsaufbau präventiv, repressiv und den Gutachtenstil.'],
+      ['✍️', 'Musterformulierungen', 'Lücken in den Musterabsätzen füllen, Bausteine ordnen oder selbst formulieren und mit dem Muster vergleichen.'],
+      ['🎯', 'In der Learnworld', 'Die Übungen stehen im Fach unter „🎯 Übungen“.'],
+    ],
+  },
+  {
     id: '2026-11-24',
     title: 'Learnworld: Ordner und Kacheln',
     items: [

@@ -234,6 +234,8 @@ Beim Lernen (`public/learn.html`) meldet „🚩 Fehler in dieser Karte melden�
 
 **Ordner und Kacheln:** Die Fachseite zeigt Ordner (`quiz.lw_folders`, verschachtelbar, Migration 036) und Dokumente (`quiz.docs.folder_id`) als Kacheln, Lernsets auf der obersten Ebene. Hash `#fach` bzw. `#fach/<ordner-id>`; Aktionen über „⋯“ (öffnen, verschieben, umbenennen, löschen = Inhalt rückt nach oben), Ziehen und Ablegen auf Ordner und Brotkrumen, Sortierung A–Z oder neueste zuerst. API: `POST /api/learnworld/courses/:slug/folders`, `PATCH`/`DELETE /folders/:id`, `PUT /folders/:id/parent`, `PUT /docs/:id/folder`; neue Dateien landen im geöffneten Ordner.
 
+**Übungen** (`/train?id=`, `public/train.html`, `quiz.trainings`, Migration 037, `GET /api/trainings/:id`; Kacheln „🎯 Übungen“ im Fach): zwei Arten, mit dem Dokumentinhalt vorbereitet und per SQL angelegt. `schema`: `data = { intro, nodes: [{ t, c: [...] }] }` (Nummerierung entsteht aus der Tiefe; Übungen Reihenfolge, Lücken, Aus dem Kopf; Auswertung per Wortabgleich `coverage()`, ab 60 % richtig). `muster`: `data = { intro, sections: [{ title, hint, blocks: [{ role, text }] }] }` mit Lücken `{{Antwort|Alternative}}` im Text (Übungen Lücken füllen, Bausteine ordnen, Selbst formulieren mit Schlüsselbegriff-Abgleich). Fortschritt wird noch nicht gespeichert.
+
 **Anfragen bearbeiten** (nicht automatisch – geschieht, wenn Claude dazu aufgefordert wird): offene Anfragen samt Dokumenttext liefert `SELECT * FROM quiz.lw_open_requests;` (Spalten `id, username, user_id, course, subject_id, course_id, doc_id, doc_title, note, text`). Danach das Lernset anlegen und die Anfrage abschließen:
 
 ```sql

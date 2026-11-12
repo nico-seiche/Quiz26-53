@@ -32,9 +32,11 @@ router.get('/courses/:slug', async (req, res) => {
   const sets = await db.query(`
     SELECT s.id, s.title, s.updated_at, (SELECT COUNT(*)::int FROM quiz.study_cards k WHERE k.set_id = s.id) AS cards
     FROM quiz.study_sets s WHERE s.owner_id = $1 AND s.course_id = $2 ORDER BY s.updated_at DESC`, [req.user.id, c.id]);
+  const trainings = await db.query('SELECT id, title, kind FROM quiz.trainings WHERE owner_id = $1 AND course_id = $2 ORDER BY title', [req.user.id, c.id]);
   const folders = await db.query('SELECT id, parent_id, name FROM quiz.lw_folders WHERE user_id = $1 AND course_id = $2 ORDER BY name', [req.user.id, c.id]);
   res.json({
     course: c,
+    trainings: trainings.map((t) => ({ id: Number(t.id), title: t.title, kind: t.kind })),
     folders: folders.map((f) => ({ id: Number(f.id), parentId: f.parent_id ? Number(f.parent_id) : null, name: f.name })),
     docs: docs.map((d) => ({ id: Number(d.id), folderId: d.folder_id ? Number(d.folder_id) : null, title: d.title, preview: d.preview, updatedAt: d.updated_at, request: d.request_id ? { id: Number(d.request_id), status: d.request_status, setId: d.request_set ? Number(d.request_set) : null, note: d.request_note } : null })),
     sets: sets.map((s) => ({ id: Number(s.id), title: s.title, cards: s.cards, updatedAt: s.updated_at })),

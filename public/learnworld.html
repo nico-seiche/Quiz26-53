@@ -153,6 +153,7 @@
           ${docs.map((d) => { const r = d.request; return `<div class="lw-tile doc" draggable="true" data-open-doc="${d.id}" data-drag="doc:${d.id}"><button type="button" class="lw-more" data-more="doc:${d.id}" aria-label="Aktionen">⋯</button><div class="ic" aria-hidden="true">📄</div><div class="nm">${escapeHtml(d.title)}</div><div class="meta">${fmt(d.updatedAt)}</div>${r && r.status === 'open' ? '<span class="lw-chip warn">⏳ Lernset wird erstellt</span>' : r && r.status === 'done' ? '<span class="lw-chip">✅ Lernset fertig</span>' : ''}</div>`; }).join('')}
         </div>
         ${!folders.length && !docs.length ? `<div class="lw-empty">${here ? 'Dieser Ordner ist leer.' : 'Noch nichts in diesem Fach.'} Lege ein Dokument an, füge Dateien hinzu oder erstelle einen Ordner.</div>` : ''}
+        ${here === null && (state.data.trainings || []).length ? `<div class="lw-sec"><h2>🎯 Übungen</h2><div class="lw-tiles">${state.data.trainings.map((x) => `<div class="lw-tile train" data-open-train="${x.id}"><div class="ic" aria-hidden="true">${x.kind === 'schema' ? '🧩' : '✍️'}</div><div class="nm">${escapeHtml(x.title)}</div><div class="meta">${x.kind === 'schema' ? 'Prüfungsschema' : 'Musterformulierungen'}</div></div>`).join('')}</div></div>` : ''}
         ${here === null ? `<div class="lw-sec"><h2>🧠 Lernsets in diesem Fach</h2>${sets.length ? `<div class="lw-tiles">${sets.map((x) => `<div class="lw-tile set" data-open-set="${x.id}"><button type="button" class="lw-more" data-more="set:${x.id}" aria-label="Aktionen">⋯</button><div class="ic" aria-hidden="true">🧠</div><div class="nm">${escapeHtml(x.title)}</div><div class="meta">${x.cards} ${x.cards === 1 ? 'Karte' : 'Karten'}</div></div>`).join('')}</div>` : '<div class="lw-empty">Noch kein Lernset. Wähle bei einem Dokument über „⋯“ „Lernset erstellen lassen“.</div>'}</div>` : ''}`;
       view.dataset.slug = c.slug;
       view.dataset.title = c.name;
@@ -300,6 +301,7 @@
       if (crumb) { go(crumb.dataset.go === '' ? null : Number(crumb.dataset.go)); return; }
       const f = e.target.closest('[data-open-folder]'); if (f) { go(Number(f.dataset.openFolder)); return; }
       const d = e.target.closest('[data-open-doc]'); if (d) { location.href = `/docs-edit?id=${d.dataset.openDoc}`; return; }
+      const tr = e.target.closest('[data-open-train]'); if (tr) { location.href = `/train?id=${tr.dataset.openTrain}`; return; }
       const st = e.target.closest('[data-open-set]'); if (st) { location.href = `/learn?id=${st.dataset.openSet}`; return; }
       const t = e.target.closest('button[data-act]');
       if (!t) return;
