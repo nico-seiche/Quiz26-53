@@ -25,7 +25,7 @@
     <div class="row spread section-head">
       <h1 style="margin:0">📝 Dokumente</h1>
       <div class="row" style="gap:.5rem"><button type="button" id="word">📥 Datei importieren</button><button type="button" class="primary" id="new">+ Neues Dokument</button></div>
-      <input type="file" id="wordfile" hidden>
+      <input type="file" id="wordfile" multiple hidden>
     </div>
     <p class="muted">Schreibe Texte mit Überschriften, Listen, Tabellen und Bildern. Als PDF speichern über „PDF / Drucken“.</p>
     <p class="error" id="error"></p>
@@ -63,11 +63,33 @@
     };
     $('#word').onclick = () => $('#wordfile').click();
     $('#wordfile').onchange = async (e) => {
-      const f = e.target.files[0];
+      const files = [...e.target.files];
       e.target.value = '';
-      if (!f) return;
+      if (!files.length) return;
+      const f = files[0];
       const btn = $('#word');
       btn.disabled = true;
+      if (files.length > 1) {      // mehrere Dateien: jede wird ein eigenes Dokument, Ergebnis steht unten
+        const log = [];
+        for (const [i, file] of files.entries()) {
+          let docId = null;
+          try {
+            btn.textContent = `Lese ${i + 1}/${files.length}: ${file.name} …`;
+            const title = file.name.replace(/\.[a-z0-9]{1,5}$/i, '').slice(0, 120) || 'Importiertes Dokument';
+            ({ id: docId } = await api('/api/docs', { method: 'POST', body: { title } }));
+            const { html } = await DocsImport.fileToHtml(file, docId, (t) => { btn.textContent = `${file.name}: ${t}`; });
+            await api(`/api/docs/${docId}`, { method: 'PUT', body: { title, delta: await DocsImport.htmlToOps(html), rev: 1 } });
+            log.push(`✓ ${file.name}`);
+          } catch (err) {
+            if (docId) await api(`/api/docs/${docId}`, { method: 'DELETE' }).catch(() => {});
+            log.push(`✗ ${file.name}: ${err.message}`);
+          }
+        }
+        $('#error').innerHTML = log.map((l) => escapeHtml(l)).join('<br>');
+        btn.disabled = false; btn.textContent = '📥 Datei importieren';
+        load();
+        return;
+      }
       try {
         btn.textContent = 'Wird importiert …';
         const title = f.name.replace(/\.[a-z0-9]{1,5}$/i, '').slice(0, 120) || 'Importiertes Dokument';

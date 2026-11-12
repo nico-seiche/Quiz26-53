@@ -27,6 +27,7 @@
   </main>
   <style>
     .lw-hero { margin-bottom: 1rem; }
+    body.dropping main { outline: 3px dashed var(--primary); outline-offset: -8px; background: color-mix(in srgb, var(--primary) 8%, transparent); }
     .lw-hero h1 { margin: 0 0 .2rem; }
     .lw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: .9rem; }
     .lw-course { display: flex; flex-direction: column; gap: .5rem; text-align: left; padding: 1.1rem; margin: 0; border: 1px solid var(--border); border-radius: 20px; background: var(--card); color: var(--text); box-shadow: var(--shadow); cursor: pointer; text-decoration: none; }
@@ -93,7 +94,7 @@
         <p class="muted" style="margin:0 0 .7rem">Dokumente dieses Fachs und die daraus entstandenen Lernsets.</p>
         <div class="lw-tools"><button type="button" class="primary" data-act="new">+ Neues Dokument</button><button type="button" data-act="files">📎 Dateien hinzufügen</button><button type="button" data-act="assign">📎 Vorhandene zuordnen</button></div>
         <input type="file" id="wordfile" multiple hidden></div>
-        <p class="muted" style="margin:.6rem 0 0;font-size:.88rem">Word, PDF, PowerPoint, Text, Markdown, HTML, OpenDocument und Bilder – die App erkennt die Art selbst und legt daraus ein bearbeitbares Dokument an. Bei PDF und PowerPoint wird nur der Text übernommen.</p><div id="import-log"></div>
+        <p class="muted" style="margin:.6rem 0 0;font-size:.88rem">Mehrere Dateien auf einmal auswählen oder hierher ziehen. Word, PDF, PowerPoint, Text, Markdown, HTML, OpenDocument und Bilder – die App erkennt die Art selbst und legt daraus ein bearbeitbares Dokument an. Bei PDF und PowerPoint wird nur der Text übernommen.</p><div id="import-log"></div>
 
         <div class="lw-sec"><h2>📄 Meine Dokumente</h2>${data.docs.length ? data.docs.map((d) => docRow(d)).join('') : '<div class="lw-empty">Noch kein Dokument in diesem Fach. Lege eine Mitschrift an, importiere eine Word-Datei oder ordne ein vorhandenes Dokument zu.</div>'}</div>
         <div class="lw-sec"><h2>🧠 Lernsets in diesem Fach</h2>${data.sets.length ? data.sets.map((s) => `<div class="lw-row"><div class="t"><a href="/learn?id=${s.id}">${escapeHtml(s.title)}</a><div class="snippet">${s.cards} ${s.cards === 1 ? "Karte" : "Karten"} · ${fmt(s.updatedAt)}</div>
@@ -184,6 +185,15 @@
         else if (t.dataset.unassign) { if (confirm('Das Dokument bleibt erhalten, ist aber nicht mehr diesem Fach zugeordnet. Offene Anfragen dazu werden zurückgezogen.')) { await api(`/api/learnworld/docs/${t.dataset.unassign}/course`, { method: 'PUT', body: { slug: null } }); route(); } }
         else if (t.dataset.unset) { await api(`/api/learnworld/sets/${t.dataset.unset}/course`, { method: 'PUT', body: { slug: null } }); route(); }
       } catch (err) { fail(err); }
+    });
+    // Dateien einfach auf die Seite ziehen (Computer/iPad mit Maus oder Split View)
+    addEventListener('dragover', (e) => { if (view.dataset.slug && [...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); document.body.classList.add('dropping'); } });
+    addEventListener('dragleave', (e) => { if (!e.relatedTarget) document.body.classList.remove('dropping'); });
+    addEventListener('drop', (e) => {
+      document.body.classList.remove('dropping');
+      if (!view.dataset.slug || !e.dataTransfer?.files?.length) return;
+      e.preventDefault();
+      importFiles(view.dataset.slug, [...e.dataTransfer.files], document.querySelector('[data-act=files]'));
     });
     document.addEventListener('change', (e) => {
       if (e.target.id !== 'wordfile') return;
