@@ -89,10 +89,17 @@
     .law-views button { padding: .45rem .8rem; font-size: .9rem; }
     .law-views button[aria-pressed="true"] { background: var(--bg); border-color: var(--primary); color: var(--link); }
     .grid-head { margin: .2rem 0 .2rem; font-size: 1.3rem; }
-    .num-row { display: grid; grid-template-columns: 3.8rem minmax(0, 1fr); gap: .5rem; align-items: center; margin-bottom: .55rem; }
-    .num-tiles { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: .55rem; }
-    .num-row-label { font-size: .8rem; font-weight: 800; color: var(--muted); }
-    .num-tile { width: 100%; aspect-ratio: 1 / .8; display: grid; place-items: center; padding: 0; border: 2px solid var(--tile-border); border-radius: 14px; background: var(--card); color: var(--text); font-weight: 800; font-size: 1.5rem; font-variant-numeric: tabular-nums; cursor: pointer; box-shadow: none; transition: transform .12s, background .12s; }
+    .law-read { container-type: inline-size; container-name: lawread; }
+    .num-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: .3rem; margin-bottom: .9rem; }
+    .num-tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .5rem; }
+    .num-row-label { font-size: .78rem; font-weight: 800; color: var(--muted); letter-spacing: .02em; }
+    /* breite Karte: Zehnerblock in einer Reihe mit Beschriftung links; schmale Karte: fünf Felder pro Zeile, Beschriftung darüber */
+    @container lawread (min-width: 640px) {
+      .num-row { grid-template-columns: 3.8rem minmax(0, 1fr); gap: .5rem; align-items: center; margin-bottom: .55rem; }
+      .num-tiles { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: .55rem; }
+      .num-tile { font-size: 1.5rem; aspect-ratio: 1 / .8; }
+    }
+    .num-tile { width: 100%; aspect-ratio: 1 / .85; display: grid; place-items: center; padding: 0; border: 2px solid var(--tile-border); border-radius: 14px; background: var(--card); color: var(--text); font-weight: 800; font-size: 1.3rem; white-space: nowrap; line-height: 1; font-variant-numeric: tabular-nums; cursor: pointer; box-shadow: none; transition: transform .12s, background .12s; }
     .num-tile:hover { background: var(--primary-grad); color: #fff; border-color: transparent; transform: translateY(-2px); }
     .num-tile[aria-current="true"] { background: var(--primary-grad); color: #fff; border-color: transparent; box-shadow: var(--glow); }
     .num-tile.empty { border: 1.5px dashed var(--border); background: transparent; color: var(--muted); font-weight: 600; opacity: .45; cursor: default; }
@@ -157,9 +164,6 @@
       .toc { overflow: visible; }
       .law-layout:not(.mobile-toc) .law-side { display: none; }
       .law-layout.mobile-toc .law-read { display: none; }
-      .num-row { grid-template-columns: minmax(0, 1fr); gap: .3rem; margin-bottom: .9rem; }
-      .num-tiles { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .45rem; }
-      .num-tile { font-size: 1.35rem; aspect-ratio: 1 / .9; }
       .law-read { padding: 1.1rem 1rem; }
       .law-keys { display: none; }
     }
