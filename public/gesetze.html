@@ -131,7 +131,25 @@
     .law-keys { margin-top: 1rem; font-size: .85rem; color: var(--muted); }
     kbd { padding: .05rem .35rem; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); font-size: .8rem; }
 
+    /* Zwei Paragraphen nebeneinander */
+    #read2 { display: none; }
+    .law-layout.split #read2 { display: block; }
+    .law-layout.split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .law-layout.split.side-open { grid-template-columns: 300px minmax(0, 1fr) minmax(0, 1fr); }
+    .law-layout.split .law-read { padding: 1.1rem 1.1rem; }
+    .law-read .btn-back { background: var(--bg); border-color: var(--primary); color: var(--link); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .p2-bar { display: flex; gap: .4rem; align-items: center; margin-bottom: .6rem; }
+    .p2-bar select { flex: 1 1 0; min-width: 0; margin: 0; width: auto; }
+    .p2-bar input { flex: 1 1 0; min-width: 0; margin: 0; width: auto; }
+    .p2-bar button { margin: 0; padding: .4rem .7rem; box-shadow: none; flex: none; }
+    .p2-hits { max-height: 18rem; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; margin-bottom: .8rem; }
+    .p2-hits:empty { display: none; }
+    .p2-hits button { display: block; width: 100%; text-align: left; margin: 0; padding: .5rem .7rem; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; color: var(--text); box-shadow: none; font-weight: 400; overflow-wrap: anywhere; }
+    .p2-hits b { color: var(--primary); }
+
     @media (max-width: 860px) {
+      .law-layout.split, .law-layout.split.side-open { grid-template-columns: minmax(0, 1fr); }
+      .law-layout.mobile-toc #read2 { display: none; }
       main.law-main { padding-left: .75rem; padding-right: .75rem; }
       .law-layout, .law-layout.side-open { grid-template-columns: minmax(0, 1fr); }
       .law-layout:not(.side-open) .law-side { display: block; }
@@ -165,6 +183,7 @@
         <div class="toc" id="toc"></div>
       </aside>
       <section class="card law-read" id="read" aria-live="polite"></section>
+      <section class="card law-read" id="read2" aria-live="polite"></section>
     </div>
     <section class="card" id="favs" hidden></section>
   </main>
@@ -183,6 +202,9 @@
     let prefs = { hidden: [], order: [] };
     let notes = [];            // Markierungen und Notizen: { id, law, num, line, start, end, quote, color, note }
     let favs = [];             // { law, num, title }
+    let trail = [];            // besuchte Paragraphen (für „Zurück“): { slug, num }
+    let split = false;         // zwei Paragraphen nebeneinander
+    const p2 = { slug: null, num: null, trail: [] };   // rechtes Fenster
     let favMode = false;       // Favoriten- oder Notizenseite offen
     let special = '__fav';     // welche: '__fav' oder '__notes'
     const cache = new Map();
@@ -390,9 +412,13 @@
     const tocOpen = () => $('#layout').classList.contains(isMobile() ? 'mobile-toc' : 'side-open');
 
     function viewsHtml() {
-      return `<div class="law-views">
+      const back = trail[trail.length - 1];
+      const bl = back && laws.find((l) => l.slug === back.slug);
+      return `<div class="law-views" style="flex-wrap:wrap">
+        ${back ? `<button type="button" class="btn-back" data-back title="Zurück zum zuletzt gelesenen Paragraphen">↩ Zurück: ${escapeHtml((bl && bl.unit) || '§')} ${escapeHtml(back.num)} ${escapeHtml(bl ? bl.short : '')}</button>` : ''}
         <button type="button" data-view="grid" aria-pressed="${pane === 'grid'}">▦ Übersicht</button>
         <button type="button" data-view="toc" aria-pressed="${tocOpen()}">☰ Inhaltsverzeichnis</button>
+        <button type="button" data-view="split" aria-pressed="${split}" title="Zwei Paragraphen nebeneinander lesen">⫼ Nebeneinander</button>
       </div>`;
     }
 
@@ -772,9 +798,10 @@
       renderFavs();
     }
 
-    function show(num, { push = true, scroll = true } = {}) {
+    function show(num, { push = true, scroll = true, trail: record = true } = {}) {
       const p = byNum.get(num);
       if (!p) return;
+      if (record && current && current !== p && pane === 'read') pushTrail(trail, { slug: law.slug, num: current.num });
       current = p;
       store.set(`law:${law.slug}`, num);
       const g = groupOf(num);
@@ -790,6 +817,7 @@
     }
 
     function showView(view) {
+      if (view === 'split') { toggleSplit(); return; }
       if (view === 'grid') {
         pane = 'grid';
         $('#layout').classList.remove('mobile-toc');
@@ -806,8 +834,9 @@
       }
     }
 
-    async function openLaw(slug, num) {
+    async function openLaw(slug, num, { trail: record = true } = {}) {
       $('#error').textContent = '';
+      const prevState = law && current && pane === 'read' ? { slug: law.slug, num: current.num } : null;
       favMode = false;
       $('#favs').hidden = true;
       if (!cache.has(slug)) cache.set(slug, await api(`/api/gesetze/${slug}`));
@@ -828,8 +857,120 @@
       renderToc();
       renderRead();
       if (num && byNum.has(num)) show(num, { scroll: false });
+      if (record && prevState && num && byNum.has(num) && (prevState.slug !== slug || prevState.num !== num)) { pushTrail(trail, prevState); renderRead(); }
       history.replaceState(null, '', num && byNum.has(num) ? `#${slug}/${num}` : `#${slug}`);
+      if (split) renderPane2();
     }
+
+    // --- Zurück (Verlauf der besuchten Paragraphen) und zwei Paragraphen nebeneinander ---
+    function pushTrail(list, entry) {
+      const last = list[list.length - 1];
+      if (last && last.slug === entry.slug && last.num === entry.num) return;
+      list.push(entry);
+      if (list.length > 60) list.shift();
+    }
+    async function goBack() {
+      const e = trail.pop();
+      if (!e) return;
+      if (law && e.slug === law.slug && !favMode) show(e.num, { trail: false });
+      else await openLaw(e.slug, e.num, { trail: false });
+      renderRead();
+    }
+
+    // Für das rechte Fenster ein anderes Gesetz kurz „aktiv“ schalten (Verweis-Erkennung und Titel hängen an diesen Variablen)
+    function prepareLaw(l) {
+      if (l._by) return;
+      l._pars = l.items.filter((i) => i.type === 'par');
+      for (const p of l._pars) if (!p.title && !p.lt) { const t = (p.text[0] || '').replace(/^\(\d+[a-z]?\)\s*/, ''); p.lt = t.length > 60 ? `${t.slice(0, 58).trim()}…` : t; }
+      l._by = new Map(l._pars.map((p) => [p.num, p]));
+    }
+    async function lawFor(slug) {
+      if (!cache.has(slug)) cache.set(slug, await api(`/api/gesetze/${slug}`));
+      const l = cache.get(slug);
+      prepareLaw(l);
+      return l;
+    }
+    function withLaw(l, fn) {
+      const saved = { law, pars, byNum, current, query };
+      law = l; pars = l._pars; byNum = l._by; current = null; query = '';
+      buildRef(); buildOtherLaw();
+      try { return fn(); } finally {
+        ({ law, pars, byNum, current, query } = saved);
+        if (law) { buildRef(); buildOtherLaw(); }
+      }
+    }
+    function toggleSplit() {
+      split = !split;
+      store.set('law:split', split ? '1' : '');
+      $('#layout').classList.toggle('split', split);
+      if (split) {
+        if (!p2.slug) { p2.slug = law ? law.slug : null; p2.num = current ? current.num : null; }
+        renderPane2();
+      } else $('#read2').innerHTML = '';
+      renderRead();
+    }
+    function p2Hits(l, term) {
+      const t = term.trim().toLowerCase().replace(/^(§|art\.?)\s*/, '');
+      const list = t ? l._pars.filter((p) => p.num.toLowerCase().startsWith(t) || (p.title || '').toLowerCase().includes(t) || (p.text[0] || '').toLowerCase().includes(t)) : l._pars;
+      return list.slice(0, 60).map((p) => `<button type="button" data-p2num="${escapeHtml(p.num)}"><b>${escapeHtml(l.unit || '§')} ${escapeHtml(p.num)}</b> ${escapeHtml(p.title || p.lt || '')}</button>`).join('');
+    }
+    async function renderPane2() {
+      const box = $('#read2');
+      if (!split) return;
+      const vis = visibleLaws();
+      if (!p2.slug) p2.slug = (vis[0] || laws[0]).slug;
+      let l;
+      try { l = await lawFor(p2.slug); } catch (err) { box.innerHTML = `<p class="error">${escapeHtml(err.message)}</p>`; return; }
+      const par = p2.num && l._by.get(p2.num);
+      const opts = [...vis, ...(vis.some((x) => x.slug === p2.slug) ? [] : laws.filter((x) => x.slug === p2.slug))];
+      const back = p2.trail[p2.trail.length - 1];
+      let html = `<div class="p2-bar"><select id="p2-law" aria-label="Gesetz rechts">${opts.map((x) => `<option value="${x.slug}" ${x.slug === p2.slug ? 'selected' : ''}>${escapeHtml(x.short)}</option>`).join('')}</select>
+        <input type="text" id="p2-q" placeholder="§ oder Stichwort" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Paragraph rechts suchen">
+        <button type="button" data-p2close title="Rechtes Fenster schließen" aria-label="Schließen">✕</button></div><div class="p2-hits" id="p2-hits">${par ? '' : p2Hits(l, '')}</div>`;
+      if (par) {
+        const i = l._pars.indexOf(par);
+        const prev = l._pars[i - 1]; const next = l._pars[i + 1];
+        const u = l.unit || '§';
+        html += withLaw(l, () => `<div class="law-views" style="flex-wrap:wrap">
+            ${back ? `<button type="button" class="btn-back" data-p2back>↩ Zurück: ${escapeHtml(u)} ${escapeHtml(back.num)}</button>` : ''}
+            <button type="button" data-p2left title="Diesen Paragraphen links öffnen">◀ Links öffnen</button></div>
+          <div class="par-nav">
+            <button type="button" data-p2num="${prev ? prev.num : ''}" data-p2seq ${prev ? '' : 'disabled'}><span class="small">‹ Vorher</span><span class="tt">${prev ? `${u} ${prev.num} ${escapeHtml(lt(prev))}` : '–'}</span></button>
+            <button type="button" data-p2num="${next ? next.num : ''}" data-p2seq ${next ? '' : 'disabled'}><span class="small">Weiter ›</span><span class="tt">${next ? `${u} ${next.num} ${escapeHtml(lt(next))}` : '–'}</span></button>
+          </div>
+          <div class="law-crumb">${escapeHtml(l.short)}</div>
+          <div class="par-head"><span class="par-num">${u} ${par.num}</span>${par.title ? `<h2 class="par-title">${escapeHtml(par.title)}</h2>` : ''}</div>
+          ${linesHtml(par.text)}`);
+      } else html += '<p class="muted">Wähle oben ein Gesetz und einen Paragraphen. Verweise aus dem linken Fenster öffnen sich hier.</p>';
+      box.innerHTML = html;
+      store.set('law:p2', JSON.stringify({ slug: p2.slug, num: p2.num }));
+    }
+    async function p2Show(slug, num, { record = true } = {}) {
+      if (record && p2.num && (p2.slug !== slug || p2.num !== num)) pushTrail(p2.trail, { slug: p2.slug, num: p2.num });
+      p2.slug = slug; p2.num = num;
+      await renderPane2();
+    }
+    $('#read2').addEventListener('click', async (e) => {
+      const t = e.target;
+      e.stopPropagation();
+      if (t.closest('[data-p2close]')) { toggleSplit(); return; }
+      if (t.closest('[data-p2left]')) { const slug = p2.slug; const num = p2.num; if (slug && num) { if (law && slug === law.slug && !favMode) show(num); else await openLaw(slug, num); } return; }
+      if (t.closest('[data-p2back]')) { const b = p2.trail.pop(); if (b) await p2Show(b.slug, b.num, { record: false }); return; }
+      const ref = t.closest('a.ref, a.ref-head');
+      if (ref) { e.preventDefault(); const l = await lawFor(p2.slug); if (l._by.has(ref.dataset.go)) { await p2Show(p2.slug, ref.dataset.go); window.scrollTo({ top: 0 }); } return; }
+      const hit = t.closest('[data-p2num]');
+      if (hit && hit.dataset.p2num) { await p2Show(p2.slug, hit.dataset.p2num, { record: !hit.hasAttribute('data-p2seq') }); }
+    });
+    $('#read2').addEventListener('change', async (e) => {
+      if (e.target.id !== 'p2-law') return;
+      p2.slug = e.target.value; p2.num = null; p2.trail = [];
+      await renderPane2();
+    });
+    $('#read2').addEventListener('input', async (e) => {
+      if (e.target.id !== 'p2-q') return;
+      const l = await lawFor(p2.slug);
+      $('#p2-hits').innerHTML = p2Hits(l, e.target.value);
+    });
 
     // --- Ereignisse ----------------------------------------------------------
     document.addEventListener('click', async (e) => {
@@ -847,10 +988,16 @@
         renderToc();
         return;
       }
+      if (e.target.closest('[data-back]')) { goBack(); return; }
       const ref = e.target.closest('a.ref, a.ref-head');
-      if (ref) { e.preventDefault(); query = ''; $('#search').value = ''; show(ref.dataset.go); return; }
+      if (ref) {
+        e.preventDefault();
+        // Bei geteilter Ansicht öffnen Verweise aus dem linken Text rechts daneben
+        if (split && ref.closest('#read') && !ref.classList.contains('ref-head')) { p2Show(law.slug, ref.dataset.go); return; }
+        query = ''; $('#search').value = ''; show(ref.dataset.go); return;
+      }
       const hit = e.target.closest('[data-num]');
-      if (hit && hit.dataset.num) { show(hit.dataset.num); return; }
+      if (hit && hit.dataset.num) { show(hit.dataset.num, { trail: !hit.closest('.par-nav') }); return; }
       const view = e.target.closest('[data-view]');
       if (view) showView(view.dataset.view);
     });
@@ -870,8 +1017,8 @@
       if (e.key === '/' && !typing) { e.preventDefault(); if (!tocOpen()) showView('toc'); $('#search').focus(); return; }
       if (typing || !current || pane !== 'read') return;
       const i = pars.indexOf(current);
-      if (e.key === 'ArrowLeft' && pars[i - 1]) show(pars[i - 1].num);
-      if (e.key === 'ArrowRight' && pars[i + 1]) show(pars[i + 1].num);
+      if (e.key === 'ArrowLeft' && pars[i - 1]) show(pars[i - 1].num, { trail: false });
+      if (e.key === 'ArrowRight' && pars[i + 1]) show(pars[i + 1].num, { trail: false });
     });
     window.addEventListener('hashchange', () => {
       const [slug, num] = location.hash.slice(1).split('/');
@@ -898,6 +1045,10 @@
         const [hs, hn] = location.hash.slice(1).split('/');
         const vis = visibleLaws();
         const slug = laws.some((l) => l.slug === hs) ? hs : (vis.some((l) => l.slug === store.get('law:last')) ? store.get('law:last') : (vis[0] || laws[0]).slug);
+        if (store.get('law:split')) {
+          try { const saved = JSON.parse(store.get('law:p2') || 'null'); if (saved && laws.some((l) => l.slug === saved.slug)) { p2.slug = saved.slug; p2.num = saved.num; } } catch { /* egal */ }
+          split = true; $('#layout').classList.add('split');
+        }
         if (hs === 'favoriten') openFavs(); else if (hs === 'notizen') openNotes(); else await openLaw(slug, hn && hs === slug ? hn : null);
       } catch (err) {
         $('#error').textContent = err.message;

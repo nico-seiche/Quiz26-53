@@ -2,6 +2,14 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-21',
+    title: 'Gesetze: nebeneinander lesen und Zurück',
+    items: [
+      ['⫼', 'Zwei Paragraphen nebeneinander', 'Über „⫼ Nebeneinander“ öffnet sich rechts ein zweites Fenster – mit eigenem Gesetz, Suche und Blättern. Verweise aus dem linken Text öffnen sich rechts daneben.'],
+      ['↩', 'Zurück-Knopf', 'Wenn du über einen Verweis, ein Inhaltsverzeichnis oder deine Favoriten zu einem anderen Paragraphen springst, bringt dich „↩ Zurück“ zum vorherigen Paragraphen – links wie rechts.'],
+    ],
+  },
+  {
     id: '2026-11-20',
     title: 'Neu: Gesetz in Dokumente einfügen',
     items: [
