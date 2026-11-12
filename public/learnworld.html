@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <script>try{var d=document.documentElement,t=localStorage.getItem("theme"),m=localStorage.getItem("motion");if(t)d.dataset.theme=t;if(m==="off"||(m==="auto"&&matchMedia("(prefers-reduced-motion: reduce)").matches))d.classList.add("reduce-motion")}catch(e){}</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Quiz">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png?v=2">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2">
+  <title>Quiz – Learnworld</title>
+  <link rel="stylesheet" href="/style.css?v=15">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/dashboard" id="back-link">← Start</a>
+    <strong>Learnworld</strong>
+    <span id="me"></span>
+  </header>
+  <main style="max-width:1000px">
+    <p class="error" id="error"></p>
+    <div id="view"></div>
+  </main>
+  <style>
+    .lw-hero { margin-bottom: 1rem; }
+    .lw-hero h1 { margin: 0 0 .2rem; }
+    .lw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: .9rem; }
+    .lw-course { display: flex; flex-direction: column; gap: .5rem; text-align: left; padding: 1.1rem; margin: 0; border: 1px solid var(--border); border-radius: 20px; background: var(--card); color: var(--text); box-shadow: var(--shadow); cursor: pointer; text-decoration: none; }
+    .lw-course:hover { transform: translateY(-2px); border-color: var(--primary); }
+    .lw-course .ic { font-size: 2.2rem; line-height: 1; }
+    .lw-course strong { font-size: 1.1rem; overflow-wrap: anywhere; }
+    .lw-chips { display: flex; flex-wrap: wrap; gap: .35rem; }
+    .lw-chip { font-size: .8rem; font-weight: 700; padding: .15rem .55rem; border-radius: 999px; background: var(--bg); color: var(--muted); }
+    .lw-chip.warn { background: #fff4c7; color: #8a6100; }
+    .lw-sec { margin-top: 1.4rem; }
+    .lw-sec h2 { margin: 0 0 .5rem; font-size: 1.15rem; }
+    .lw-row { display: flex; gap: .8rem; align-items: flex-start; padding: .8rem; border: 1px solid var(--border); border-radius: 16px; background: var(--card); margin-bottom: .55rem; }
+    .lw-row .t { flex: 1; min-width: 0; }
+    .lw-row .t a { font-weight: 800; color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
+    .lw-row .snippet { color: var(--muted); font-size: .88rem; max-height: 2.9em; overflow: hidden; overflow-wrap: anywhere; }
+    .lw-actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .5rem; align-items: center; }
+    .lw-actions button, .lw-actions a.btn { margin: 0; padding: .4rem .75rem; font-size: .9rem; }
+    .lw-tools { display: flex; flex-wrap: wrap; gap: .5rem; }
+    .lw-tools button { margin: 0; }
+    .lw-empty { color: var(--muted); padding: .6rem .2rem; }
+    .lw-modal { position: fixed; inset: 0; z-index: 100; background: rgba(20, 22, 50, .5); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+    .lw-modal .card { width: min(560px, 100%); margin: 0; max-height: 90vh; overflow: auto; }
+    .lw-pick { max-height: 16rem; overflow: auto; border: 1px solid var(--border); border-radius: 12px; margin: .5rem 0; }
+    .lw-pick button { display: block; width: 100%; text-align: left; margin: 0; padding: .55rem .8rem; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; color: var(--text); box-shadow: none; font-weight: 600; }
+  </style>
+  <script src="/js/docs-import.js"></script>
+  <script src="/js/changelog.js"></script>
+  <script src="/js/common.js"></script>
+  <script>
+    const view = $('#view');
+    const fmt = (d) => new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const fail = (err) => { $('#error').textContent = err.message; };
+    const slugNow = () => decodeURIComponent(location.hash.slice(1)).split('/')[0];
+    let courses = [];
+
+    function modal(html, onMount) {
+      const box = document.createElement('div');
+      box.className = 'lw-modal';
+      box.innerHTML = `<div class="card">${html}</div>`;
+      document.body.appendChild(box);
+      box.addEventListener('click', (e) => { if (e.target === box || e.target.closest('[data-close]')) box.remove(); });
+      onMount(box, () => box.remove());
+      return box;
+    }
+
+    // ---------- Startseite: die Rechtsfächer ----------
+    async function home() {
+      $('#back-link').href = '/dashboard'; $('#back-link').textContent = '← Start';
+      courses = await api('/api/learnworld');
+      const open = courses.reduce((n, c) => n + c.open_requests, 0);
+      view.innerHTML = `<div class="card lw-hero"><h1>🎓 Learnworld</h1>
+        <p class="muted" style="margin:0">Deine Rechtsfächer. Lege Mitschriften und Unterlagen aus den Vorlesungen im passenden Fach ab – und lass daraus Lernsets erstellen. Sie erscheinen danach auch bei „Lernen“ unter deinen Lernsets.</p>
+        ${open ? `<p style="margin:.6rem 0 0"><span class="lw-chip warn">⏳ ${open} Anfrage${open === 1 ? '' : 'n'} warten auf ein Lernset</span></p>` : ''}</div>
+        <div class="lw-grid">${courses.map((c) => `<a class="lw-course" href="#${c.slug}"><span class="ic" aria-hidden="true">${c.icon}</span><strong>${escapeHtml(c.name)}</strong>
+          <span class="lw-chips"><span class="lw-chip">📄 ${c.docs} Dokument${c.docs === 1 ? '' : 'e'}</span><span class="lw-chip">🧠 ${c.sets} Lernset${c.sets === 1 ? '' : 's'}</span>${c.open_requests ? `<span class="lw-chip warn">⏳ ${c.open_requests}</span>` : ''}</span></a>`).join('')}</div>`;
+    }
+
+    // ---------- Ein Fach ----------
+    async function course(slug) {
+      const data = await api(`/api/learnworld/courses/${slug}`);
+      const c = data.course;
+      $('#back-link').href = '#'; $('#back-link').textContent = '← Alle Fächer';
+      view.innerHTML = `<div class="card lw-hero"><h1>${c.icon} ${escapeHtml(c.name)}</h1>
+        <p class="muted" style="margin:0 0 .7rem">Dokumente dieses Fachs und die daraus entstandenen Lernsets.</p>
+        <div class="lw-tools"><button type="button" class="primary" data-act="new">+ Neues Dokument</button><button type="button" data-act="word">📥 Word-Datei importieren</button><button type="button" data-act="assign">📎 Vorhandene zuordnen</button></div>
+        <input type="file" id="wordfile" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden></div>
+
+        <div class="lw-sec"><h2>📄 Meine Dokumente</h2>${data.docs.length ? data.docs.map((d) => docRow(d)).join('') : '<div class="lw-empty">Noch kein Dokument in diesem Fach. Lege eine Mitschrift an, importiere eine Word-Datei oder ordne ein vorhandenes Dokument zu.</div>'}</div>
+        <div class="lw-sec"><h2>🧠 Lernsets in diesem Fach</h2>${data.sets.length ? data.sets.map((s) => `<div class="lw-row"><div class="t"><a href="/learn?id=${s.id}">${escapeHtml(s.title)}</a><div class="snippet">${s.cards} ${s.cards === 1 ? "Karte" : "Karten"} · ${fmt(s.updatedAt)}</div>
+          <div class="lw-actions"><a class="btn primary" href="/learn?id=${s.id}">Lernen</a><a class="btn" href="/study-edit?id=${s.id}">Bearbeiten</a><button type="button" data-unset="${s.id}">Aus dem Fach nehmen</button></div></div></div>`).join('') : '<div class="lw-empty">Noch kein Lernset. Wähle bei einem Dokument „🧠 Lernset erstellen lassen“.</div>'}</div>`;
+      view.dataset.slug = slug;
+      view.dataset.title = c.name;
+    }
+    function docRow(d) {
+      const r = d.request;
+      const status = r && r.status === 'open' ? `<span class="lw-chip warn">⏳ Lernset wird erstellt</span>`
+        : r && r.status === 'done' ? `<span class="lw-chip">✅ Lernset fertig</span>` : '';
+      return `<div class="lw-row"><div class="t"><a href="/docs-edit?id=${d.id}">${escapeHtml(d.title)}</a> ${status}
+        <div class="snippet">${escapeHtml(d.preview || 'Leeres Dokument')}</div>
+        <div class="lw-actions"><a class="btn" href="/docs-edit?id=${d.id}">Öffnen</a>
+          ${r && r.status === 'open' ? `<button type="button" data-cancel="${r.id}">Anfrage zurückziehen</button>`
+            : r && r.status === 'done' && r.setId ? `<a class="btn primary" href="/learn?id=${r.setId}">Lernset lernen</a><button type="button" data-req="${d.id}" data-title="${escapeHtml(d.title)}">Neues Lernset anfragen</button>`
+            : `<button type="button" class="primary" data-req="${d.id}" data-title="${escapeHtml(d.title)}">🧠 Lernset erstellen lassen</button>`}
+          <button type="button" data-unassign="${d.id}">Aus dem Fach nehmen</button></div></div></div>`;
+    }
+
+    // ---------- Aktionen ----------
+    async function newDoc(slug) { const { id } = await api(`/api/learnworld/courses/${slug}/docs`, { method: 'POST', body: {} }); location.href = `/docs-edit?id=${id}`; }
+    async function importWord(slug, file, btn) {
+      btn.disabled = true;
+      try {
+        btn.textContent = 'Wird importiert …';
+        const title = file.name.replace(/\.docx$/i, '').slice(0, 120) || 'Importiertes Dokument';
+        const { id } = await api(`/api/learnworld/courses/${slug}/docs`, { method: 'POST', body: { title } });
+        const { html } = await DocsImport.docxToHtml(file, id, (t) => { btn.textContent = t; });
+        sessionStorage.setItem(`docimport:${id}`, html);
+        location.href = `/docs-edit?id=${id}`;
+      } catch (err) { fail(err); btn.disabled = false; btn.textContent = '📥 Word-Datei importieren'; }
+    }
+    async function assignDialog(slug) {
+      const un = await api('/api/learnworld/unassigned');
+      if (!un.docs.length && !un.sets.length) { fail(new Error('Alle deine Dokumente und Lernsets sind schon einem Fach zugeordnet.')); return; }
+      modal(`<h2 style="margin:0 0 .3rem">📎 Zuordnen</h2><p class="muted" style="margin:0">Tippe auf ein Dokument oder Lernset, um es diesem Fach zuzuordnen.</p>
+        ${un.docs.length ? `<h3 style="margin:.8rem 0 0">Dokumente</h3><div class="lw-pick">${un.docs.map((d) => `<button type="button" data-doc="${d.id}">📄 ${escapeHtml(d.title)}</button>`).join('')}</div>` : ''}
+        ${un.sets.length ? `<h3 style="margin:.8rem 0 0">Lernsets</h3><div class="lw-pick">${un.sets.map((s) => `<button type="button" data-set="${s.id}">🧠 ${escapeHtml(s.title)}</button>`).join('')}</div>` : ''}
+        <div class="row" style="justify-content:flex-end"><button type="button" data-close>Fertig</button></div>`, (box) => {
+        box.addEventListener('click', async (e) => {
+          const b = e.target.closest('[data-doc], [data-set]');
+          if (!b) return;
+          try { await api(b.dataset.doc ? `/api/learnworld/docs/${b.dataset.doc}/course` : `/api/learnworld/sets/${b.dataset.set}/course`, { method: 'PUT', body: { slug } }); b.remove(); route(); } catch (err) { fail(err); }
+        });
+      });
+    }
+    function requestDialog(docId, title) {
+      modal(`<h2 style="margin:0 0 .3rem">🧠 Lernset erstellen lassen</h2><p class="muted" style="margin:0 0 .6rem">Aus „${escapeHtml(title)}“ entsteht ein Lernset mit Begriffen und Definitionen. Es erscheint danach in diesem Fach und bei „Lernen“.</p>
+        <label for="rq-note">Wünsche (optional)</label>
+        <textarea id="rq-note" rows="4" maxlength="1000" style="width:100%" placeholder="z. B. ca. 30 Karten, Schwerpunkt Gefahrenbegriffe, jeweils mit Paragraph"></textarea>
+        <p class="muted" style="font-size:.88rem">Die Karten werden nicht sofort fertig: Die Anfrage wird abgearbeitet, sobald Claude dazu aufgefordert wird. Hier siehst du den Stand.</p>
+        <p class="error" id="rq-err"></p>
+        <div class="row" style="justify-content:flex-end;gap:.5rem"><button type="button" data-close>Abbrechen</button><button type="button" class="primary" id="rq-ok">Anfrage senden</button></div>`, (box, close) => {
+        box.querySelector('#rq-ok').onclick = async () => {
+          try { await api('/api/learnworld/requests', { method: 'POST', body: { docId, note: box.querySelector('#rq-note').value } }); close(); route(); }
+          catch (err) { box.querySelector('#rq-err').textContent = err.message; }
+        };
+      });
+    }
+    view.addEventListener('click', async (e) => {
+      const t = e.target.closest('button');
+      if (!t) return;
+      const slug = view.dataset.slug;
+      try {
+        if (t.dataset.act === 'new') await newDoc(slug);
+        else if (t.dataset.act === 'word') $('#wordfile').click();
+        else if (t.dataset.act === 'assign') await assignDialog(slug);
+        else if (t.dataset.req) requestDialog(t.dataset.req, t.dataset.title);
+        else if (t.dataset.cancel) { await api(`/api/learnworld/requests/${t.dataset.cancel}`, { method: 'DELETE' }); route(); }
+        else if (t.dataset.unassign) { if (confirm('Das Dokument bleibt erhalten, ist aber nicht mehr diesem Fach zugeordnet. Offene Anfragen dazu werden zurückgezogen.')) { await api(`/api/learnworld/docs/${t.dataset.unassign}/course`, { method: 'PUT', body: { slug: null } }); route(); } }
+        else if (t.dataset.unset) { await api(`/api/learnworld/sets/${t.dataset.unset}/course`, { method: 'PUT', body: { slug: null } }); route(); }
+      } catch (err) { fail(err); }
+    });
+    document.addEventListener('change', (e) => {
+      if (e.target.id !== 'wordfile') return;
+      const f = e.target.files[0];
+      e.target.value = '';
+      if (f) importWord(view.dataset.slug, f, document.querySelector('[data-act=word]'));
+    });
+    document.querySelector('#back-link').addEventListener('click', (e) => { if (slugNow()) { e.preventDefault(); location.hash = ''; } });
+
+    function route() {
+      $('#error').textContent = '';
+      const slug = slugNow();
+      (slug ? course(slug) : home()).catch(fail);
+    }
+    addEventListener('hashchange', route);
+    requireLogin().then((me) => { mountNav('home', me); route(); });
+  </script>
+</body>
+</html>

@@ -228,6 +228,20 @@ Beim Lernen (`public/learn.html`) meldet „🚩 Fehler in dieser Karte melden�
 - **Anmeldung offline:** `requireLogin()` nutzt bei fehlender Verbindung das zuletzt gespeicherte Konto (`localStorage.me`); beim Abmelden werden `quiz-data-*`, `me`, `offline:pins` und die Warteschlange gelöscht (gemeinsam genutzte Geräte).
 - **Nicht offline:** Quiz spielen/hosten, Battles, Folien, Dokumente, Markierungen/Favoriten setzen, Sprachausgabe mit Piper-Stimmen.
 
+## Learnworld
+
+`/learnworld` (Startseite → „Ansehen“ → Learnworld, `public/learnworld.html`, `src/learnworld.js`, Migration 034): Rechtsfächer (`quiz.lw_courses`, per SQL erweiterbar; `subject_id` verknüpft das passende Fach der Lernsets) mit den eigenen **Dokumenten** (`quiz.docs.course_id`: neu anlegen, Word-Datei importieren, vorhandene zuordnen) und **Lernsets** (`quiz.study_sets.course_id`; sie erscheinen wie alle eigenen Lernsets auch bei „Lernen“). Bei einem Dokument lässt sich ein Lernset **anfragen** (`quiz.lw_requests`, Wünsche als Text, je Dokument eine offene Anfrage, höchstens 20 offene je Nutzer; Zustand „wird erstellt“ → „fertig“ mit Link).
+
+**Anfragen bearbeiten** (nicht automatisch – geschieht, wenn Claude dazu aufgefordert wird): offene Anfragen samt Dokumenttext liefert `SELECT * FROM quiz.lw_open_requests;` (Spalten `id, username, user_id, course, subject_id, course_id, doc_id, doc_title, note, text`). Danach das Lernset anlegen und die Anfrage abschließen:
+
+```sql
+WITH s AS (INSERT INTO quiz.study_sets (owner_id, title, subject_id, course_id, is_public) VALUES (<user_id>, '<Titel>', <subject_id|NULL>, <course_id>, false) RETURNING id),
+c AS (INSERT INTO quiz.study_cards (set_id, position, term, definition) SELECT id, v.pos, v.term, v.def FROM s, (VALUES (0, 'Begriff', 'Definition'), …) AS v(pos, term, def) RETURNING set_id)
+UPDATE quiz.lw_requests SET status = 'done', set_id = (SELECT id FROM s), done_at = now() WHERE id = <request_id>;
+```
+
+Karten: `term` ≤ 200, `definition` ≤ 4000 Zeichen, Definition in einer Zeile (Leerraum wird in der App ohnehin zusammengezogen).
+
 ## Quiz-Import (z. B. von einer KI erstellt)
 
 Im Quiz-Editor (neu und bestehend) öffnet „🤖 Import“ einen Dialog: Anleitung für die KI kopieren (enthält die Fächerliste, optional mit Thema), KI-Antwort einfügen, Vorschau mit Fehlern, „Übernehmen“. Parser und Anleitung: `public/js/quiz-import.js` (`QuizImport.prompt/parse/finalize`), reine Textverarbeitung im Browser, keine KI im Programm. Format:

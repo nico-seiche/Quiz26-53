@@ -2,6 +2,15 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-22',
+    title: 'Neu: Learnworld',
+    items: [
+      ['🎓', 'Deine Rechtsfächer', 'Auf der Startseite gibt es jetzt „Learnworld“: Staatsrecht, Eingriffsrecht, Strafrecht, Verkehrsrecht, Beamtenrecht und mehr.'],
+      ['📄', 'Unterlagen ablegen', 'Lege Mitschriften aus den Vorlesungen im passenden Fach ab – neu schreiben, Word-Datei importieren oder ein vorhandenes Dokument zuordnen.'],
+      ['🧠', 'Lernsets erstellen lassen', 'Bei einem Dokument „Lernset erstellen lassen“ wählen. Das fertige Lernset erscheint im Fach und bei „Lernen“.'],
+    ],
+  },
+  {
     id: '2026-11-21',
     title: 'Gesetze: nebeneinander lesen und Zurück',
     items: [
