@@ -2,6 +2,14 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-23',
+    title: 'Learnworld: jede Datei hinzufügen',
+    items: [
+      ['📎', 'Dateien hinzufügen', 'In einem Fach kannst du jetzt beliebige Dateien auswählen – auch mehrere auf einmal. Die App erkennt selbst, was es ist: PDF, Word, PowerPoint, OpenDocument, Text, Markdown, HTML oder ein Bild.'],
+      ['📄', 'Wird zum Dokument', 'Aus jeder Datei entsteht ein bearbeitbares Dokument mit Überschriften, Listen und Absätzen. Bei PDF und PowerPoint wird der Text übernommen.'],
+    ],
+  },
+  {
     id: '2026-11-22',
     title: 'Neu: Learnworld',
     items: [

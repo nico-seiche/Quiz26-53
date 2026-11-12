@@ -147,7 +147,7 @@
     <button type="button" id="d-link" title="Link">🔗</button>
     <button type="button" id="d-image" title="Bild einfügen">🖼️</button>
     <button type="button" id="d-pen" title="Mit dem Apple Pencil überall auf dem Blatt schreiben und zeichnen">✏️ Pencil</button>
-    <button type="button" id="d-word" title="Word-Datei (.docx) an der Cursorstelle einfügen">📥 Word</button>
+    <button type="button" id="d-word" title="Datei (Word, PDF, PowerPoint, Text, Bild …) an der Cursorstelle einfügen">📥 Datei</button>
     <button type="button" id="d-table" title="Tabelle">⊞</button>
     <button type="button" data-act="clean" title="Formatierung entfernen">Tx</button>
   </div>
@@ -156,7 +156,7 @@
   </div>
   <div class="doc-foot"><span id="count"></span><span></span></div>
   <input type="file" id="file" accept="image/*" hidden>
-  <input type="file" id="wordfile" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+  <input type="file" id="wordfile" hidden>
   <script src="/js/docs-import.js"></script>
   <script src="/js/docs-pdf.js"></script>
   <script src="/js/docs-pen.js"></script>
@@ -383,15 +383,15 @@
       e.target.value = '';
       if (!f) return;
       try {
-        setState('Word-Datei wird gelesen …');
-        const { html, images, skipped } = await DocsImport.docxToHtml(f, id, setState);
+        setState('Datei wird gelesen …');
+        const { html, images, skipped } = await DocsImport.fileToHtml(f, id, setState);
         // in Tabellen nicht einfügen (zerstört die Tabelle): dann ans Ende des Dokuments
         const inTable = lastRange && quill.getFormat(lastRange).table;
         const at = lastRange && !inTable ? lastRange.index + lastRange.length : Math.max(0, quill.getLength() - 1);
         quill.clipboard.dangerouslyPasteHTML(at, html, 'user');
         dirty();
         setState(skipped ? `Eingefügt – ${skipped} Bild(er) nicht übernommen` : '✓ Eingefügt');
-      } catch (err) { setState(`Word-Datei: ${err.message}`, 'warn'); }
+      } catch (err) { setState(`Datei: ${err.message}`, 'warn'); }
     });
     $('#title').addEventListener('input', () => { document.title = `${$('#title').value || 'Dokument'} – Dokumente`; dirty(); });
     // Druckdialog: window.print() muss direkt im Klick laufen (nach einem await blockieren Safari/iPad es), Speichern ist dafür nicht nötig

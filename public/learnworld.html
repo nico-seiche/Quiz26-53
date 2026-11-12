@@ -91,8 +91,9 @@
       $('#back-link').href = '#'; $('#back-link').textContent = '← Alle Fächer';
       view.innerHTML = `<div class="card lw-hero"><h1>${c.icon} ${escapeHtml(c.name)}</h1>
         <p class="muted" style="margin:0 0 .7rem">Dokumente dieses Fachs und die daraus entstandenen Lernsets.</p>
-        <div class="lw-tools"><button type="button" class="primary" data-act="new">+ Neues Dokument</button><button type="button" data-act="word">📥 Word-Datei importieren</button><button type="button" data-act="assign">📎 Vorhandene zuordnen</button></div>
-        <input type="file" id="wordfile" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden></div>
+        <div class="lw-tools"><button type="button" class="primary" data-act="new">+ Neues Dokument</button><button type="button" data-act="files">📎 Dateien hinzufügen</button><button type="button" data-act="assign">📎 Vorhandene zuordnen</button></div>
+        <input type="file" id="wordfile" multiple hidden></div>
+        <p class="muted" style="margin:.6rem 0 0;font-size:.88rem">Word, PDF, PowerPoint, Text, Markdown, HTML, OpenDocument und Bilder – die App erkennt die Art selbst und legt daraus ein bearbeitbares Dokument an. Bei PDF und PowerPoint wird nur der Text übernommen.</p><div id="import-log"></div>
 
         <div class="lw-sec"><h2>📄 Meine Dokumente</h2>${data.docs.length ? data.docs.map((d) => docRow(d)).join('') : '<div class="lw-empty">Noch kein Dokument in diesem Fach. Lege eine Mitschrift an, importiere eine Word-Datei oder ordne ein vorhandenes Dokument zu.</div>'}</div>
         <div class="lw-sec"><h2>🧠 Lernsets in diesem Fach</h2>${data.sets.length ? data.sets.map((s) => `<div class="lw-row"><div class="t"><a href="/learn?id=${s.id}">${escapeHtml(s.title)}</a><div class="snippet">${s.cards} ${s.cards === 1 ? "Karte" : "Karten"} · ${fmt(s.updatedAt)}</div>
@@ -115,16 +116,33 @@
 
     // ---------- Aktionen ----------
     async function newDoc(slug) { const { id } = await api(`/api/learnworld/courses/${slug}/docs`, { method: 'POST', body: {} }); location.href = `/docs-edit?id=${id}`; }
-    async function importWord(slug, file, btn) {
+    // Beliebige Dateien (auch mehrere) als Dokumente im Fach ablegen
+    async function importFiles(slug, files, btn) {
+      const log = [];
+      const show = () => { $('#import-log').innerHTML = log.map((l) => `<div class="lw-chip ${l.ok ? '' : 'warn'}" style="display:block;margin-top:.35rem;white-space:normal">${l.ok ? '✓' : '✗'} ${escapeHtml(l.text)}</div>`).join(''); };
       btn.disabled = true;
-      try {
-        btn.textContent = 'Wird importiert …';
-        const title = file.name.replace(/\.docx$/i, '').slice(0, 120) || 'Importiertes Dokument';
-        const { id } = await api(`/api/learnworld/courses/${slug}/docs`, { method: 'POST', body: { title } });
-        const { html } = await DocsImport.docxToHtml(file, id, (t) => { btn.textContent = t; });
-        sessionStorage.setItem(`docimport:${id}`, html);
-        location.href = `/docs-edit?id=${id}`;
-      } catch (err) { fail(err); btn.disabled = false; btn.textContent = '📥 Word-Datei importieren'; }
+      for (const [i, file] of files.entries()) {
+        const label = `${file.name}${files.length > 1 ? ` (${i + 1}/${files.length})` : ''}`;
+        let docId = null;
+        try {
+          btn.textContent = `Lese ${label} …`;
+          const title = file.name.replace(/\.[a-z0-9]{1,5}$/i, '').slice(0, 120) || 'Importiertes Dokument';
+          ({ id: docId } = await api(`/api/learnworld/courses/${slug}/docs`, { method: 'POST', body: { title } }));
+          const { html, kind } = await DocsImport.fileToHtml(file, docId, (t) => { btn.textContent = `${label}: ${t}`; });
+          btn.textContent = `Lege ${label} ab …`;
+          const ops = await DocsImport.htmlToOps(html);
+          await api(`/api/docs/${docId}`, { method: 'PUT', body: { title, delta: ops, rev: 1 } });
+          log.push({ ok: true, text: `${file.name} als ${DocsImport.KINDS[kind] || kind}-Datei hinzugefügt` });
+        } catch (err) {
+          if (docId) await api(`/api/docs/${docId}`, { method: 'DELETE' }).catch(() => {});
+          log.push({ ok: false, text: `${file.name}: ${err.message}` });
+        }
+        show();
+      }
+      btn.disabled = false; btn.textContent = '📎 Dateien hinzufügen';
+      const keep = log.slice();
+      await course(slug).catch(fail);
+      log.splice(0, log.length, ...keep); show();
     }
     async function assignDialog(slug) {
       const un = await api('/api/learnworld/unassigned');
@@ -159,7 +177,7 @@
       const slug = view.dataset.slug;
       try {
         if (t.dataset.act === 'new') await newDoc(slug);
-        else if (t.dataset.act === 'word') $('#wordfile').click();
+        else if (t.dataset.act === 'files') $('#wordfile').click();
         else if (t.dataset.act === 'assign') await assignDialog(slug);
         else if (t.dataset.req) requestDialog(t.dataset.req, t.dataset.title);
         else if (t.dataset.cancel) { await api(`/api/learnworld/requests/${t.dataset.cancel}`, { method: 'DELETE' }); route(); }
@@ -169,9 +187,9 @@
     });
     document.addEventListener('change', (e) => {
       if (e.target.id !== 'wordfile') return;
-      const f = e.target.files[0];
+      const files = [...e.target.files];
       e.target.value = '';
-      if (f) importWord(view.dataset.slug, f, document.querySelector('[data-act=word]'));
+      if (files.length) importFiles(view.dataset.slug, files, document.querySelector('[data-act=files]'));
     });
     document.querySelector('#back-link').addEventListener('click', (e) => { if (slugNow()) { e.preventDefault(); location.hash = ''; } });
 

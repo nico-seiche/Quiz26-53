@@ -24,8 +24,8 @@
   <main style="max-width:1000px">
     <div class="row spread section-head">
       <h1 style="margin:0">📝 Dokumente</h1>
-      <div class="row" style="gap:.5rem"><button type="button" id="word">📥 Word-Datei importieren</button><button type="button" class="primary" id="new">+ Neues Dokument</button></div>
-      <input type="file" id="wordfile" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+      <div class="row" style="gap:.5rem"><button type="button" id="word">📥 Datei importieren</button><button type="button" class="primary" id="new">+ Neues Dokument</button></div>
+      <input type="file" id="wordfile" hidden>
     </div>
     <p class="muted">Schreibe Texte mit Überschriften, Listen, Tabellen und Bildern. Als PDF speichern über „PDF / Drucken“.</p>
     <p class="error" id="error"></p>
@@ -70,12 +70,12 @@
       btn.disabled = true;
       try {
         btn.textContent = 'Wird importiert …';
-        const title = f.name.replace(/\.docx$/i, '').slice(0, 120) || 'Importiertes Dokument';
+        const title = f.name.replace(/\.[a-z0-9]{1,5}$/i, '').slice(0, 120) || 'Importiertes Dokument';
         const { id } = await api('/api/docs', { method: 'POST', body: { title } });
-        const { html } = await DocsImport.docxToHtml(f, id, (t) => { btn.textContent = t; });
+        const { html } = await DocsImport.fileToHtml(f, id, (t) => { btn.textContent = t; });
         sessionStorage.setItem(`docimport:${id}`, html);
         location.href = `/docs-edit?id=${id}`;
-      } catch (err) { $('#error').textContent = `Word-Import: ${err.message}`; btn.disabled = false; btn.textContent = '📥 Word-Datei importieren'; }
+      } catch (err) { $('#error').textContent = `Import: ${err.message}`; btn.disabled = false; btn.textContent = '📥 Datei importieren'; }
     };
     document.querySelector('main').onclick = async (e) => {
       const t = e.target.closest('button');
