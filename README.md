@@ -232,6 +232,10 @@ Beim Lernen (`public/learn.html`) meldet „🚩 Fehler in dieser Karte melden�
 - **Anmeldung offline:** `requireLogin()` nutzt bei fehlender Verbindung das zuletzt gespeicherte Konto (`localStorage.me`); beim Abmelden werden `quiz-data-*`, `me`, `offline:pins` und die Warteschlange gelöscht (gemeinsam genutzte Geräte).
 - **Nicht offline:** Quiz spielen/hosten, Battles, Folien, Dokumente, Markierungen/Favoriten setzen, Sprachausgabe mit Piper-Stimmen.
 
+## Startseite
+
+`public/dashboard.html`: schmale Zeile „🎮 Quiz-Raum“ (PIN + GO!, darunter der Level-Fortschritt), dann Kacheln „✨ Erstellen“ (Quiz, Quiz importieren, Umfrage, Lernset, Präsentation, Dokument) und „📚 Bereiche“ (Learnworld, Gesetze, Präsentationen, Dokumente) sowie „Zuletzt gespielt“. Was schon in der unteren Menüleiste steht (Quiz, Lernen, Bestenliste, Profil), steht nicht mehr als Kachel auf der Startseite; im Profil gibt es keine Verknüpfungen zu Gesetzen und Folien mehr.
+
 ## Learnworld
 
 `/learnworld` (Startseite → „Ansehen“ → Learnworld, `public/learnworld.html`, `src/learnworld.js`, Migration 034): Rechtsfächer (`quiz.lw_courses`, per SQL erweiterbar; `subject_id` verknüpft das passende Fach der Lernsets) mit den eigenen **Dokumenten** (`quiz.docs.course_id`: neu anlegen, **beliebige Dateien hinzufügen** (auch mehrere, `importFiles()`), vorhandene zuordnen) und **Lernsets** (`quiz.study_sets.course_id`; sie erscheinen wie alle eigenen Lernsets auch bei „Lernen“). Bei einem Dokument lässt sich ein Lernset **anfragen** (`quiz.lw_requests`, Wünsche als Text, je Dokument eine offene Anfrage, höchstens 20 offene je Nutzer; Zustand „wird erstellt“ → „fertig“ mit Link).

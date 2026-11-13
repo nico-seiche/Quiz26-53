@@ -13,7 +13,7 @@
   <link rel="icon" href="/icons/icon-192.png?v=2">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2">
   <title>Quiz – Home</title>
-  <link rel="stylesheet" href="/style.css?v=16">
+  <link rel="stylesheet" href="/style.css?v=17">
 </head>
 <body>
   <header class="top">
@@ -25,12 +25,9 @@
 
     <a class="card battle-banner" id="battle-banner" href="/study" hidden></a>
 
-    <div class="card join-card">
-      <div class="join-art" aria-hidden="true">
-        <span class="spark s1">✨</span><span id="art-avatar"></span><span class="spark s2">✨</span><span class="spark s3">❓</span>
-      </div>
-      <h2>Einem Quiz beitreten</h2>
-      <form class="join-form" id="join-form">
+    <div class="card join-slim">
+      <form class="join-form" id="join-form" aria-label="Einem Quiz beitreten">
+        <span class="join-label" aria-hidden="true">🎮 Quiz-Raum</span>
         <input type="text" id="join-pin" inputmode="numeric" placeholder="PIN eingeben" aria-label="Game-PIN">
         <button class="go-btn" type="submit">GO!</button>
       </form>
@@ -45,51 +42,26 @@
       </div>
     </div>
 
-    <section class="split" aria-label="Schnellauswahl">
-      <div class="card split-half split-create">
-        <h2>✨ Erstellen</h2>
-        <a class="pick" href="/edit"><span class="pick-ico" aria-hidden="true">❓</span><span><strong>Quiz</strong><small>Fragen mit Punkten</small></span></a>
-        <a class="pick" href="/edit?import=1"><span class="pick-ico" aria-hidden="true">📥</span><span><strong>Quiz importieren</strong><small>Aus KI-Text oder Datei</small></span></a>
-        <a class="pick" href="/edit?kind=poll"><span class="pick-ico" aria-hidden="true">📊</span><span><strong>Umfrage</strong><small>Mit Diagramm</small></span></a>
-        <a class="pick" href="/study-edit"><span class="pick-ico" aria-hidden="true">🃏</span><span><strong>Lernset</strong><small>Karteikarten</small></span></a>
-        <button class="pick" type="button" id="new-deck"><span class="pick-ico" aria-hidden="true">🖥️</span><span><strong>Präsentation</strong><small>Folien</small></span></button>
-        <button class="pick" type="button" id="new-doc"><span class="pick-ico" aria-hidden="true">📝</span><span><strong>Dokument</strong><small>Texte schreiben</small></span></button>
-      </div>
-      <div class="card split-half split-view">
-        <h2>👀 Ansehen</h2>
-        <a class="pick" href="/quizzes"><span class="pick-ico" aria-hidden="true">🗂️</span><span><strong>Meine Quiz</strong><small>Starten &amp; bearbeiten</small></span></a>
-        <a class="pick" href="/study"><span class="pick-ico" aria-hidden="true">📚</span><span><strong>Lernen</strong><small>Lernsets &amp; Battles</small></span></a>
-        <a class="pick" href="/slides"><span class="pick-ico" aria-hidden="true">🎞️</span><span><strong>Präsentationen</strong><small>Meine Folien</small></span></a>
-        <a class="pick" href="/docs"><span class="pick-ico" aria-hidden="true">📄</span><span><strong>Dokumente</strong><small>Meine Texte</small></span></a>
-        <a class="pick" href="/learnworld"><span class="pick-ico" aria-hidden="true">🎓</span><span><strong>Learnworld</strong><small>Rechtsfächer &amp; Unterlagen</small></span></a>
-        <a class="pick" href="/gesetze"><span class="pick-ico" aria-hidden="true">⚖️</span><span><strong>Gesetze</strong><small>Paragraphen lesen</small></span></a>
-      </div>
-    </section>
+    <h2 class="tiles-head">✨ Erstellen</h2>
+    <div class="app-tiles">
+      <a class="app-tile" href="/edit"><span class="at-ico" aria-hidden="true">❓</span><strong>Quiz</strong><small>Fragen mit Punkten</small></a>
+      <a class="app-tile" href="/edit?import=1"><span class="at-ico" aria-hidden="true">📥</span><strong>Quiz importieren</strong><small>Aus KI-Text oder Datei</small></a>
+      <a class="app-tile" href="/edit?kind=poll"><span class="at-ico" aria-hidden="true">📊</span><strong>Umfrage</strong><small>Mit Diagramm</small></a>
+      <a class="app-tile" href="/study-edit"><span class="at-ico" aria-hidden="true">🃏</span><strong>Lernset</strong><small>Karteikarten</small></a>
+      <button class="app-tile" type="button" id="new-deck"><span class="at-ico" aria-hidden="true">🖥️</span><strong>Präsentation</strong><small>Folien</small></button>
+      <button class="app-tile" type="button" id="new-doc"><span class="at-ico" aria-hidden="true">📝</span><strong>Dokument</strong><small>Texte schreiben</small></button>
+    </div>
 
-    <div class="tile-grid">
-      <a class="tile tile-gold" href="/profile">
-        <span class="tile-icon" aria-hidden="true">🏆</span>
-        <span class="tile-value" id="t-points">–</span>
-        <span class="tile-label">Punkte</span>
-        <span class="tile-chip dark" id="t-today" hidden></span>
-      </a>
-      <a class="tile tile-silver" href="/leaderboard">
-        <span class="tile-icon" aria-hidden="true">🥇</span>
-        <span class="tile-value" id="t-rank">–</span>
-        <span class="tile-label" id="t-rank-label">Platz</span>
-        <span class="tile-chip" id="t-rank-chip" hidden></span>
-      </a>
-      <a class="tile tile-rainbow" href="/profile#erfolge">
-        <span class="tile-icon" aria-hidden="true">⭐</span>
-        <span class="tile-value" id="t-ach">–</span>
-        <span class="tile-label">Erfolge</span>
-        <span class="tile-chip" id="t-ach-chip" hidden></span>
-      </a>
+    <h2 class="tiles-head">📚 Bereiche</h2>
+    <div class="app-tiles">
+      <a class="app-tile" href="/learnworld"><span class="at-ico" aria-hidden="true">🎓</span><strong>Learnworld</strong><small>Rechtsfächer &amp; Unterlagen</small></a>
+      <a class="app-tile" href="/gesetze"><span class="at-ico" aria-hidden="true">⚖️</span><strong>Gesetze</strong><small>Paragraphen lesen</small></a>
+      <a class="app-tile" href="/slides"><span class="at-ico" aria-hidden="true">🎞️</span><strong>Präsentationen</strong><small>Meine Folien</small></a>
+      <a class="app-tile" href="/docs"><span class="at-ico" aria-hidden="true">📄</span><strong>Dokumente</strong><small>Meine Texte</small></a>
     </div>
 
     <div class="row spread section-head">
       <h2>Zuletzt gespielt</h2>
-      <a class="pill-btn" href="/profile">Alle Ergebnisse</a>
     </div>
     <div class="recent-list" id="recent"></div>
 
@@ -133,48 +105,26 @@
     }
 
     async function loadOverview(me) {
-      // Jede Kennzahl lädt für sich; ein Fehler bei einer soll die übrigen nicht verhindern
-      const [results, achievements, board] = await Promise.all([
-        api('/api/results').catch(() => null),
-        api('/api/achievements').catch(() => null),
-        api('/api/leaderboard').catch(() => null),
-      ]);
-      if (results) {
-        $('#t-points').textContent = nf(results.total);
-        if (results.today > 0) { $('#t-today').hidden = false; $('#t-today').textContent = `+${nf(results.today)} heute`; }
-        showLevel(me, results.dayStreak);
-        $('#recent').innerHTML = results.results.slice(0, 3).map((r) => `
-          <div class="recent-row">
-            <span class="subject-icon" aria-hidden="true">${r.subject_icon || '📘'}</span>
-            <div>
-              <div class="recent-title">${escapeHtml(r.quiz_title)}</div>
-              ${r.subject ? `<span class="tag">${escapeHtml(r.subject)}</span>` : ''}
-              <span class="muted">${new Date(r.played_at).toLocaleDateString('de-DE')}</span>
-            </div>
-            <div class="recent-meta">
-              <span class="pts-pill ${pillClass(r)}">${nf(r.score)} Punkte</span>
-              <span class="muted">Platz ${r.rank}/${r.player_count}</span>
-            </div>
-          </div>`).join('') || '<div class="card muted">Noch nichts gespielt – tritt einem Quiz bei und deine Ergebnisse erscheinen hier.</div>';
-      }
-      if (achievements) {
-        $('#t-ach').textContent = `${achievements.earned}/${achievements.total}`;
-        if (achievements.title) { $('#t-ach-chip').hidden = false; $('#t-ach-chip').textContent = achievements.title; }
-      }
-      if (board) {
-        const ranked = board.me.points > 0;
-        $('#t-rank').textContent = ranked ? board.me.rank : '–';
-        $('#t-rank-label').textContent = ranked ? `Platz von ${board.userCount}` : 'noch ohne Platz';
-        // Chip: Aufsteiger (Platz seit dem letzten Spiel verbessert), sonst Spitzenplätze
-        const up = board.me.prevRank ? board.me.prevRank - board.me.rank : 0;
-        const chip = !ranked ? null : up > 0 ? `Aufsteiger! ▲${up}` : board.me.rank === 1 ? 'Spitze! 👑' : board.me.rank <= 3 ? 'Top 3' : null;
-        if (chip) { $('#t-rank-chip').hidden = false; $('#t-rank-chip').textContent = chip; }
-      }
+      const results = await api('/api/results').catch(() => null);
+      if (!results) return;
+      showLevel(me, results.dayStreak);
+      $('#recent').innerHTML = results.results.slice(0, 3).map((r) => `
+        <div class="recent-row">
+          <span class="subject-icon" aria-hidden="true">${r.subject_icon || '📘'}</span>
+          <div>
+            <div class="recent-title">${escapeHtml(r.quiz_title)}</div>
+            ${r.subject ? `<span class="tag">${escapeHtml(r.subject)}</span>` : ''}
+            <span class="muted">${new Date(r.played_at).toLocaleDateString('de-DE')}</span>
+          </div>
+          <div class="recent-meta">
+            <span class="pts-pill ${pillClass(r)}">${nf(r.score)} Punkte</span>
+            <span class="muted">Platz ${r.rank}/${r.player_count}</span>
+          </div>
+        </div>`).join('') || '<div class="card muted">Noch nichts gespielt – tritt einem Quiz bei und deine Ergebnisse erscheinen hier.</div>';
     }
 
     requireLogin().then((me) => {
       $('#hello-name').textContent = me.username;
-      $('#art-avatar').innerHTML = avatarHtml(me.username, '4.5rem');
       mountNav('home', me);
       if (me.battleInvites) { $('#battle-banner').hidden = false; $('#battle-banner').textContent = `⚔️ ${me.battleInvites === 1 ? 'Du wurdest' : me.battleInvites + ' Herausforderungen:'} zu einem Battle herausgefordert – jetzt ansehen →`; }
       showLevel(me, 0);
