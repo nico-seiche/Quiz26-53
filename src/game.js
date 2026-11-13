@@ -460,6 +460,9 @@ router.get('/:pin/qr', requireAuth, requireHost, async (req, res) => {
 
 // Die vier Reaktionen, die Teilnehmer in der Lobby schicken können
 const REACTIONS = ['👋', '🔥', '😂', '🎉', '👮'];
+// Zusätzliche Reaktionen für bestimmte Nutzer (Name ohne Beachtung der Groß-/Kleinschreibung)
+const SPECIAL_REACTIONS = { nico: ['👑'] };
+const allowedReactions = (user) => [...REACTIONS, ...((user && SPECIAL_REACTIONS[String(user.username).toLowerCase()]) || [])];
 
 router.get('/:pin/host', requireAuth, requireHost, async (req, res) => {
   const data = await loadGame(req.params.pin);
@@ -484,7 +487,7 @@ router.get('/:pin/host', requireAuth, requireHost, async (req, res) => {
 router.post('/:pin/react', async (req, res) => {
   const key = playerKey(req);
   const emoji = String(req.body.emoji || '');
-  if (!key || !REACTIONS.includes(emoji)) return res.status(400).json({ error: 'Ungültige Reaktion' });
+  if (!key || !allowedReactions(req.user).includes(emoji)) return res.status(400).json({ error: 'Ungültige Reaktion' });
   const row = await db.one(`
     SELECT p.name, g.state, (SELECT MAX(created_at) FROM quiz.game_reactions r WHERE r.game_pin = g.pin AND r.player_key = p.key) AS last
     FROM quiz.games g JOIN quiz.game_players p ON p.game_pin = g.pin AND p.key = $2 WHERE g.pin = $1`, [req.params.pin, key]);
