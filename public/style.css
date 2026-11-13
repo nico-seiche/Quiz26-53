@@ -779,8 +779,8 @@ input[type="password"]::-ms-reveal, input[type="password"]::-ms-clear { display:
 .join-slim input { flex: 1; min-width: 0; margin: 0; padding: .55rem .8rem; }
 .join-slim .go-btn { margin: 0; padding: .55rem 1.1rem; flex: none; }
 .join-slim .level-line { margin-top: .5rem; }
-.tiles-head { margin: 1.2rem 0 .6rem; font-size: 1.1rem; }
-.app-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .8rem; }
+.tiles-head { margin: 0 0 .75rem; }   /* gleiche Überschrift wie „Zuletzt gespielt“ (.section-head h2) */
+.app-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .8rem; margin-bottom: 1.6rem; }   /* gleicher Abstand wie unter der Liste „Zuletzt gespielt“ */
 .app-tile { display: flex; flex-direction: column; align-items: flex-start; gap: .15rem; padding: 1rem .9rem; border: 1px solid var(--border); border-radius: 20px; background: var(--card); color: var(--text); text-align: left; text-decoration: none; cursor: pointer; box-shadow: var(--shadow); font: inherit; min-width: 0; margin: 0; transition: transform .12s, border-color .12s; }
 .app-tile:hover { transform: translateY(-2px); border-color: var(--primary); }
 .app-tile .at-ico { font-size: 2.2rem; line-height: 1.1; margin-bottom: .35rem; }
