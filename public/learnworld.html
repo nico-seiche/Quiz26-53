@@ -153,7 +153,7 @@
           ${docs.map((d) => { const r = d.request; return `<div class="lw-tile doc" draggable="true" data-open-doc="${d.id}" data-drag="doc:${d.id}"><button type="button" class="lw-more" data-more="doc:${d.id}" aria-label="Aktionen">⋯</button><div class="ic" aria-hidden="true">📄</div><div class="nm">${escapeHtml(d.title)}</div><div class="meta">${fmt(d.updatedAt)}</div>${r && r.status === 'open' ? '<span class="lw-chip warn">⏳ Lernset wird erstellt</span>' : r && r.status === 'done' ? '<span class="lw-chip">✅ Lernset fertig</span>' : ''}</div>`; }).join('')}
         </div>
         ${!folders.length && !docs.length ? `<div class="lw-empty">${here ? 'Dieser Ordner ist leer.' : 'Noch nichts in diesem Fach.'} Lege ein Dokument an, füge Dateien hinzu oder erstelle einen Ordner.</div>` : ''}
-        ${here === null && (state.data.trainings || []).length ? `<div class="lw-sec"><h2>🎯 Übungen</h2><div class="lw-tiles">${state.data.trainings.map((x) => `<div class="lw-tile train" data-open-train="${x.id}"><div class="ic" aria-hidden="true">${x.kind === 'schema' ? '🧩' : '✍️'}</div><div class="nm">${escapeHtml(x.title)}</div><div class="meta">${x.kind === 'schema' ? 'Prüfungsschema' : 'Musterformulierungen'}</div></div>`).join('')}</div></div>` : ''}
+        ${here === null && (state.data.trainings || []).length ? `<div class="lw-sec"><h2>🎯 Übungen</h2><div class="lw-tiles">${state.data.trainings.map((x) => `<div class="lw-tile train" data-open-train="${x.id}"><button type="button" class="lw-more" data-more="train:${x.id}" aria-label="Aktionen">⋯</button><div class="ic" aria-hidden="true">${x.kind === 'schema' ? '🧩' : '✍️'}</div><div class="nm">${escapeHtml(x.title)}</div><div class="meta">${x.kind === 'schema' ? 'Prüfungsschema' : 'Musterformulierungen'}</div></div>`).join('')}</div></div>` : ''}
         ${here === null ? `<div class="lw-sec"><h2>🧠 Lernsets in diesem Fach</h2>${sets.length ? `<div class="lw-tiles">${sets.map((x) => `<div class="lw-tile set" data-open-set="${x.id}"><button type="button" class="lw-more" data-more="set:${x.id}" aria-label="Aktionen">⋯</button><div class="ic" aria-hidden="true">🧠</div><div class="nm">${escapeHtml(x.title)}</div><div class="meta">${x.cards} ${x.cards === 1 ? 'Karte' : 'Karten'}</div></div>`).join('')}</div>` : '<div class="lw-empty">Noch kein Lernset. Wähle bei einem Dokument über „⋯“ „Lernset erstellen lassen“.</div>'}</div>` : ''}`;
       view.dataset.slug = c.slug;
       view.dataset.title = c.name;
@@ -197,13 +197,16 @@
         items = [['open', '📄 Öffnen'],
           r && r.status === 'open' ? ['cancel', '↩ Anfrage zurückziehen'] : r && r.status === 'done' && r.setId ? ['learn', '🧠 Lernset lernen'] : null,
           !(r && r.status === 'open') ? ['request', r && r.status === 'done' ? '🧠 Neues Lernset anfragen' : '🧠 Lernset erstellen lassen'] : null,
-          ['move', '📁 In Ordner verschieben …'], ['unassign', '✖ Aus dem Fach nehmen']];
+          ['move', '📁 In Ordner verschieben …'], ['unassign', '✖ Aus dem Fach nehmen'], ['delete', '🗑 Löschen']];
       } else if (kind === 'folder') {
         title = folderById(id).name;
         items = [['open', '📂 Öffnen'], ['rename', '✏️ Umbenennen'], ['move', '📁 Verschieben …'], ['delete', '🗑 Ordner löschen (Inhalt bleibt erhalten)']];
+      } else if (kind === 'train') {
+        title = state.data.trainings.find((y) => y.id === id).title;
+        items = [['open', '🎯 Öffnen'], ['delete', '🗑 Löschen']];
       } else {
         const x = state.data.sets.find((y) => y.id === id); title = x.title;
-        items = [['learn', '🧠 Lernen'], ['edit', '✏️ Bearbeiten'], ['unset', '✖ Aus dem Fach nehmen']];
+        items = [['learn', '🧠 Lernen'], ['edit', '✏️ Bearbeiten'], ['unset', '✖ Aus dem Fach nehmen'], ['delete', '🗑 Löschen']];
       }
       modal(`<h2 style="margin:0 0 .6rem;overflow-wrap:anywhere">${escapeHtml(title)}</h2><div class="lw-menu">${items.filter(Boolean).map(([k, l]) => `<button type="button" data-m="${k}">${l}</button>`).join('')}</div>
         <div class="row" style="justify-content:flex-end"><button type="button" data-close>Schließen</button></div>`, (box, close) => {
@@ -220,6 +223,7 @@
               else if (m === 'request') requestDialog(String(id), d.title);
               else if (m === 'cancel') { await api(`/api/learnworld/requests/${d.request.id}`, { method: 'DELETE' }); await refresh(); }
               else if (m === 'move') moveDialog('doc', id);
+              else if (m === 'delete' && confirm(`Dokument „${d.title}“ endgültig löschen? Text, Bilder und Handschrift gehen verloren – das lässt sich nicht rückgängig machen.`)) { await api(`/api/docs/${id}`, { method: 'DELETE' }); await refresh(); }
               else if (m === 'unassign' && confirm('Das Dokument bleibt erhalten, ist aber nicht mehr diesem Fach zugeordnet. Offene Anfragen dazu werden zurückgezogen.')) { await api(`/api/learnworld/docs/${id}/course`, { method: 'PUT', body: { slug: null } }); await refresh(); }
             } else if (kind === 'folder') {
               const f = folderById(id);
@@ -227,8 +231,13 @@
               else if (m === 'rename') nameDialog('Ordner umbenennen', f.name, (v) => api(`/api/learnworld/folders/${id}`, { method: 'PATCH', body: { name: v } }));
               else if (m === 'move') moveDialog('folder', id);
               else if (m === 'delete' && confirm(`Ordner „${f.name}“ löschen? Die Dateien und Unterordner darin bleiben erhalten und rücken eine Ebene nach oben.`)) { await api(`/api/learnworld/folders/${id}`, { method: 'DELETE' }); await refresh(); }
+            } else if (kind === 'train') {
+              const t = state.data.trainings.find((y) => y.id === id);
+              if (m === 'open') location.href = `/train?id=${id}`;
+              else if (m === 'delete' && confirm(`Übung „${t.title}“ endgültig löschen?`)) { await api(`/api/trainings/${id}`, { method: 'DELETE' }); await refresh(); }
             } else {
-              if (m === 'learn') location.href = `/learn?id=${id}`;
+              if (m === 'delete') { const x = state.data.sets.find((y) => y.id === id); if (confirm(`Lernset „${x.title}“ mit allen Karten endgültig löschen? Das lässt sich nicht rückgängig machen.`)) { await api(`/api/study/${id}`, { method: 'DELETE' }); await refresh(); } }
+              else if (m === 'learn') location.href = `/learn?id=${id}`;
               else if (m === 'edit') location.href = `/study-edit?id=${id}`;
               else if (m === 'unset') { await api(`/api/learnworld/sets/${id}/course`, { method: 'PUT', body: { slug: null } }); await refresh(); }
             }
