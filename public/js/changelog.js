@@ -2,6 +2,14 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-27',
+    title: 'Neu: Prüfung präventiv zum Ausfüllen',
+    items: [
+      ['🛡️', 'Prüfung in der Learnworld', 'Im Fach Eingriffsrecht startest du mit „🛡️ Prüfung präventiv“ ein Dokument: oben der Sachverhalt, darunter alle Prüfungspunkte als Überschriften, unter die du deine Prüfung schreibst.'],
+      ['▾', 'Ein- und ausklappen', 'Vor jeder Überschrift in einem Dokument steht jetzt ein Pfeil – tippen klappt den Abschnitt darunter zu oder auf.'],
+    ],
+  },
+  {
     id: '2026-11-26',
     title: 'Bestenliste: mehrere Fächer zusammen',
     items: [

@@ -36,6 +36,12 @@
     .paper { --text: #1b1d3a; --muted: #667085; --border: #e1e5f7; --link: #4338ca; --card: #fff; max-width: 860px; margin: 0 auto; background: #fff; color: #1b1d3a; box-shadow: 0 10px 40px rgba(20, 20, 60, .2); border-radius: 4px; min-height: 80vh; }
     #editor .ql-editor { padding: 3.2rem 4rem; min-height: 70vh; font-family: Inter, system-ui, sans-serif; font-size: 16px; line-height: 1.6; overflow-y: visible; }
     #editor .ql-editor.ql-blank::before { color: #9aa0bd; font-style: normal; left: 4rem; right: 4rem; }
+    /* Einklappbare Abschnitte: Chevron links der Überschrift (public/js/docs-fold.js) */
+    .ql-editor h1, .ql-editor h2, .ql-editor h3 { position: relative; }
+    .ql-editor [data-fold]::before { content: '▾'; position: absolute; left: -1.9rem; top: 0; width: 1.9rem; text-align: center; font-size: 1.15rem; line-height: inherit; font-weight: 400; color: #6b72a0; cursor: pointer; user-select: none; -webkit-user-select: none; }
+    .ql-editor [data-fold="closed"]::before { content: '▸'; color: #4f6cf5; }
+    .ql-editor [data-fold="closed"]::after { content: ' …'; color: #9aa0bd; font-weight: 400; }
+    .ql-editor [hidden] { display: none !important; }
     .ql-editor h1 { font-size: 2.1rem; margin: 1.2rem 0 .5rem; line-height: 1.2; }
     .ql-editor h2 { font-size: 1.6rem; margin: 1rem 0 .4rem; line-height: 1.25; }
     .ql-editor h3 { font-size: 1.25rem; margin: .9rem 0 .3rem; }
@@ -103,6 +109,8 @@
       .d-scroll { overflow: visible; padding: 0; background: #fff; }
       .paper { box-shadow: none; max-width: none; border-radius: 0; min-height: 0; }
       #editor .ql-editor { padding: 0; min-height: 0; }
+      #editor .ql-editor [hidden] { display: block !important; }
+      #editor .ql-editor [data-fold]::before, #editor .ql-editor [data-fold]::after { display: none; }
       .ql-ink { border: 0; background: none; }
       html, body { height: auto; background: #fff; }
     }
@@ -161,6 +169,7 @@
   <script src="/js/docs-pdf.js"></script>
   <script src="/js/docs-pen.js"></script>
   <script src="/js/docs-flyout.js"></script>
+  <script src="/js/docs-fold.js"></script>
   <script src="/js/changelog.js"></script>
   <script src="/js/common.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
@@ -174,6 +183,7 @@
     let conflict = false;
     let lastRange = null;
     let pen = null;
+    let fold = null;
     let inkTimer = null;
     let inkPending = false;
     let inkSaving = false;
@@ -374,6 +384,7 @@
       quill.root.addEventListener('paste', (e) => { const f = [...(e.clipboardData?.files || [])].find((x) => /^image\//.test(x.type)); if (f) { e.preventDefault(); e.stopPropagation(); uploadImage(f); } }, true);
       pen = DocsPen.attach(quill, { initial: doc.ink || [], onChange: inkChanged });
       DocsFlyout.mount(quill, { getRange: () => lastRange });
+      fold = DocsFold.attach(quill, id);
       quill.root.addEventListener('drop', (e) => { const f = [...(e.dataTransfer?.files || [])].find((x) => /^image\//.test(x.type)); if (f) { e.preventDefault(); e.stopPropagation(); uploadImage(f); } }, true);
       refreshTools();
     }

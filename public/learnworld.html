@@ -144,7 +144,7 @@
       view.innerHTML = `<div class="card lw-hero"><h1>${c.icon} ${escapeHtml(c.name)}</h1>
         <p class="muted" style="margin:0">Deine Unterlagen in diesem Fach – sortiert in Ordnern. Dateien auf einen Ordner ziehen oder über „⋯“ verschieben.</p></div>
         <div class="lw-crumbs">${crumb(null, `${c.icon} ${escapeHtml(c.name)}`, here === null)}${path.map((f, i) => `<span class="sep">›</span>${crumb(f.id, `📁 ${escapeHtml(f.name)}`, i === path.length - 1)}`).join('')}</div>
-        <div class="lw-bar"><button type="button" class="primary" data-act="new">+ Neues Dokument</button><button type="button" data-act="files">📎 Dateien hinzufügen</button><button type="button" data-act="folder">📁 Neuer Ordner</button><button type="button" data-act="assign">📎 Vorhandene zuordnen</button>
+        <div class="lw-bar"><button type="button" class="primary" data-act="new">+ Neues Dokument</button><button type="button" data-act="files">📎 Dateien hinzufügen</button>${(state.data.tests || []).map((t) => `<button type="button" data-act="test" data-tpl="${escapeHtml(t.id)}" title="Neue Prüfung mit Sachverhalt und einklappbaren Prüfungspunkten">${t.icon} ${escapeHtml(t.title)}</button>`).join('')}<button type="button" data-act="folder">📁 Neuer Ordner</button><button type="button" data-act="assign">📎 Vorhandene zuordnen</button>
           <select id="lw-sort" aria-label="Sortierung"><option value="name" ${state.sort === 'name' ? 'selected' : ''}>A–Z</option><option value="date" ${state.sort === 'date' ? 'selected' : ''}>Neueste zuerst</option></select></div>
         <input type="file" id="wordfile" multiple hidden>
         <div id="import-log"></div>
@@ -308,6 +308,7 @@
       if (!t) return;
       try {
         if (t.dataset.act === 'new') await newDoc();
+        else if (t.dataset.act === 'test') { t.disabled = true; const { id } = await api(`/api/learnworld/courses/${state.slug}/tests`, { method: 'POST', body: { template: t.dataset.tpl, folderId: state.folder } }); location.href = `/docs-edit?id=${id}`; }
         else if (t.dataset.act === 'files') $('#wordfile').click();
         else if (t.dataset.act === 'assign') await assignDialog(state.slug);
         else if (t.dataset.act === 'folder') nameDialog('Neuer Ordner', '', (v) => api(`/api/learnworld/courses/${state.slug}/folders`, { method: 'POST', body: { name: v, parentId: state.folder } }));

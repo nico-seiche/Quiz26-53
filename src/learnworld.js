@@ -1,6 +1,7 @@
 const express = require('express');
 const { requireAuth } = require('./auth');
 const db = require('./db');
+const { TEMPLATES, buildDelta, forCourse } = require('./pruefungen');
 
 // Learnworld: Rechtsfächer mit eigenen Dokumenten (Vorlesungsmitschriften) und Lernsets.
 // Aus einem Dokument lässt sich ein Lernset „anfragen“; die Anfragen stehen in quiz.lw_open_requests und werden von Hand
@@ -36,6 +37,7 @@ router.get('/courses/:slug', async (req, res) => {
   const folders = await db.query('SELECT id, parent_id, name FROM quiz.lw_folders WHERE user_id = $1 AND course_id = $2 ORDER BY name', [req.user.id, c.id]);
   res.json({
     course: c,
+    tests: forCourse(c.slug),
     trainings: trainings.map((t) => ({ id: Number(t.id), title: t.title, kind: t.kind })),
     folders: folders.map((f) => ({ id: Number(f.id), parentId: f.parent_id ? Number(f.parent_id) : null, name: f.name })),
     docs: docs.map((d) => ({ id: Number(d.id), folderId: d.folder_id ? Number(d.folder_id) : null, title: d.title, preview: d.preview, updatedAt: d.updated_at, request: d.request_id ? { id: Number(d.request_id), status: d.request_status, setId: d.request_set ? Number(d.request_set) : null, note: d.request_note } : null })),
@@ -66,6 +68,18 @@ router.post('/courses/:slug/docs', async (req, res) => {
   const title = String((req.body && req.body.title) || '').trim().slice(0, 120) || `${c.name} – Mitschrift`;
   const folderId = await ownFolder(req.user.id, c.id, req.body && req.body.folderId);
   const row = await db.one('INSERT INTO quiz.docs (owner_id, title, delta, course_id, folder_id) VALUES ($1, $2, $3, $4, $5) RETURNING id', [req.user.id, title, JSON.stringify([{ insert: '\n' }]), c.id, folderId]);
+  res.json({ id: Number(row.id) });
+});
+
+// Neue Prüfung (Dokument mit Sachverhalt und den Prüfungspunkten als einklappbare Überschriften) aus einer Vorlage
+router.post('/courses/:slug/tests', async (req, res) => {
+  const c = await course(req.params.slug);
+  if (!c) return res.status(404).json({ error: 'Fach nicht gefunden' });
+  const t = TEMPLATES[String((req.body && req.body.template) || '')];
+  if (!t || !t.courses.includes(c.slug)) return res.status(400).json({ error: 'Diese Vorlage gibt es in diesem Fach nicht' });
+  const folderId = await ownFolder(req.user.id, c.id, req.body && req.body.folderId);
+  const delta = buildDelta(t);
+  const row = await db.one('INSERT INTO quiz.docs (owner_id, title, delta, course_id, folder_id) VALUES ($1, $2, $3, $4, $5) RETURNING id', [req.user.id, t.title, JSON.stringify(delta), c.id, folderId]);
   res.json({ id: Number(row.id) });
 });
 

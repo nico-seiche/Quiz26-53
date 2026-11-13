@@ -32,6 +32,8 @@ const DocsPdf = (() => {
     holder.style.cssText = 'position:relative;background:#fff;color:#1b1d3a;--text:#1b1d3a;--muted:#667085;--border:#e1e5f7;--link:#4338ca;--card:#fff;box-shadow:none;border:0;margin:0;padding:0;width:100%;max-width:none';
     const clone = editorEl.cloneNode(true);
     clone.removeAttribute('contenteditable');
+    clone.querySelectorAll('[hidden]').forEach((e) => e.removeAttribute('hidden'));      // eingeklappte Abschnitte gehören ins PDF
+    clone.querySelectorAll('[data-fold]').forEach((e) => e.removeAttribute('data-fold'));
     clone.style.cssText = 'min-height:0;overflow:visible;height:auto;width:100%;box-sizing:border-box';
     holder.appendChild(clone);
     stage.appendChild(holder);
