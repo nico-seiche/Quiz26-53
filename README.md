@@ -238,7 +238,7 @@ Beim Lernen (`public/learn.html`) meldet „🚩 Fehler in dieser Karte melden�
 
 ## Prüfungen zum Ausfüllen (Learnworld)
 
-`src/pruefungen.js` enthält Vorlagen (`TEMPLATES`, derzeit „Prüfung präventiv“ für Eingriffsrecht). `POST /api/learnworld/courses/:slug/tests { template, folderId }` legt daraus ein normales Dokument im Fach an: Überschrift „Sachverhalt“ mit leerem Textabsatz, danach jeder Prüfungspunkt als Überschrift (A. / I. / 1. → Ebene 1–3) mit leerem Absatz. Im Editor lassen sich Abschnitte per Chevron vor jeder Überschrift ein- und ausklappen (`public/js/docs-fold.js`; Zustand pro Dokument im `localStorage` `fold:<id>`, im PDF/Druck stets aufgeklappt). Weitere Vorlagen (z. B. repressiv) = neuer Eintrag in `TEMPLATES` mit `courses`.
+`src/pruefungen.js` enthält Vorlagen (`TEMPLATES`, „Prüfung präventiv“ und „Prüfung repressiv“ für Eingriffsrecht). `POST /api/learnworld/courses/:slug/tests { template, folderId }` legt daraus ein normales Dokument im Fach an: Überschrift „Sachverhalt“ mit leerem Textabsatz, danach jeder Prüfungspunkt als Überschrift (A. / I. / 1. → Ebene 1–3) mit leerem Absatz. Im Editor lassen sich Abschnitte per Chevron vor jeder Überschrift ein- und ausklappen (`public/js/docs-fold.js`; Zustand pro Dokument im `localStorage` `fold:<id>`, im PDF/Druck stets aufgeklappt). Weitere Vorlagen = neuer Eintrag in `TEMPLATES` mit `courses`.
 
 ## Startseite
 

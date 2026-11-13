@@ -32,6 +32,34 @@ const TEMPLATES = {
   },
 };
 
+TEMPLATES.repressiv = {
+  title: 'Prüfung repressiv',
+  icon: '🔎',
+  courses: ['eingriffsrecht'],
+  nodes: [
+    N('Vorprüfung',
+      N('Nennen der Maßnahmen'),
+      N('Grundrechtsprüfung (Eingriff, sachlicher Schutzbereich)'),
+      N('Präventive oder repressive Zielrichtung (PolG NRW oder StPO oder OWiG)'),
+      N('Rechtsnatur der Eingriffsmaßnahme (Justizverwaltungsakt gem. § 23 EGGVG)')),
+    N('Formelle Rechtmäßigkeit',
+      N('Sachliche Zuständigkeit – §§ 1 IV PolG i.V.m. § 163 StPO i.V.m. §§ 10, 11 I Nr. 2 POG'),
+      N('Örtliche Zuständigkeit – § 7 I POG'),
+      N('Allgemeine Verfahrensvorschriften (keine) und Formvorschriften (§ 168b StPO – Protokoll über ermittlungsbehördliche Untersuchungshandlungen)')),
+    N('Materielle Rechtmäßigkeit',
+      N('Zulässigkeit der Eingriffsmaßnahme'),
+      N('Ermächtigungsgrundlagen',
+        N('Tatbestandsvoraussetzungen'),
+        N('Rechtsfolge'),
+        N('Anordnungs- und Durchführungskompetenz'),
+        N('Verfahrens- und Formvorschriften')),
+      N('Adressat'),
+      N('Pflichtgemäße Ermessensausübung'),
+      N('Übermaßverbot (Geeignetheit, Erforderlichkeit, Angemessenheit)')),
+    N('Ergebnisfeststellung'),
+  ],
+};
+
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 const LETTER = (i) => String.fromCharCode(65 + i);
 // Gliederungszeichen je Ebene: A. / I. / 1.

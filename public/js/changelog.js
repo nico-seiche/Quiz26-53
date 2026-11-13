@@ -2,6 +2,13 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-28',
+    title: 'Neu: Prüfung repressiv',
+    items: [
+      ['🔎', 'Prüfung repressiv', 'Im Fach Eingriffsrecht gibt es neben der präventiven jetzt auch die repressive Prüfung: Sachverhalt oben, darunter alle Prüfungspunkte zum Ausfüllen und Einklappen.'],
+    ],
+  },
+  {
     id: '2026-11-27',
     title: 'Neu: Prüfung präventiv zum Ausfüllen',
     items: [
