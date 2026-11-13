@@ -22,7 +22,8 @@
     <span id="me"></span>
   </header>
   <main>
-    <div class="tabs" id="tabs" role="tablist" aria-label="Wertung wählen"></div>
+    <div class="tabs" id="tabs" role="group" aria-label="Wertung wählen"></div>
+    <p class="muted" id="multi-hint" style="margin:-.3rem 0 .8rem;font-size:.9rem"></p>
     <p class="error" id="error"></p>
     <div class="card" id="summary"></div>
     <div class="card">
@@ -33,7 +34,8 @@
   <script src="/js/changelog.js"></script>
   <script src="/js/common.js"></script>
   <script>
-    let selected = new URLSearchParams(location.search).get('subject') || 'all';
+    // Auswahl: leer = Gesamt, sonst die gewählten Fächer (Punkte werden zusammengerechnet)
+    let sel = (new URLSearchParams(location.search).get('subject') || '').split(',').filter((x) => /^\d+$/.test(x));
     let myName = '';
 
     const nf = (n) => n.toLocaleString('de-DE');
@@ -54,12 +56,18 @@
     }
 
     function render(d) {
-      selected = String(d.selected);
-      const tabs = [{ id: 'all', name: 'Gesamt' }, ...d.subjects.map((s) => ({ id: String(s.id), name: s.name }))];
-      $('#tabs').innerHTML = tabs.map((t) => `
-        <button type="button" role="tab" aria-selected="${t.id === selected}" class="${t.id === selected ? 'active' : ''}" data-subject="${t.id}">${escapeHtml(t.name)}</button>`).join('');
+      sel = d.selected === 'all' ? [] : d.selected.map(String);
+      const same = (ids) => ids.length === sel.length && ids.every((i) => sel.includes(String(i)));
+      $('#tabs').innerHTML = [
+        `<button type="button" aria-pressed="${sel.length === 0}" class="${sel.length === 0 ? 'active' : ''}" data-all="1">Gesamt</button>`,
+        ...(d.groups || []).map((g) => `<button type="button" aria-pressed="${same(g.ids)}" class="${same(g.ids) ? 'active' : ''}" data-group="${g.ids.join(',')}">⚖️ ${escapeHtml(g.name)}</button>`),
+        ...d.subjects.map((x) => `<button type="button" aria-pressed="${sel.includes(String(x.id))}" class="${sel.includes(String(x.id)) ? 'active' : ''}" data-subject="${x.id}">${escapeHtml(x.name)}</button>`),
+      ].join('');
+      $('#multi-hint').textContent = sel.length > 1 ? `${sel.length} Fächer zusammen – die Punkte werden addiert.` : 'Tipp: Mehrere Fächer antippen, dann werden ihre Punkte zusammengerechnet.';
 
-      const scope = selected === 'all' ? 'insgesamt' : `in ${d.subjects.find((s) => String(s.id) === selected).name}`;
+      const names = sel.map((id) => d.subjects.find((x) => String(x.id) === id).name);
+      const grp = (d.groups || []).find((g) => same(g.ids));
+      const scope = sel.length === 0 ? 'insgesamt' : grp ? `in den ${grp.name}n` : `in ${names.length > 2 ? `${names.length} Fächern (${names.join(' + ')})` : names.join(' + ')}`;
       $('#summary').innerHTML = d.me.points > 0
         ? `<div class="stat-total">Platz ${d.me.rank}</div>
            <div class="muted">von ${d.userCount} · ${nf(d.me.points)} Punkte ${scope} · ${d.me.games} ${d.me.games === 1 ? 'Spiel' : 'Spiele'}</div>`
@@ -78,18 +86,20 @@
     async function load() {
       $('#error').textContent = '';
       try {
-        render(await api(`/api/leaderboard?subject=${encodeURIComponent(selected)}`));
+        render(await api(`/api/leaderboard?subject=${sel.length ? sel.join(',') : 'all'}`));
       } catch (err) {
-        if (selected !== 'all') { selected = 'all'; return load(); }  // ungültiges Fach in der Adresse
+        if (sel.length) { sel = []; return load(); }  // ungültiges Fach in der Adresse
         $('#error').textContent = err.message;
       }
     }
 
     $('#tabs').addEventListener('click', (e) => {
-      const button = e.target.closest('[data-subject]');
-      if (!button) return;
-      selected = button.dataset.subject;
-      history.replaceState(null, '', selected === 'all' ? '/leaderboard' : `/leaderboard?subject=${selected}`);
+      const t = e.target.closest('button');
+      if (!t) return;
+      if (t.dataset.all) sel = [];
+      else if (t.dataset.group) { const ids = t.dataset.group.split(','); sel = ids.every((i) => sel.includes(i)) && ids.length === sel.length ? [] : ids; }
+      else if (t.dataset.subject) sel = sel.includes(t.dataset.subject) ? sel.filter((x) => x !== t.dataset.subject) : [...sel, t.dataset.subject];
+      history.replaceState(null, '', sel.length ? `/leaderboard?subject=${sel.join(',')}` : '/leaderboard');
       load();
     });
 

@@ -2,6 +2,14 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-26',
+    title: 'Bestenliste: mehrere Fächer zusammen',
+    items: [
+      ['🏆', 'Fächer kombinieren', 'In der Bestenliste kannst du jetzt mehrere Fächer antippen – die Punkte werden zusammengerechnet.'],
+      ['⚖️', 'Rechtsfächer', 'Mit „Rechtsfächer“ wählst du Eingriffs-, Straf-, Staats-, Beamten- und Verkehrsrecht auf einmal.'],
+    ],
+  },
+  {
     id: '2026-11-25',
     title: 'Neu: Übungen für Gutachten',
     items: [

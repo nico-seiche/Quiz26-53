@@ -216,6 +216,10 @@ Aktuell einfache Wertung: richtige Antwort = 500–1000 Punkte, je schneller des
 - Nach dem Import `node scripts/build-gesetze-index.js` ausführen (schreibt `src/gesetze/index.json`, dort steht auch die Tab-Reihenfolge) und das Gesetz in `LOADERS` (`src/gesetze.js`) eintragen. Die Texte werden erst beim Öffnen geladen.
 - Aktuell enthalten: PolG NRW (gültig ab 13.12.2025), OBG NRW (ab 01.07.2026), POG NRW (ab 01.10.2020), VwVG NRW (ab 01.04.2025), LBG NRW (ab 04.08.2026), StVG, FeV, VersG, WaffG, BtMG, JGG, GVG, VwGO, VwVfG, BeamtStG, BDSG, AufenthG (alle Bundesrecht über `import-gii.js`; Kurznamen z. B. `vwgo`, `waffg_2002`, `btmg_1981`, `fev_2010`, `bdsg_2018`, `aufenthg_2004`), StGB, StPO, OWiG, StVO, StVZO, GG (Artikel statt Paragraphen) und BGB (z. B. `import-gii.js stgb StGB`, `owig_1968 OWiG`, `stvo_2013 StVO`, `stvzo_2012 StVZO`; Anlagen wie die Verkehrszeichen-Kataloge der StVO sind nicht dabei).
 
+## Bestenliste mit mehreren Fächern
+
+`GET /api/leaderboard?subject=all|<id>|<id>,<id>,…` (`src/leaderboard.js`): bei mehreren Fächern werden die Punkte und Spiele der gewählten Fächer addiert (`r.subject_id = ANY($2)`), Platz und Aufsteiger-Vergleich rechnen mit derselben Auswahl. Die Antwort enthält `selected` (`'all'` oder Liste) und `groups` (Schnellauswahl „Rechtsfächer“ = Fächer, die einem Rechtsfach der Learnworld zugeordnet sind). Die Seite (`public/leaderboard.html`) schaltet Fächer einzeln ein und aus; Adresse `/leaderboard?subject=4,5`.
+
 ## Fehler melden (Lernsets)
 
 Beim Lernen (`public/learn.html`) meldet „🚩 Fehler in dieser Karte melden“ eine Karte (Tippfehler / inhaltlich falsch / Sonstiges + Notiz) über `POST /api/study/cards/:cardId/report`; Tabelle `quiz.card_reports` (Migration 030; Begriff und Definition werden als Momentaufnahme mitgespeichert, eine offene Meldung je Karte und Melder, höchstens 50 pro Tag). Besitzer und Mitarbeiter sehen im Editor (`study-edit.html`) den Kasten „Gemeldete Fehler“ (`GET /api/study/:id/reports`, `POST /api/study/:id/reports/:rid` mit `status` done/dismissed/open) und in der Lernset-Liste ein 🚩 mit der Zahl offener Meldungen.
