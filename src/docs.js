@@ -32,6 +32,7 @@ function cleanAttributes(a) {
   for (const k of ['color', 'background']) { const h = hex(a[k]); if (h) out[k] = h; }
   if (FONTS.includes(a.font)) out.font = a.font;
   if (SIZES.includes(a.size)) out.size = a.size;
+  if (a.locked === 'yes' && [1, 2, 3].includes(a.header)) out.locked = 'yes';    // Überschrift ist nicht bearbeitbar (Prüfungsvorlagen)
   if (a.script === 'sub' || a.script === 'super') out.script = a.script;
   if ([1, 2, 3].includes(a.header)) out.header = a.header;
   if (['ordered', 'bullet', 'checked', 'unchecked'].includes(a.list)) out.list = a.list;

@@ -40,7 +40,7 @@ const label = (depth, i) => (depth === 0 ? `${LETTER(i)}.` : depth === 1 ? `${RO
 // Quill-Delta: „Sachverhalt“ mit leerem Textabsatz, danach jeder Prüfungspunkt als Überschrift (Ebene 1–3) mit leerem Absatz darunter
 function buildDelta(template) {
   const ops = [];
-  const heading = (text, level) => { ops.push({ insert: text }, { insert: '\n', attributes: { header: level } }); };
+  const heading = (text, level) => { ops.push({ insert: text }, { insert: '\n', attributes: { header: level, locked: 'yes' } }); };
   const blank = () => ops.push({ insert: '\n' });
   heading('Sachverhalt', 1);
   blank();

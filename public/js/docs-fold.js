@@ -33,12 +33,11 @@ const DocsFold = (() => {
     }
     // Klick auf den Chevron (linker Rand der Überschrift)
     root.addEventListener('click', (e) => {
-      const el = e.target.closest && e.target.closest('h1, h2, h3');
-      if (!el || el.parentElement !== root) return;
-      const r = el.getBoundingClientRect();
-      if (e.clientX - r.left > 30 || e.clientX < r.left - 40) return;
-      e.preventDefault();
-      toggle(el);
+      for (const el of root.children) {
+        if (!HEAD.test(el.tagName)) continue;
+        const r = el.getBoundingClientRect();
+        if (e.clientY >= r.top && e.clientY <= Math.min(r.bottom, r.top + 48) && e.clientX >= r.left - 46 && e.clientX <= r.left + 6) { e.preventDefault(); toggle(el); return; }
+      }
     });
     function toggle(el) {
       const k = el.dataset.fk;
@@ -67,5 +66,25 @@ const DocsFold = (() => {
       apply,
     };
   }
-  return { attach };
+
+  // Gesperrte Überschriften (Format „locked“): nicht anklickbar zum Schreiben, nicht löschbar, nicht mit dem Nachbarabsatz verschmelzbar
+  function lockHeadings(quill) {
+    const root = quill.root;
+    const mark = () => { for (const el of root.children) { const on = el.classList.contains('ql-locked-yes'); if (on !== (el.getAttribute('contenteditable') === 'false')) { if (on) { el.setAttribute('contenteditable', 'false'); el.dataset.locked = '1'; } else { el.removeAttribute('contenteditable'); delete el.dataset.locked; } } } };
+    const lockedAt = (index) => { const [line] = quill.getLine(index); return Boolean(line && line.domNode.classList.contains('ql-locked-yes')); };
+    const snapshot = () => quill.getLines(0).filter((l) => l.domNode.classList.contains('ql-locked-yes')).map((l) => l.domNode.textContent).join('\n');
+    let snap = snapshot();
+    // Zurück-/Entf-Taste am Rand einer gesperrten Überschrift wirkungslos machen
+    const guard = (key, hits) => { quill.keyboard.addBinding({ key }, (range) => !(range.length === 0 && hits(range)) && true); const list = quill.keyboard.bindings[key === 'Backspace' ? 'Backspace' : 'Delete']; if (list && list.length) list.unshift(list.pop()); };
+    guard('Backspace', (r) => { const [line, off] = quill.getLine(r.index); return off === 0 && quill.getIndex(line) > 0 && lockedAt(quill.getIndex(line) - 1); });
+    guard('Delete', (r) => { const [line, off] = quill.getLine(r.index); return off === line.length() - 1 && lockedAt(quill.getIndex(line) + line.length()); });
+    // Auffangnetz (Auswahl über mehrere Zeilen, Einfügen …): Änderung an gesperrten Überschriften rückgängig machen
+    quill.on('text-change', (d, o, source) => {
+      mark();
+      if (source === 'user' && snapshot() !== snap) { quill.history.undo(); mark(); }
+      snap = snapshot();
+    });
+    mark();
+  }
+  return { attach, lockHeadings };
 })();
