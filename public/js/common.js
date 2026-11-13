@@ -399,27 +399,41 @@ const Nav = (() => {
     if (t) new MutationObserver(touch).observe(t, { childList: true });
   });
 
-  // Der Ort, von dem man aus einem anderen Bereich hierher kam
-  function previous() {
+  // Der Ort davor (die Seite, von der man hierher kam)
+  function backEntry() {
     const list = read();
     const i = list.length - 1;
     if (i < 1 || list[i].p !== here()) return null;
     const prev = list[i - 1];
-    return prev.a !== area ? { ...prev, index: i - 1 } : null;
+    return prev.p === here() ? null : { ...prev, index: i - 1 };
   }
+  const shortLabel = (e) => (e.t && e.t.startsWith(e.a) ? e.t : e.t && e.t !== e.a ? `${e.a} · ${e.t}` : e.a);
+  const rememberTarget = (prev) => {
+    write(read().slice(0, prev.index + 1));                              // Verlauf bis zum Ziel kürzen
+    try { sessionStorage.setItem('navScroll', JSON.stringify({ p: prev.p, sy: prev.sy || 0 })); } catch { /* egal */ }
+  };
+  // Zurück-Link im Seitenkopf („← Profil“ usw.) führt dorthin, wo man wirklich herkam – nicht in eine feste Übersicht
+  function rewriteBackLink() {
+    const prev = backEntry();
+    const link = [...document.querySelectorAll('header a.brand, .d-top a.back, a.back')].find((a) => /^←/.test(a.textContent.trim()) && !a.hasAttribute('data-nav-fixed'));
+    if (!link || !prev) return false;
+    link.href = prev.u;
+    link.textContent = `← ${shortLabel(prev)}`;
+    link.classList.add('nav-back-link');
+    link.addEventListener('click', () => rememberTarget(prev));
+    return true;
+  }
+  // Seiten ohne Zurück-Link im Kopf: „↩ Zurück zu …“ nach einem Bereichswechsel
   function render() {
-    const prev = previous();
+    if (rewriteBackLink()) return;
+    const prev = backEntry();
     const main = document.querySelector('main');
-    if (!prev || !main || document.querySelector('.nav-back')) return;
+    if (!prev || prev.a === area || !main || document.querySelector('.nav-back')) return;
     const a = document.createElement('a');
     a.className = 'nav-back';
     a.href = prev.u;
-    const txt = prev.t && prev.t.startsWith(prev.a) ? prev.t : prev.t && prev.t !== prev.a ? `${prev.a} · ${prev.t}` : prev.a;
-    a.innerHTML = `<span aria-hidden="true">↩</span> Zurück zu <strong>${escapeHtml(txt)}</strong>`;
-    a.addEventListener('click', () => {
-      write(read().slice(0, prev.index + 1));                              // Verlauf bis zum Ziel kürzen
-      try { sessionStorage.setItem('navScroll', JSON.stringify({ p: prev.p, sy: prev.sy || 0 })); } catch { /* egal */ }
-    });
+    a.innerHTML = `<span aria-hidden="true">↩</span> Zurück zu <strong>${escapeHtml(shortLabel(prev))}</strong>`;
+    a.addEventListener('click', () => rememberTarget(prev));
     main.insertBefore(a, main.firstChild);
   }
   // Scrollposition wiederherstellen, wenn man über „Zurück zu …“ kommt
@@ -431,5 +445,5 @@ const Nav = (() => {
   }
   addEventListener('DOMContentLoaded', render);
   addEventListener('load', restoreScroll);
-  return { clear() { try { localStorage.removeItem(KEY); } catch { /* egal */ } } };
+  return { clear() { try { localStorage.removeItem(KEY); } catch { /* egal */ } }, hasBack: () => Boolean(backEntry()), backEntry, shortLabel };
 })();
