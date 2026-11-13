@@ -63,8 +63,9 @@
     .ql-editor li[data-list="checked"]::before, .ql-editor li[data-list="unchecked"]::before { cursor: pointer; }
     /* Handschrift (Pencil) über dem ganzen Blatt */
     /* Flyout-Menü am rechten Rand */
-    .flyout-btn { position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 45; width: 2rem; height: 4.4rem; margin: 0; padding: 0; border: 1px solid var(--border); border-right: 0; border-radius: 14px 0 0 14px; background: var(--card); color: var(--text); font-size: 1.3rem; font-weight: 800; box-shadow: -4px 4px 16px rgba(20, 22, 50, .18); cursor: pointer; transition: right .22s; }
+    .flyout-btn { position: fixed; right: 0; top: calc(50% - 2.6rem); transform: none; z-index: 45; width: 2.4rem; height: 5.2rem; touch-action: manipulation; margin: 0; padding: 0; border: 1px solid var(--border); border-right: 0; border-radius: 14px 0 0 14px; background: var(--card); color: var(--text); font-size: 1.3rem; font-weight: 800; box-shadow: -4px 4px 16px rgba(20, 22, 50, .18); cursor: pointer; transition: right .22s; }
     .flyout-btn.open { right: min(400px, 92vw); }
+    .flyout-btn:hover:not(:disabled), .flyout-btn:active { transform: none; }   /* nicht mitwandern (die globale Hover-Regel würde sonst die Lasche verschieben) */
     .flyout { position: fixed; top: 0; right: 0; bottom: 0; width: min(400px, 92vw); z-index: 44; background: var(--card); border-left: 1px solid var(--border); box-shadow: -12px 0 40px rgba(20, 22, 50, .25); transform: translateX(105%); transition: transform .22s; display: flex; flex-direction: column; visibility: hidden; padding-top: env(safe-area-inset-top, 0px); }
     .flyout.open { transform: none; visibility: visible; }
     .fly-head { display: flex; align-items: center; gap: .5rem; padding: .7rem .8rem; border-bottom: 1px solid var(--border); }
