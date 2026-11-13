@@ -232,6 +232,10 @@ Beim Lernen (`public/learn.html`) meldet „🚩 Fehler in dieser Karte melden�
 - **Anmeldung offline:** `requireLogin()` nutzt bei fehlender Verbindung das zuletzt gespeicherte Konto (`localStorage.me`); beim Abmelden werden `quiz-data-*`, `me`, `offline:pins` und die Warteschlange gelöscht (gemeinsam genutzte Geräte).
 - **Nicht offline:** Quiz spielen/hosten, Battles, Folien, Dokumente, Markierungen/Favoriten setzen, Sprachausgabe mit Piper-Stimmen.
 
+## Verlauf und „Zurück zu …“
+
+`Nav` in `public/js/common.js`: Jede besuchte Seite eines Bereichs (Home, Quiz, Lernen, Learnworld, Dokumente, Folien, Gesetze, Bestenliste, Profil; Zuordnung nach Adresse in `AREAS`) wird samt Zustand im `localStorage` (`navTrail`, höchstens 40 Einträge, 12 Stunden) gemerkt: Adresse **mit #Teil** (Paragraph im Gesetz, Ordner in der Learnworld), Titel (`document.title`, damit Seiten mit wechselndem Zustand einen aussagekräftigen Titel setzen) und Scrollposition. Wer aus einem anderen Bereich kommt, sieht oben in `main` die Pille „↩ Zurück zu <Bereich · Ort>“, die genau dorthin zurückführt (Verlauf wird bis dorthin gekürzt, Scrollposition wird wiederhergestellt). Browser-Zurück kürzt den Verlauf (`navigation.type === 'back_forward'`); beim Abmelden wird er gelöscht. Neue Seiten mit eigenem Zustand: Titel bei Zustandswechsel setzen und in `AREAS` eintragen.
+
 ## Startseite
 
 `public/dashboard.html`: schmale Zeile „🎮 Quiz-Raum“ (PIN + GO!, darunter der Level-Fortschritt), dann Kacheln „✨ Erstellen“ (Quiz, Quiz importieren, Umfrage, Lernset, Präsentation, Dokument) und „📚 Bereiche“ (Learnworld, Gesetze, Präsentationen, Dokumente) sowie „Zuletzt gespielt“. Was schon in der unteren Menüleiste steht (Quiz, Lernen, Bestenliste, Profil), steht nicht mehr als Kachel auf der Startseite; im Profil gibt es keine Verknüpfungen zu Gesetzen und Folien mehr.

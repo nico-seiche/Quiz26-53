@@ -13,7 +13,7 @@
   <link rel="icon" href="/icons/icon-192.png?v=2">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2">
   <title>Quiz – Gesetze</title>
-  <link rel="stylesheet" href="/style.css?v=18">
+  <link rel="stylesheet" href="/style.css?v=19">
   <style>
     :root { --tile-border: #d3d9fd; }   /* heller Rahmen im Lightmode */
     @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --tile-border: var(--link); } }
@@ -729,6 +729,7 @@
       $('#layout').hidden = true;
       $('#favs').hidden = false;
       renderTabs();
+      document.title = 'Quiz – Gesetze · Notizen';
       history.replaceState(null, '', '#notizen');
       renderNotes();
     }
@@ -798,6 +799,7 @@
       $('#layout').hidden = true;
       $('#favs').hidden = false;
       renderTabs();
+      document.title = 'Quiz – Gesetze · Favoriten';
       history.replaceState(null, '', '#favoriten');
       renderFavs();
     }
@@ -807,6 +809,7 @@
       if (!p) return;
       if (record && current && current !== p && pane === 'read') pushTrail(trail, { slug: law.slug, num: current.num });
       current = p;
+      document.title = `Quiz – ${law.short} ${U()} ${num}`;
       store.set(`law:${law.slug}`, num);
       const g = groupOf(num);
       if (g) openGroups.add(g);
@@ -855,6 +858,7 @@
       query = '';
       $('#search').value = '';
       store.set('law:last', slug);
+      document.title = `Quiz – ${law.short}`;
       renderTabs();
       $('#layout').hidden = false;
       $('#layout').classList.remove('mobile-toc');

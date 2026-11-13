@@ -79,7 +79,7 @@ async function requireLogin() {
 async function logout() {
   await api('/api/auth/logout', { method: 'POST' });
   // gespeicherte persönliche Daten (Offline-Speicher) entfernen
-  try { for (const k of await caches.keys()) if (/^quiz-data-/.test(k)) await caches.delete(k); localStorage.removeItem('me'); localStorage.removeItem('offline:pins'); await Outbox.clear(); } catch { /* egal */ }
+  try { for (const k of await caches.keys()) if (/^quiz-data-/.test(k)) await caches.delete(k); localStorage.removeItem('me'); localStorage.removeItem('offline:pins'); Nav.clear(); await Outbox.clear(); } catch { /* egal */ }
   location.href = '/';
 }
 
@@ -344,4 +344,92 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
       localStorage.setItem('offline:refreshed', String(Date.now()));
     } catch { /* egal */ }
   }, 4000));
+})();
+
+
+// --- Verlauf über die ganze App („Zurück zu …“) ---
+// Jede besuchte Seite samt Zustand (Adresse inkl. #Teil, z. B. Paragraph im Gesetz oder Ordner in der Learnworld) landet in einem Verlauf.
+// Kommt man aus einem anderen Bereich, steht oben auf der Seite „↩ Zurück zu <Ort>“ und führt genau dorthin zurück – samt Scrollposition.
+const Nav = (() => {
+  const KEY = 'navTrail';
+  const MAX = 40;
+  const KEEP_MS = 12 * 3600 * 1000;
+  // Bereiche nach Adresse (längster passender Anfang gewinnt)
+  const AREAS = [['/dashboard', 'Home'], ['/quizzes', 'Quiz'], ['/edit', 'Quiz'], ['/poll-results', 'Quiz'], ['/study', 'Lernen'], ['/learn', 'Lernen'], ['/battle', 'Lernen'],
+    ['/learnworld', 'Learnworld'], ['/train', 'Learnworld'], ['/docs', 'Dokumente'], ['/slides', 'Folien'], ['/gesetze', 'Gesetze'], ['/leaderboard', 'Bestenliste'], ['/user', 'Bestenliste'],
+    ['/profile', 'Profil'], ['/settings', 'Profil'], ['/friends', 'Profil'], ['/offline', 'Profil'], ['/features', 'Profil']];
+  const areaOf = (path) => { let best = null; for (const [p, name] of AREAS) if ((path === p || path.startsWith(`${p}-`) || path.startsWith(`${p}/`)) && (!best || p.length > best[0].length)) best = [p, name]; return best && best[1]; };
+  const read = () => { try { return (JSON.parse(localStorage.getItem(KEY)) || []).filter((e) => Date.now() - e.ts < KEEP_MS); } catch { return []; } };
+  const write = (list) => { try { localStorage.setItem(KEY, JSON.stringify(list.slice(-MAX))); } catch { /* egal */ } };
+  const here = () => `${location.pathname}${location.search}`;
+  const url = () => `${location.pathname}${location.search}${location.hash}`;
+  const label = () => document.title.replace(/^Quiz\s*[–-]\s*/, '').replace(/\s*[–-]\s*(Dokumente|Folien|Übung|Präsentation)$/, '').trim();
+
+  const area = areaOf(location.pathname);
+  let trail = read();
+  let navType = 'navigate';
+  try { navType = (performance.getEntriesByType('navigation')[0] || {}).type || 'navigate'; } catch { /* egal */ }
+
+  function record() {
+    if (!area) return;
+    const entry = { u: url(), p: here(), t: label(), a: area, ts: Date.now(), sy: 0 };
+    const top = trail[trail.length - 1];
+    if (top && top.p === entry.p) { trail[trail.length - 1] = { ...top, ...entry, sy: top.sy }; }          // gleiche Seite (Neuladen, anderer #Teil)
+    else if (navType === 'back_forward') {                                                           // Browser-Zurück: Verlauf bis dorthin kürzen
+      const i = trail.map((e) => e.p).lastIndexOf(entry.p);
+      if (i >= 0) { trail = trail.slice(0, i + 1); trail[i] = { ...trail[i], ...entry, sy: trail[i].sy }; } else trail.push(entry);
+    } else trail.push(entry);
+    write(trail);
+  }
+  function touch() {      // aktuellen Eintrag (Adresse, Titel, Scrollposition) aktuell halten
+    if (!area) return;
+    trail = read();
+    const top = trail[trail.length - 1];
+    if (!top || top.p !== here()) return;
+    top.u = url(); top.t = label(); top.sy = Math.round(scrollY); top.ts = Date.now();
+    write(trail);
+  }
+  record();
+  addEventListener('hashchange', touch);
+  addEventListener('pagehide', touch);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') touch(); });
+  addEventListener('scroll', (() => { let t = null; return () => { clearTimeout(t); t = setTimeout(touch, 400); }; })(), { passive: true });
+  addEventListener('DOMContentLoaded', () => {
+    const t = document.querySelector('title');
+    if (t) new MutationObserver(touch).observe(t, { childList: true });
+  });
+
+  // Der Ort, von dem man aus einem anderen Bereich hierher kam
+  function previous() {
+    const list = read();
+    const i = list.length - 1;
+    if (i < 1 || list[i].p !== here()) return null;
+    const prev = list[i - 1];
+    return prev.a !== area ? { ...prev, index: i - 1 } : null;
+  }
+  function render() {
+    const prev = previous();
+    const main = document.querySelector('main');
+    if (!prev || !main || document.querySelector('.nav-back')) return;
+    const a = document.createElement('a');
+    a.className = 'nav-back';
+    a.href = prev.u;
+    const txt = prev.t && prev.t.startsWith(prev.a) ? prev.t : prev.t && prev.t !== prev.a ? `${prev.a} · ${prev.t}` : prev.a;
+    a.innerHTML = `<span aria-hidden="true">↩</span> Zurück zu <strong>${escapeHtml(txt)}</strong>`;
+    a.addEventListener('click', () => {
+      write(read().slice(0, prev.index + 1));                              // Verlauf bis zum Ziel kürzen
+      try { sessionStorage.setItem('navScroll', JSON.stringify({ p: prev.p, sy: prev.sy || 0 })); } catch { /* egal */ }
+    });
+    main.insertBefore(a, main.firstChild);
+  }
+  // Scrollposition wiederherstellen, wenn man über „Zurück zu …“ kommt
+  function restoreScroll() {
+    try {
+      const r = JSON.parse(sessionStorage.getItem('navScroll') || 'null');
+      if (r && r.p === here() && r.sy > 0) { sessionStorage.removeItem('navScroll'); [300, 900, 1800].forEach((ms) => setTimeout(() => { if (scrollY < 5) scrollTo(0, r.sy); }, ms)); }
+    } catch { /* egal */ }
+  }
+  addEventListener('DOMContentLoaded', render);
+  addEventListener('load', restoreScroll);
+  return { clear() { try { localStorage.removeItem(KEY); } catch { /* egal */ } } };
 })();
