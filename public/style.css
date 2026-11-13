@@ -789,8 +789,4 @@ input[type="password"]::-ms-reveal, input[type="password"]::-ms-clear { display:
 @media (max-width: 520px) { .join-slim .join-label { display: none; } .app-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; } .app-tile { padding: .8rem .7rem; } }
 .reduce-motion .app-tile { transition: none; }
 
-/* „Zurück zu …“ nach einem Bereichswechsel (public/js/common.js, Nav) */
-.nav-back { display: inline-flex; align-items: center; gap: .4rem; max-width: 100%; margin: 0 0 .8rem; padding: .4rem .85rem; border-radius: 999px; background: var(--card); border: 1px solid var(--primary); color: var(--link); font-size: .88rem; text-decoration: none; box-shadow: var(--shadow); }
-.nav-back strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media print { .nav-back { display: none; } }
 header.top a.brand.nav-back-link, .d-top a.back.nav-back-link { max-width: 62%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

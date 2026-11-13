@@ -13,7 +13,7 @@
   <link rel="icon" href="/icons/icon-192.png?v=2">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=2">
   <title>Quiz – Learnworld</title>
-  <link rel="stylesheet" href="/style.css?v=20">
+  <link rel="stylesheet" href="/style.css?v=21">
 </head>
 <body>
   <header class="top">
@@ -99,7 +99,7 @@
 
     // ---------- Startseite: die Rechtsfächer ----------
     async function home() {
-      { const b = Nav.backEntry(); $('#back-link').href = b ? b.u : '/dashboard'; $('#back-link').textContent = b ? `← ${Nav.shortLabel(b)}` : '← Start'; }
+      $('#back-link').href = '/dashboard'; $('#back-link').textContent = '← Start';
       courses = await api('/api/learnworld');
       const open = courses.reduce((n, c) => n + c.open_requests, 0);
       view.innerHTML = `<div class="card lw-hero"><h1>🎓 Learnworld</h1>

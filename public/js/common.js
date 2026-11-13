@@ -349,7 +349,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
 
 // --- Verlauf über die ganze App („Zurück zu …“) ---
 // Jede besuchte Seite samt Zustand (Adresse inkl. #Teil, z. B. Paragraph im Gesetz oder Ordner in der Learnworld) landet in einem Verlauf.
-// Kommt man aus einem anderen Bereich, steht oben auf der Seite „↩ Zurück zu <Ort>“ und führt genau dorthin zurück – samt Scrollposition.
+// Öffnet man eine Datei (Dokument, Folien, Lernset, Quiz …), führt „← …“ im Seitenkopf genau dorthin zurück, wo man vorher war – samt Scrollposition.
 const Nav = (() => {
   const KEY = 'navTrail';
   const MAX = 40;
@@ -365,6 +365,9 @@ const Nav = (() => {
   const url = () => `${location.pathname}${location.search}${location.hash}`;
   const label = () => document.title.replace(/^Quiz\s*[–-]\s*/, '').replace(/\s*[–-]\s*(Dokumente|Folien|Übung|Präsentation)$/, '').trim();
 
+  // „Dateien“ (ein einzelnes Dokument, Lernset, Quiz …) kennen den Weg zurück zum vorherigen Ort; „Seiten“ (Übersichten) behalten ihre feste Navigation
+  const ITEM_PAGES = ['/docs-edit', '/slides-edit', '/study-edit', '/edit', '/learn', '/train', '/poll-results', '/battle'];
+  const isItem = ITEM_PAGES.includes(location.pathname);
   const area = areaOf(location.pathname);
   let trail = read();
   let navType = 'navigate';
@@ -414,7 +417,7 @@ const Nav = (() => {
   };
   // Zurück-Link im Seitenkopf („← Profil“ usw.) führt dorthin, wo man wirklich herkam – nicht in eine feste Übersicht
   function rewriteBackLink() {
-    const prev = backEntry();
+    const prev = isItem ? backEntry() : null;
     const link = [...document.querySelectorAll('header a.brand, .d-top a.back, a.back')].find((a) => /^←/.test(a.textContent.trim()) && !a.hasAttribute('data-nav-fixed'));
     if (!link || !prev) return false;
     link.href = prev.u;
@@ -423,19 +426,7 @@ const Nav = (() => {
     link.addEventListener('click', () => rememberTarget(prev));
     return true;
   }
-  // Seiten ohne Zurück-Link im Kopf: „↩ Zurück zu …“ nach einem Bereichswechsel
-  function render() {
-    if (rewriteBackLink()) return;
-    const prev = backEntry();
-    const main = document.querySelector('main');
-    if (!prev || prev.a === area || !main || document.querySelector('.nav-back')) return;
-    const a = document.createElement('a');
-    a.className = 'nav-back';
-    a.href = prev.u;
-    a.innerHTML = `<span aria-hidden="true">↩</span> Zurück zu <strong>${escapeHtml(shortLabel(prev))}</strong>`;
-    a.addEventListener('click', () => rememberTarget(prev));
-    main.insertBefore(a, main.firstChild);
-  }
+  function render() { rewriteBackLink(); }
   // Scrollposition wiederherstellen, wenn man über „Zurück zu …“ kommt
   function restoreScroll() {
     try {
@@ -445,5 +436,5 @@ const Nav = (() => {
   }
   addEventListener('DOMContentLoaded', render);
   addEventListener('load', restoreScroll);
-  return { clear() { try { localStorage.removeItem(KEY); } catch { /* egal */ } }, hasBack: () => Boolean(backEntry()), backEntry, shortLabel };
+  return { clear() { try { localStorage.removeItem(KEY); } catch { /* egal */ } }, hasBack: () => isItem && Boolean(backEntry()), backEntry, shortLabel };
 })();
