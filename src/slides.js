@@ -151,6 +151,7 @@ function cleanDeck(data) {
   const gradients = (Array.isArray(data.gradients) ? data.gradients : []).slice(0, 12)
     .map((g) => (g && typeof g === 'object' && hexOnly(g.from) && hexOnly(g.to) ? { from: hexOnly(g.from), to: hexOnly(g.to), angle: num(g.angle, 0, 360, 135) } : null)).filter(Boolean);
   const out = { v: 1, slides, palette: [...new Set(palette)], gradients };
+  if (data.mode === 'pecha') out.mode = 'pecha';       // Pecha Kucha: Folien laufen automatisch (PECHA_SECONDS Sekunden je Folie)
   if (Buffer.byteLength(JSON.stringify(out)) > MAX_JSON_BYTES) throw new Error('Die Präsentation ist zu groß');
   return out;
 }
@@ -167,6 +168,16 @@ const blankDeck = () => ({
     ],
   }],
 });
+
+// Pecha Kucha: 20 Folien, je eine Überschrift oben und ein Bild darunter; in der Präsentation läuft unten ein 20-Sekunden-Balken
+const pechaSlide = (i) => ({
+  id: `s${i + 1}`, bg: '#ffffff', notes: '', transition: 'fade',
+  elements: [
+    { type: 'text', id: `t${i + 1}`, x: 80, y: 28, w: 1120, h: 92, text: 'Überschrift', size: 48, bold: true, align: 'center', valign: 'middle', color: 'auto', font: 'sans' },
+    { type: 'placeholder', id: `p${i + 1}`, x: 80, y: 132, w: 1120, h: 548, label: 'Bild einfügen', radius: 16 },
+  ],
+});
+const pechaDeck = () => ({ v: 1, mode: 'pecha', slides: Array.from({ length: 20 }, (_, i) => pechaSlide(i)) });
 
 const COLLAB = (deckCol, userParam) => `EXISTS (SELECT 1 FROM quiz.slide_collaborators c WHERE c.deck_id = ${deckCol} AND c.user_id = ${userParam})`;
 const PRESENCE_SECONDS = 8;
@@ -208,11 +219,11 @@ async function accessDeck(req, { ownerOnly = false } = {}) {
 }
 const notFound = (res) => res.status(404).json({ error: 'Präsentation nicht gefunden' });
 
-const listRow = (r) => ({ id: Number(r.id), title: r.title, updatedAt: r.updated_at, slides: r.slides, first: r.first, owner: r.owner });
+const listRow = (r) => ({ id: Number(r.id), title: r.title, updatedAt: r.updated_at, slides: r.slides, first: r.first, owner: r.owner, mode: r.mode === 'pecha' ? 'pecha' : 'normal' });
 
 router.get('/', async (req, res) => {
   const rows = await db.query(`
-    SELECT d.id, d.title, d.updated_at, jsonb_array_length(d.data->'slides') AS slides, d.data->'slides'->0 AS first, u.username AS owner, (d.owner_id = $1) AS mine
+    SELECT d.id, d.title, d.updated_at, jsonb_array_length(d.data->'slides') AS slides, d.data->'slides'->0 AS first, d.data->>'mode' AS mode, u.username AS owner, (d.owner_id = $1) AS mine
     FROM quiz.slide_decks d JOIN quiz.users u ON u.id = d.owner_id
     WHERE d.owner_id = $1 OR ${COLLAB('d.id', '$1')} ORDER BY d.updated_at DESC`, [req.user.id]);
   res.json({ mine: rows.filter((r) => r.mine).map(listRow), shared: rows.filter((r) => !r.mine).map(listRow) });
@@ -220,7 +231,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   const row = await db.one('INSERT INTO quiz.slide_decks (owner_id, title, data) VALUES ($1, $2, $3) RETURNING id',
-    [req.user.id, cleanTitle(req.body.title), JSON.stringify(cleanDeck(blankDeck()))]);
+    [req.user.id, cleanTitle(req.body.title), JSON.stringify(cleanDeck(req.body.mode === 'pecha' ? pechaDeck() : blankDeck()))]);
   res.json({ id: Number(row.id) });
 });
 
@@ -252,7 +263,7 @@ router.post('/:id/ops', async (req, res) => {
       const doc = { title: d.title, slides: d.data.slides, palette: d.data.palette || [], gradients: d.data.gradients || [] };
       SlidesSync.apply(doc, ops);
       if (!doc.slides.length) doc.slides.push(blankDeck().slides[0]);      // alle Folien gleichzeitig gelöscht: eine leere bleibt
-      const data = cleanDeck({ slides: doc.slides, palette: doc.palette, gradients: doc.gradients });
+      const data = cleanDeck({ slides: doc.slides, palette: doc.palette, gradients: doc.gradients, mode: d.data.mode });
       const title = cleanTitle(doc.title);
       const { rows: [row] } = await client.query('UPDATE quiz.slide_decks SET title = $1, data = $2, rev = rev + 1, updated_at = now() WHERE id = $3 RETURNING rev',
         [title, JSON.stringify(data), probe.id]);
@@ -356,4 +367,4 @@ router.post('/:id/share', async (req, res) => {
   res.json({ token });
 });
 
-module.exports = { router, cleanDeck };
+module.exports = { router, cleanDeck, pechaDeck };

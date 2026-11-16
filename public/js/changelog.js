@@ -2,6 +2,14 @@
 // danach sehen alle das Fenster einmal wieder. Nur Einträge mit coolen Neuerungen aufnehmen.
 const CHANGELOG = [
   {
+    id: '2026-11-29',
+    title: 'Neu: Pecha Kucha',
+    items: [
+      ['⏱️', 'Pecha-Kucha-Präsentation', 'Beim Anlegen einer Präsentation wählst du jetzt „Normal“ oder „Pecha Kucha“: 20 Folien mit Überschrift oben und Bild darunter.'],
+      ['▶', 'Automatischer Ablauf', 'In der Präsentation läuft unten ein Balken genau 20 Sekunden, dann geht es von selbst zur nächsten Folie. Mit der Leertaste (oder ⏸) hältst du an.'],
+    ],
+  },
+  {
     id: '2026-11-28',
     title: 'Neu: Prüfung repressiv',
     items: [

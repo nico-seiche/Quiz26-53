@@ -368,6 +368,12 @@ const SlideRender = (() => {
     root.className = 'sl';
     root.style.background = bgCss(slide);
     (slide.elements || []).forEach((e) => { if (!(opts && opts.present && e.type === 'placeholder')) root.appendChild(elementEl(e, slide, opts)); });
+    if (opts && opts.pecha) {       // Pecha Kucha: Balken unten; in der Präsentation füllt er sich in der Folienzeit (siehe slides-present.html)
+      const track = document.createElement('div');
+      track.className = 'sl-pk';
+      track.innerHTML = '<i></i>';
+      root.appendChild(track);
+    }
     return root;
   }
 
@@ -392,6 +398,8 @@ const SlideRender = (() => {
     .sl-svg { position: absolute; left: 0; top: 0; overflow: visible; }
     .sl-text { box-sizing: border-box; width: 100%; height: 100%; display: flex; flex-direction: column; line-height: 1.25; overflow: hidden; }
     .sl-line { overflow-wrap: anywhere; white-space: pre-wrap; }
+    .sl-pk { position: absolute; left: 0; right: 0; bottom: 0; height: 12px; background: rgba(120, 128, 160, .25); pointer-events: none; }
+    .sl-pk i { display: block; height: 100%; width: 0; background: #4f6cf5; transform-origin: 0 0; }
     .sl-image img { width: 100%; height: 100%; display: block; }
   `;
   const style = document.createElement('style');

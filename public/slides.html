@@ -56,7 +56,7 @@
     const card = (d, mine) => `
         <div class="card deck-card" data-id="${d.id}">
           <button type="button" class="deck-thumb" data-open="${d.id}" aria-label="${escapeHtml(d.title)} öffnen"></button>
-          <div><div class="deck-title">${escapeHtml(d.title)}</div><span class="muted">${d.slides} ${d.slides === 1 ? 'Folie' : 'Folien'} · ${fmt(d.updatedAt)}</span>${mine ? '' : `<br><span class="tag">🤝 von ${escapeHtml(d.owner)}</span>`}</div>
+          <div><div class="deck-title">${escapeHtml(d.title)}</div><span class="muted">${d.slides} ${d.slides === 1 ? 'Folie' : 'Folien'} · ${fmt(d.updatedAt)}</span>${d.mode === 'pecha' ? '<br><span class="tag">⏱️ Pecha Kucha</span>' : ''}${mine ? '' : `<br><span class="tag">🤝 von ${escapeHtml(d.owner)}</span>`}</div>
           <div class="deck-actions">
             <a class="btn primary" href="/slides-present?id=${d.id}">▶ Präsentieren</a>
             <a class="btn" href="/slides-edit?id=${d.id}">Bearbeiten</a>
@@ -110,7 +110,7 @@
     };
 
     $('#new').onclick = async () => {
-      try { const { id } = await api('/api/slides', { method: 'POST', body: { title: 'Neue Präsentation' } }); location.href = `/slides-edit?id=${id}`; }
+      try { await newDeck(); }
       catch (err) { $('#error').textContent = err.message; }
     };
     document.querySelector('main').onclick = async (e) => {

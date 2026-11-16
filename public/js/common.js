@@ -347,6 +347,33 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
 })();
 
 
+// Neue Präsentation: zuerst wählen, ob normal oder Pecha Kucha (20 Folien × 20 Sekunden, Bild + Überschrift, automatischer Ablauf)
+function chooseDeckType() {
+  return new Promise((resolve) => {
+    const box = document.createElement('div');
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-label', 'Art der Präsentation');
+    box.style.cssText = 'position:fixed;inset:0;z-index:200;display:grid;place-items:center;padding:1rem;background:rgba(15,17,40,.55)';
+    box.innerHTML = `<div class="card" style="width:min(30rem,100%);margin:0"><h2 style="margin:0 0 .3rem">Neue Präsentation</h2><p class="muted" style="margin:0 0 .8rem">Wie soll sie ablaufen?</p>
+      <div style="display:grid;gap:.6rem">
+        <button type="button" data-mode="normal" style="text-align:left;padding:.9rem 1rem;margin:0"><strong>🖥️ Normal</strong><br><span class="muted" style="font-weight:400">Frei gestaltete Folien, du klickst dich durch.</span></button>
+        <button type="button" data-mode="pecha" style="text-align:left;padding:.9rem 1rem;margin:0"><strong>⏱️ Pecha Kucha</strong><br><span class="muted" style="font-weight:400">20 Folien mit Bild und Überschrift. Ein Balken läuft 20 Sekunden, dann geht es automatisch weiter.</span></button>
+      </div><div style="text-align:right;margin-top:.8rem"><button type="button" data-mode="">Abbrechen</button></div></div>`;
+    const done = (v) => { box.remove(); document.removeEventListener('keydown', onKey); resolve(v || null); };
+    const onKey = (e) => { if (e.key === 'Escape') done(null); };
+    box.addEventListener('click', (e) => { if (e.target === box) done(null); const b = e.target.closest('[data-mode]'); if (b) done(b.dataset.mode); });
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(box);
+    box.querySelector('[data-mode=normal]').focus();
+  });
+}
+async function newDeck() {
+  const mode = await chooseDeckType();
+  if (!mode) return;
+  const { id } = await api('/api/slides', { method: 'POST', body: { title: mode === 'pecha' ? 'Pecha Kucha' : 'Neue Präsentation', mode } });
+  location.href = `/slides-edit?id=${id}`;
+}
+
 // --- Verlauf über die ganze App („Zurück zu …“) ---
 // Jede besuchte Seite samt Zustand (Adresse inkl. #Teil, z. B. Paragraph im Gesetz oder Ordner in der Learnworld) landet in einem Verlauf.
 // Öffnet man eine Datei (Dokument, Folien, Lernset, Quiz …), führt „← …“ im Seitenkopf genau dorthin zurück, wo man vorher war – samt Scrollposition.

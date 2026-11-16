@@ -397,12 +397,14 @@
       if (t) SlideRender.mount(t, deck.data.slides[i], 130);
     }
 
+    const isPecha = () => deck && deck.data && deck.data.mode === 'pecha';
     // Layouts für neue Folien (Farben „auto“ passen sich dem Hintergrund an)
     function layoutElements(name) {
       const T = (x, y, w, h, text, o = {}) => ({ type: 'text', id: uid(), x, y, w, h, text, size: 32, color: 'auto', font: 'sans', align: 'left', valign: 'top', list: 'none', opacity: 1, fill: 'none', ...o });
       if (name === 'title') return [T(140, 240, 1000, 130, 'Titel', { size: 72, bold: true, align: 'center', valign: 'middle' }), T(240, 390, 800, 70, 'Untertitel', { align: 'center', color: '#667085' })];
       if (name === 'titleContent') return [T(80, 50, 1120, 100, 'Titel', { size: 52, bold: true, valign: 'middle' }), T(80, 180, 1120, 480, 'Erster Punkt\nZweiter Punkt\nDritter Punkt', { size: 36, list: 'bullet' })];
       if (name === 'two') return [T(80, 50, 1120, 100, 'Titel', { size: 52, bold: true, valign: 'middle' }), T(80, 180, 540, 480, 'Linke Spalte', { size: 32, list: 'bullet' }), T(660, 180, 540, 480, 'Rechte Spalte', { size: 32, list: 'bullet' })];
+      if (name === 'pecha') return [T(80, 28, 1120, 92, 'Überschrift', { size: 48, bold: true, align: 'center', valign: 'middle' }), { type: 'placeholder', id: uid(), x: 80, y: 132, w: 1120, h: 548, label: 'Bild einfügen', radius: 16, opacity: 1 }];
       if (name === 'titleOnly') return [T(80, 50, 1120, 100, 'Titel', { size: 52, bold: true, valign: 'middle' })];
       return [];
     }
@@ -451,7 +453,7 @@
     }
     function renderStage() {
       layoutStage();
-      SlideRender.mount($('#stagehost'), slide(), W * zoom);
+      SlideRender.mount($('#stagehost'), slide(), W * zoom, { pecha: isPecha() });
       renderOverlay();
     }
     function renderOverlay() {
@@ -1422,7 +1424,7 @@
     // ---------------- Folienleiste: Klicks, Ziehen ----------------
     $('#slides').addEventListener('click', (ev) => {
       const add = ev.target.closest('#add-slide');
-      if (add) { const m = $('#layout-menu'); m.hidden = !m.hidden; return; }
+      if (add) { if (isPecha()) { addSlide('pecha'); return; } const m = $('#layout-menu'); m.hidden = !m.hidden; return; }
       const lay = ev.target.closest('[data-layout]');
       if (lay) { addSlide(lay.dataset.layout); return; }
       const t = ev.target.closest('.thumb');
