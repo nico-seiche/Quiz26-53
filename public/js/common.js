@@ -395,7 +395,9 @@ const Nav = (() => {
   // „Dateien“ (ein einzelnes Dokument, Lernset, Quiz …) kennen den Weg zurück zum vorherigen Ort; „Seiten“ (Übersichten) behalten ihre feste Navigation
   const ITEM_PAGES = ['/docs-edit', '/slides-edit', '/study-edit', '/edit', '/learn', '/train', '/poll-results', '/battle'];
   const isItem = ITEM_PAGES.includes(location.pathname);
-  const area = areaOf(location.pathname);
+  // Vollbild-Ansichten (Präsentation) sind nur ein „Fenster“ auf eine Datei und kommen nicht in den Verlauf – sonst führt „Zurück“ im Kreis
+  const TRANSIENT = ['/slides-present'];
+  const area = TRANSIENT.includes(location.pathname) ? null : areaOf(location.pathname);
   let trail = read();
   let navType = 'navigate';
   try { navType = (performance.getEntriesByType('navigation')[0] || {}).type || 'navigate'; } catch { /* egal */ }
@@ -463,5 +465,6 @@ const Nav = (() => {
   }
   addEventListener('DOMContentLoaded', render);
   addEventListener('load', restoreScroll);
-  return { clear() { try { localStorage.removeItem(KEY); } catch { /* egal */ } }, hasBack: () => isItem && Boolean(backEntry()), backEntry, shortLabel };
+  return { clear() { try { localStorage.removeItem(KEY); } catch { /* egal */ } }, hasBack: () => isItem && Boolean(backEntry()),
+    lastEntry: () => read().slice(-1)[0] || null, backEntry, shortLabel };
 })();

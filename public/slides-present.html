@@ -155,7 +155,8 @@
     }
 
     // --- Bedienung ---
-    const exit = () => { location.href = token ? '/' : `/slides-edit?id=${id}`; };
+    // zurück dorthin, wo man hergekommen ist (Folienliste oder Editor); die Präsentation selbst steht nicht im Verlauf
+    const exit = () => { const last = token ? null : Nav.lastEntry(); location.href = token ? '/' : (last && /^\/slides(-edit)?(\?|$)/.test(last.u) ? last.u : `/slides-edit?id=${id}`); };
     const toggleFull = () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.().catch(() => {}); };
     document.addEventListener('keydown', (e) => {
       if (!deck || e.metaKey || e.ctrlKey || e.altKey) return;
