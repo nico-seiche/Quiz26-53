@@ -151,7 +151,7 @@ function cleanDeck(data) {
   const gradients = (Array.isArray(data.gradients) ? data.gradients : []).slice(0, 12)
     .map((g) => (g && typeof g === 'object' && hexOnly(g.from) && hexOnly(g.to) ? { from: hexOnly(g.from), to: hexOnly(g.to), angle: num(g.angle, 0, 360, 135) } : null)).filter(Boolean);
   const out = { v: 1, slides, palette: [...new Set(palette)], gradients };
-  if (data.mode === 'pecha') out.mode = 'pecha';       // Pecha Kucha: Folien laufen automatisch (PECHA_SECONDS Sekunden je Folie)
+  if (data.mode === 'pecha') out.mode = 'pecha';       // Pecha Kucha: 20 Folien mit Bild und Überschrift
   if (Buffer.byteLength(JSON.stringify(out)) > MAX_JSON_BYTES) throw new Error('Die Präsentation ist zu groß');
   return out;
 }
@@ -169,7 +169,7 @@ const blankDeck = () => ({
   }],
 });
 
-// Pecha Kucha: 20 Folien, je eine Überschrift oben und ein Bild darunter; in der Präsentation läuft unten ein 20-Sekunden-Balken
+// Pecha Kucha: 20 Folien, je eine Überschrift oben und ein Bild darunter; in der Präsentation zeigt jeder Klick die nächste Folie
 const pechaSlide = (i) => ({
   id: `s${i + 1}`, bg: '#ffffff', notes: '', transition: 'fade',
   elements: [

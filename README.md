@@ -238,7 +238,7 @@ Beim Lernen (`public/learn.html`) meldet „🚩 Fehler in dieser Karte melden�
 
 ## Pecha Kucha (Folien)
 
-Beim Anlegen einer Präsentation (`chooseDeckType()`/`newDeck()` in `common.js`, genutzt von Startseite und Folienliste) wählt man „Normal“ oder „Pecha Kucha“. `POST /api/slides { mode: 'pecha' }` legt 20 Folien an (Überschrift oben, Bildplatzhalter darunter, `pechaDeck()` in `src/slides.js`); der Modus steht als `mode: 'pecha'` im Deck-JSON (`cleanDeck` und die Ops-Speicherung erhalten ihn). Im Editor legt „＋ Folie“ direkt eine Pecha-Folie an und die Bühne zeigt unten die Balkenspur. In `slides-present.html` füllt sich der Balken (`.sl-pk`) in `SECS = 20` Sekunden und blättert dann automatisch weiter (letzte Folie: bleibt stehen); Leertaste/⏸ hält an, manuelles Blättern startet den Balken neu.
+Beim Anlegen einer Präsentation (`chooseDeckType()`/`newDeck()` in `common.js`, genutzt von Startseite und Folienliste) wählt man „Normal“ oder „Pecha Kucha“. `POST /api/slides { mode: 'pecha' }` legt 20 Folien an (Überschrift oben, Bildplatzhalter darunter, `pechaDeck()` in `src/slides.js`); der Modus steht als `mode: 'pecha'` im Deck-JSON (`cleanDeck` und die Ops-Speicherung erhalten ihn). Im Editor legt „＋ Folie“ direkt eine Pecha-Folie an. In `slides-present.html` zeigt jeder Klick auf den Bildschirm die nächste Folie (kein Timer); zurück mit Pfeiltaste, Wischen oder ‹.
 
 ## Prüfungen zum Ausfüllen (Learnworld)
 

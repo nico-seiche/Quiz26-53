@@ -6,7 +6,7 @@ const CHANGELOG = [
     title: 'Neu: Pecha Kucha',
     items: [
       ['⏱️', 'Pecha-Kucha-Präsentation', 'Beim Anlegen einer Präsentation wählst du jetzt „Normal“ oder „Pecha Kucha“: 20 Folien mit Überschrift oben und Bild darunter.'],
-      ['▶', 'Automatischer Ablauf', 'In der Präsentation läuft unten ein Balken genau 20 Sekunden, dann geht es von selbst zur nächsten Folie. Mit der Leertaste (oder ⏸) hältst du an.'],
+      ['👆', 'Klick = nächste Folie', 'In der Präsentation zeigt jeder Klick auf den Bildschirm die nächste Folie.'],
     ],
   },
   {
