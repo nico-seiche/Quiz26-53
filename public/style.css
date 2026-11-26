@@ -539,7 +539,8 @@ button.tw.bad:hover:not(:disabled) { transform: none; }
 .team-suggest { margin-top: .4rem; }
 
 /* Live-Bearbeitung */
-.save-state { font-size: .85rem; white-space: nowrap; }
+.save-state { font-size: .85rem; flex: 1 1 0; min-width: 0; text-align: right; line-height: 1.25; overflow-wrap: anywhere; }
+header.top > button#save { flex: none; white-space: nowrap; }
 .save-state.ok { color: var(--ok); }
 .save-state.warn { color: var(--danger); }
 .card.locked { opacity: .8; border-style: dashed; }
